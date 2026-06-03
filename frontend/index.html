@@ -114,45 +114,95 @@
       <div class="results-wrap">
         <header class="results-head">
           <p class="eyebrow">Session debrief</p>
-          <h1 class="display results-title">How it <em>went</em>.</h1>
+          <h1 class="display results-title">Interview <em>Results</em></h1>
         </header>
 
-        <div class="results-grid">
-          <div class="card card-overall">
-            <h2 class="card-title">At a glance</h2>
-            <ul id="metrics-overall" class="metrics-overall"></ul>
+        <!-- 1. Score chips -->
+        <div class="score-chips">
+          <div class="chip">
+            <span class="chip-label">Attention</span>
+            <span id="chip-attention" class="chip-value">—</span>
           </div>
+          <div class="chip">
+            <span class="chip-label">Confidence</span>
+            <span id="chip-confidence" class="chip-value">—</span>
+          </div>
+          <div class="chip">
+            <span class="chip-label">Nervousness</span>
+            <span id="chip-nervousness" class="chip-value">—</span>
+          </div>
+          <div class="chip">
+            <span class="chip-label">Composure</span>
+            <span id="chip-composure" class="chip-value">—</span>
+          </div>
+        </div>
 
-          <div class="card card-chart">
-            <h2 class="card-title">Over time</h2>
-            <div class="chart-holder">
-              <img id="chart-img" alt="Interview metrics chart over time" />
-            </div>
-            <p id="saved-path"></p>
+        <!-- 2. Six category cards -->
+        <div class="category-grid">
+          <div class="card category-card">
+            <h2 class="card-title">Eye &amp; Gaze</h2>
+            <ul id="card-eye" class="card-list"></ul>
           </div>
+          <div class="card category-card">
+            <h2 class="card-title">Head Pose</h2>
+            <ul id="card-head" class="card-list"></ul>
+          </div>
+          <div class="card category-card">
+            <h2 class="card-title">Expression</h2>
+            <ul id="card-expression" class="card-list"></ul>
+          </div>
+          <div class="card category-card">
+            <h2 class="card-title">Posture &amp; Body</h2>
+            <ul id="card-posture" class="card-list"></ul>
+          </div>
+          <div class="card category-card">
+            <h2 class="card-title">Engagement</h2>
+            <ul id="card-engagement" class="card-list"></ul>
+          </div>
+          <div class="card category-card">
+            <h2 class="card-title">Presence</h2>
+            <ul id="card-presence" class="card-list"></ul>
+          </div>
+        </div>
 
-          <div class="card card-coaching">
-            <h2 class="card-title">Coaching</h2>
-            <div id="coaching" class="coaching"></div>
+        <!-- 3. Per-question table -->
+        <div class="card card-table">
+          <h2 class="card-title">By question</h2>
+          <div class="table-scroll">
+            <table class="results-table">
+              <thead>
+                <tr>
+                  <th>Question</th>
+                  <th>Eye contact</th>
+                  <th>Upright</th>
+                  <th>Composure</th>
+                  <th>Response</th>
+                  <th>Face-touch</th>
+                </tr>
+              </thead>
+              <tbody id="metrics-per-question"></tbody>
+            </table>
           </div>
+        </div>
 
-          <div class="card card-table">
-            <h2 class="card-title">By question</h2>
-            <div class="table-scroll">
-              <table class="results-table">
-                <thead>
-                  <tr>
-                    <th>Question</th>
-                    <th>Eye contact</th>
-                    <th>Upright</th>
-                    <th>Steadiness</th>
-                    <th>Face-touch</th>
-                  </tr>
-                </thead>
-                <tbody id="metrics-per-question"></tbody>
-              </table>
-            </div>
+        <!-- 4. Big full-width chart -->
+        <div class="card card-chart">
+          <h2 class="card-title">Over time</h2>
+          <div class="chart-holder chart-holder-big">
+            <img id="chart-img" alt="Interview metrics chart over time" />
           </div>
+        </div>
+
+        <!-- 5. Coaching -->
+        <div class="card card-coaching">
+          <h2 class="card-title">Coaching</h2>
+          <div id="coaching" class="coaching"></div>
+        </div>
+
+        <!-- 6. Saved path + disclaimer -->
+        <div class="results-footer">
+          <p id="saved-path" class="saved-path"></p>
+          <p class="disclaimer">Facial/body signals are supplementary indicators, not objective emotion or identity measurements.</p>
         </div>
 
         <div class="results-actions">

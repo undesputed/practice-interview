@@ -480,14 +480,9 @@ body {
    RESULTS SCREEN
    ============================================================ */
 .results-wrap { max-width: 1240px; margin: 0 auto; }
-.results-head { margin-bottom: 2.2rem; }
+.results-head { margin-bottom: 1.8rem; }
 .results-title { font-size: clamp(2.4rem, 5vw, 4.2rem); }
 
-.results-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: clamp(1rem, 2vw, 1.6rem);
-}
 .card {
   background: var(--paper);
   border: 1.5px solid var(--line);
@@ -495,10 +490,6 @@ body {
   padding: 1.6rem 1.7rem;
   box-shadow: var(--shadow-sm);
 }
-.card-overall { grid-column: span 1; }
-.card-chart   { grid-column: span 1; }
-.card-table   { grid-column: 1 / -1; }
-.card-coaching{ grid-column: 1 / -1; }
 .card-title {
   font-family: "Fraunces", serif;
   font-weight: 600;
@@ -515,29 +506,77 @@ body {
   background: var(--sage);
 }
 
-/* overall metrics list */
-.metrics-overall { list-style: none; display: grid; gap: 0.1rem; }
-.metrics-overall li {
+/* ---- 1. Score chips ---- */
+.score-chips {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: clamp(0.7rem, 1.4vw, 1.2rem);
+  margin-bottom: clamp(1.4rem, 2.6vw, 2.2rem);
+}
+.chip {
+  position: relative;
+  background: var(--paper);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 1.35rem 1.5rem;
+  box-shadow: var(--shadow-sm);
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 1rem;
-  padding: 0.7rem 0;
+  flex-direction: column;
+  gap: 0.55rem;
+  overflow: hidden;
+  transition: transform 0.35s var(--ease), box-shadow 0.35s var(--ease);
+}
+.chip::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 4px;
+  background: linear-gradient(90deg, var(--sage), var(--sage-deep));
+}
+.chip:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+.chip-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-weight: 700;
+}
+.chip-value {
+  font-family: "Fraunces", serif;
+  font-size: clamp(2rem, 3.4vw, 2.8rem);
+  font-weight: 600;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- 2. Category cards grid ---- */
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(1rem, 2vw, 1.6rem);
+  margin-bottom: clamp(1.4rem, 2.6vw, 2.2rem);
+}
+.category-card { display: flex; flex-direction: column; }
+.card-list { list-style: none; display: grid; gap: 0.1rem; }
+.card-list li {
+  padding: 0.62rem 0;
   border-bottom: 1px dashed var(--line);
-  font-size: 0.98rem;
+  font-size: 0.92rem;
   color: var(--ink-soft);
   font-weight: 500;
-  line-height: 1.4;
+  line-height: 1.45;
 }
-.metrics-overall li:last-child { border-bottom: none; }
-.metrics-overall li strong,
-.metrics-overall li b {
+.card-list li:last-child { border-bottom: none; }
+.card-list li strong,
+.card-list li b {
   color: var(--ink);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
-/* chart */
+/* ---- 4. Big full-width chart ---- */
+.card-chart { margin-top: clamp(1.4rem, 2.6vw, 2.2rem); }
 .chart-holder {
   border-radius: var(--radius);
   overflow: hidden;
@@ -547,15 +586,41 @@ body {
   display: grid;
   place-items: center;
 }
+.chart-holder-big { min-height: clamp(320px, 46vw, 600px); }
 #chart-img { display: block; width: 100%; height: auto; }
 
-/* coaching */
+/* ---- 5. Coaching ---- */
+.card-coaching { margin-top: clamp(1.4rem, 2.6vw, 2.2rem); }
 .coaching { font-size: 1.02rem; line-height: 1.6; color: var(--ink-soft); }
 .coaching p { margin-bottom: 0.85rem; }
 .coaching p:last-child { margin-bottom: 0; }
 .coaching strong { color: var(--ink); font-weight: 700; }
 
-/* table */
+/* ---- 6. Footer: saved path + disclaimer ---- */
+.results-footer {
+  margin-top: 1.8rem;
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 0.5rem;
+}
+.saved-path {
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.disclaimer {
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: var(--ink-faint);
+  font-style: italic;
+  max-width: 70ch;
+}
+
+/* ---- 3. table ---- */
+.card-table { margin-top: 0; }
 .table-scroll { overflow-x: auto; }
 .results-table {
   width: 100%;
@@ -598,8 +663,12 @@ body {
   .start-aside { display: none; }
   .interview-grid { grid-template-columns: 1fr; }
   .transcript-pane { height: clamp(300px, 42vh, 460px); }
-  .results-grid { grid-template-columns: 1fr; }
-  .card-overall, .card-chart { grid-column: 1 / -1; }
+  .score-chips { grid-template-columns: repeat(2, 1fr); }
+  .category-grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 640px) {
+  .category-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 560px) {
