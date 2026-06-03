@@ -95,3 +95,15 @@ def test_pitch_30_degrees():
     assert abs(pitch - 30) < 1e-3
     assert abs(yaw) < 1e-3
     assert abs(roll) < 1e-3
+
+from backend.analysis import questions_from_transcript
+
+def test_questions_from_transcript_maps_interviewer_turns():
+    segments = [
+        {"speaker": "interviewer", "text": "Tell me about yourself.", "t": 0},
+        {"speaker": "candidate", "text": "Sure, I ...", "t": 5000},
+        {"speaker": "interviewer", "text": "Describe a challenge.", "t": 20000},
+        {"speaker": "candidate", "text": "Once ...", "t": 25000},
+    ]
+    q = questions_from_transcript(segments)
+    assert q == {0: "Tell me about yourself.", 1: "Describe a challenge."}

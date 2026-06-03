@@ -105,3 +105,14 @@ def compute_metrics(frames: list[dict], questions: dict | None = None) -> dict:
     return {"duration_sec": duration_sec, "frame_count": total,
             "no_face_pct": no_face_pct, "overall": _metric_block(frames),
             "per_question": per_question}
+
+
+def questions_from_transcript(segments: list[dict]) -> dict:
+    """Map interviewer turn index -> question text, in order of appearance."""
+    questions: dict[int, str] = {}
+    idx = 0
+    for seg in segments:
+        if seg.get("speaker") == "interviewer":
+            questions[idx] = seg.get("text", "")
+            idx += 1
+    return questions
