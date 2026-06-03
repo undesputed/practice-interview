@@ -73,3 +73,15 @@ def test_session_summary_has_timing(monkeypatch):
     data = client.post("/api/session", json=body).json()
     assert "timing" in data["summary"]
     assert data["summary"]["timing"]["per_question_response_sec"] == [1.5]
+
+def test_session_summary_has_integrity(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
+    frames = [{"t": i*100.0, "turn": 0, "face": True, "face_count": (2 if i == 0 else 1),
+               "bs": {}, "m": [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],
+               "objects": ([{"label": "cell phone", "score": 0.9}] if i == 0 else None)}
+              for i in range(4)]
+    body = {"role": "X", "frames": frames, "transcript": {"full_text": "", "segments": []}}
+    data = client.post("/api/session", json=body).json()
+    assert "integrity" in data["summary"]
+    assert data["summary"]["integrity"]["another_person_detected"] is True
+    assert data["summary"]["integrity"]["device_detected"] is True
