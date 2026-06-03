@@ -516,19 +516,26 @@ body {
 }
 
 /* overall metrics list */
-.metrics-overall { list-style: none; display: grid; gap: 0.2rem; }
+.metrics-overall { list-style: none; display: grid; gap: 0.1rem; }
 .metrics-overall li {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   gap: 1rem;
-  padding: 0.85rem 0;
+  padding: 0.7rem 0;
   border-bottom: 1px dashed var(--line);
-  font-size: 1.02rem;
+  font-size: 0.98rem;
   color: var(--ink-soft);
   font-weight: 500;
+  line-height: 1.4;
 }
 .metrics-overall li:last-child { border-bottom: none; }
+.metrics-overall li strong,
+.metrics-overall li b {
+  color: var(--ink);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
 
 /* chart */
 .chart-holder {
