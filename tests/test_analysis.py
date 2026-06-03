@@ -223,3 +223,16 @@ def test_gaze_breakdown_center_and_left():
     out2 = gaze_breakdown(left)
     assert out2["left_pct"] == 100.0
     assert out2["center_pct"] == 0.0
+
+from backend.analysis import head_pose_stats
+
+def test_head_pose_stats():
+    frames = [_frame(i*100.0, yaw_deg=10.0) for i in range(3)]
+    out = head_pose_stats(frames)
+    assert abs(out["yaw"]["mean"] - 10.0) < 0.5
+    assert out["yaw"]["min"] <= out["yaw"]["max"]
+    assert out["pitch"]["mean"] == 0.0
+
+def test_head_pose_stats_empty():
+    out = head_pose_stats([_frame(i*100.0, face=False) for i in range(2)])
+    assert out["yaw"] == {"mean": 0.0, "min": 0.0, "max": 0.0}

@@ -239,6 +239,23 @@ def gaze_breakdown(frames: list[dict]) -> dict:
     return {k + "_pct": round(100.0 * v / total, 1) for k, v in counts.items()}
 
 
+def head_pose_stats(frames: list[dict]) -> dict:
+    """Mean and (min,max) of pitch/yaw/roll over face frames with a matrix."""
+    p, y, r = [], [], []
+    for f in frames:
+        if not f.get("face", False) or "m" not in f:
+            continue
+        pitch, yaw, roll = matrix_to_euler(f["m"])
+        p.append(pitch); y.append(yaw); r.append(roll)
+
+    def stats(v):
+        if not v:
+            return {"mean": 0.0, "min": 0.0, "max": 0.0}
+        return {"mean": round(sum(v) / len(v), 1), "min": round(min(v), 1), "max": round(max(v), 1)}
+
+    return {"pitch": stats(p), "yaw": stats(y), "roll": stats(r)}
+
+
 def questions_from_transcript(segments: list[dict]) -> dict:
     """Map interviewer turn index -> question text, in order of appearance."""
     questions: dict[int, str] = {}
