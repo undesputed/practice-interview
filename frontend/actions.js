@@ -33,6 +33,7 @@ export function createActionDetector() {
   const expr = { smile: false, frown: false, brow: false, surprise: false };
   let headBuf = [];
   let nodCd = 0, shakeCd = 0;
+  let lastDbg = 0;  // TEMP: throttle the calibration log
 
   function exprEvent(out, t, turn, key, value, onThresh, icon, label) {
     if (!expr[key] && value > onThresh) {
@@ -59,6 +60,11 @@ export function createActionDetector() {
         const frown = ((bs.mouthFrownLeft || 0) + (bs.mouthFrownRight || 0)) / 2;
         const brow = Math.max(bs.browInnerUp || 0, bs.browOuterUpLeft || 0, bs.browOuterUpRight || 0);
         const surprise = bs.jawOpen || 0;
+        // TEMP calibration log — make each face and read the peak values, then tune thresholds.
+        if (t - lastDbg > 400) {
+          lastDbg = t;
+          console.log(`[expr] smile=${smile.toFixed(2)} frown=${frown.toFixed(2)} brow=${brow.toFixed(2)} jawOpen=${surprise.toFixed(2)}`);
+        }
         exprEvent(out, t, turn, "smile", smile, SMILE_ON, "🙂", "Smile");
         exprEvent(out, t, turn, "frown", frown, FROWN_ON, "☹️", "Frown");
         exprEvent(out, t, turn, "brow", brow, BROW_ON, "🤨", "Eyebrow raise");
