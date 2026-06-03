@@ -16,7 +16,7 @@ stack. They are intentionally **omitted** from the review page rather than faked
 ## Emotion & Expression
 | Wanted | Why not | What we do instead |
 |--------|---------|--------------------|
-| Labeled basic emotions (happy/sad/angry/surprised/fearful/disgusted/neutral/contempt) | MediaPipe outputs blendshape *coefficients*, not a trained emotion classifier. Emotion-from-face is accuracy- and bias-prone and legally restricted in hiring. | Show raw expression signals: smile intensity, eyebrow raise, mouth/eye openness. |
+| Labeled basic emotions (happy/sad/angry/surprised/fearful/disgusted/neutral/contempt) | MediaPipe ships **no** emotion classifier — only blendshape *coefficients*. A custom classifier could be trained on blendshape vectors via **MediaPipe Model Maker**, but it is not available out of the box, and emotion-from-face is accuracy/bias-prone and legally restricted in hiring. | Show raw expression signals: smile intensity, eyebrow raise, mouth/eye openness. |
 | Emotion confidence scores | No emotion classifier → no class probabilities. | — |
 | Micro-expressions | Require specialized high-FPS detection; not provided. | — |
 | Facial Action Units (validated FACS) | Blendshapes are ARKit-style coefficients — related to AUs but not validated FACS. | Surface the blendshape signals directly. |
@@ -33,7 +33,11 @@ stack. They are intentionally **omitted** from the review page rather than faked
 |--------|---------|--------------------|
 | Identity verification (match to an ID photo) | Requires face recognition / embeddings + a matcher — not a MediaPipe Tasks capability (e.g., persolhr used AWS Rekognition). | — |
 | Liveness detection (real person vs photo/video) | No MediaPipe liveness model; needs a dedicated anti-spoofing system. | — |
-| Multiple-faces detection | Our pipeline runs single-face (`numFaces: 1`) by design. (MediaPipe *can* detect multiple faces, but multi-person handling is not implemented here.) | Face-presence detection (is a face there at all). |
+
+> **Multiple-faces detection is NOT a MediaPipe limitation** — Face Landmarker's `numFaces`
+> accepts any integer > 1 out of the box. We deliberately set `numFaces: 1` (single candidate;
+> temporal smoothing only applies at 1). Detecting >1 face for "someone else in frame" is a
+> config change we could enable, not something MediaPipe can't do.
 
 ## Demographics
 | Wanted | Why not |
@@ -52,3 +56,14 @@ stack. They are intentionally **omitted** from the review page rather than faked
 
 **Principle:** facial/body data is used as *supplementary* signals, shown transparently, and
 never presented as objective emotion/identity ground truth.
+
+---
+
+**Verified against official MediaPipe docs (2026-06-03).** Sources:
+[Face Landmarker (Web)](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker/web_js) ·
+[Vision tasks list](https://ai.google.dev/edge/mediapipe/solutions/tasks) ·
+[Model Maker](https://ai.google.dev/edge/mediapipe/solutions/model_maker) ·
+[blendshape names (source)](https://github.com/google-ai-edge/mediapipe/blob/master/mediapipe/tasks/cc/vision/face_landmarker/face_blendshapes_graph.cc) ·
+[Image Embedder](https://ai.google.dev/edge/mediapipe/solutions/vision/image_embedder).
+Confirmed not shipped: emotion classifier, micro-expressions, validated FACS AUs, pupil
+diameter, face recognition/`FaceEmbedder`, liveness, age, gender. `numFaces > 1` IS supported.
