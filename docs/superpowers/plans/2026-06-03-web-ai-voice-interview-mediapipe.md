@@ -184,6 +184,7 @@ Expected: FAIL with `ModuleNotFoundError`/`ImportError` (no `matrix_to_euler`).
 
 ```python
 # backend/analysis.py
+from __future__ import annotations  # PEP 604 (X | Y) on Python 3.9
 import math
 from typing import Sequence
 
@@ -462,6 +463,7 @@ Expected: FAIL with `ImportError` (no `save_session`).
 
 ```python
 # backend/report.py
+from __future__ import annotations  # PEP 604 (X | Y) on Python 3.9
 import csv, json, os
 import matplotlib
 matplotlib.use("Agg")  # headless backend — no display needed
