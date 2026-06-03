@@ -13,6 +13,7 @@ def _frame(t, turn=0):
 
 def test_session_endpoint_returns_summary(monkeypatch):
     # avoid a real Anthropic call
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     import backend.main as main
     monkeypatch.setattr(main, "generate_coaching",
                         lambda *a, **k: {"summary": "ok", "strengths": [], "improvements": [],

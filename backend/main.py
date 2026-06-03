@@ -50,9 +50,9 @@ def session(req: SessionRequest):
     summary = compute_metrics(req.frames, questions)
 
     coaching = None
-    anthropic_key = os.getenv("ANTHROPIC_API_KEY", "")
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
     full_text = req.transcript.get("full_text", "")
-    if full_text.strip():
+    if anthropic_key and full_text.strip():
         coaching = generate_coaching(anthropic_key, full_text, req.role)
 
     session_id = datetime.now().strftime("%Y-%m-%dT%H%M%S")
