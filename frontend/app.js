@@ -1,14 +1,16 @@
 // frontend/app.js
 import { CONFIG } from "./config.js";
 import { startVoiceAgent } from "./deepgram-client.js";
-import { pickPose, pickHands } from "./landmarks.js";
-import { FaceLandmarker, PoseLandmarker, HandLandmarker, GestureRecognizer, FilesetResolver, DrawingUtils }
+import { pickPose, pickHands, pickObjects } from "./landmarks.js";
+import { FaceLandmarker, PoseLandmarker, HandLandmarker, GestureRecognizer, ObjectDetector, FilesetResolver, DrawingUtils }
   from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35";
 
 let landmarker = null;
 let poseLandmarker = null;
 let gestureRecognizer = null;
 let lastHandResult = null;   // cached for smooth every-frame drawing
+let objectDetector = null;
+let lastObjectResult = null;
 let lastBodyTs = 0;
 let frames = [];
 let segments = [];
@@ -47,7 +49,7 @@ async function initLandmarker() {
   landmarker = await FaceLandmarker.createFromOptions(fileset, {
     baseOptions: { modelAssetPath: CONFIG.MODEL_URL },
     runningMode: "VIDEO",
-    numFaces: 1,
+    numFaces: 2,
     outputFaceBlendshapes: true,
     outputFacialTransformationMatrixes: true,
   });
@@ -58,6 +60,10 @@ async function initLandmarker() {
   gestureRecognizer = await GestureRecognizer.createFromOptions(fileset, {
     baseOptions: { modelAssetPath: CONFIG.GESTURE_MODEL_URL },
     runningMode: "VIDEO", numHands: 2,
+  });
+  objectDetector = await ObjectDetector.createFromOptions(fileset, {
+    baseOptions: { modelAssetPath: CONFIG.OBJECT_MODEL_URL },
+    runningMode: "VIDEO", scoreThreshold: 0.4, maxResults: 5,
   });
 }
 
@@ -106,9 +112,10 @@ function renderLoop(video, canvas, ctx, draw) {
     ? Array.from(result.facialTransformationMatrixes[0].data)
     : [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
 
-  const frame = { t: now - sessionStart, turn: turnIndex, face: hasFace, bs, m };
+  const faceCount = result.faceLandmarks ? result.faceLandmarks.length : 0;
+  const frame = { t: now - sessionStart, turn: turnIndex, face: hasFace, face_count: faceCount, bs, m };
 
-  // Pose + hands are heavier — run them throttled and attach only on those frames.
+  // Pose + hands + objects are heavier — run them throttled and attach only on those frames.
   if (now - lastBodyTs >= CONFIG.POSE_THROTTLE_MS) {
     lastBodyTs = now;
     try {
@@ -116,6 +123,9 @@ function renderLoop(video, canvas, ctx, draw) {
       const hr = gestureRecognizer.recognizeForVideo(video, now);
       lastHandResult = (hr && hr.landmarks && hr.landmarks.length) ? hr : null;
       frame.hands = pickHands(hr);
+      const orr = objectDetector.detectForVideo(video, now);
+      lastObjectResult = orr;
+      frame.objects = pickObjects(orr);
     } catch (e) { console.warn("[interview] body detect skipped:", e.message); }
   }
   frames.push(frame);
@@ -140,7 +150,7 @@ function onTranscript({ speaker, text }) {
 async function startInterview() {
   role = $("role-select").value || CONFIG.ROLES[0];
   frames = []; segments = []; turnIndex = -1;
-  lastHandResult = null; lastBodyTs = 0;
+  lastHandResult = null; lastObjectResult = null; lastBodyTs = 0;
   show("screen-interview");
   console.log("[interview] starting; role=", role);
 
