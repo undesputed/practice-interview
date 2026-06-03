@@ -21,6 +21,12 @@ export function startVoiceAgent({ url, token, scheme, config, micStream, onTrans
     // Browsers may start an AudioContext suspended; resume so TTS is audible.
     inCtx.resume().catch(() => {});
     outCtx.resume().catch(() => {});
+    // Tell Deepgram the ACTUAL input sample rate (browsers may not honor 48k) to avoid
+    // mislabeled PCM that garbles transcription.
+    if (config && config.audio && config.audio.input) {
+      config.audio.input.sample_rate = inCtx.sampleRate;
+    }
+    console.log("[dg] input sample_rate =", inCtx.sampleRate);
     ws.send(JSON.stringify(config)); // Settings first
 
     source = inCtx.createMediaStreamSource(micStream);
