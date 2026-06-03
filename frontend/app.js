@@ -1,10 +1,14 @@
 // frontend/app.js
 import { CONFIG } from "./config.js";
 import { startVoiceAgent } from "./deepgram-client.js";
-import { FaceLandmarker, FilesetResolver, DrawingUtils }
+import { pickPose, pickHands } from "./landmarks.js";
+import { FaceLandmarker, PoseLandmarker, HandLandmarker, FilesetResolver, DrawingUtils }
   from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35";
 
 let landmarker = null;
+let poseLandmarker = null;
+let handLandmarker = null;
+let lastBodyTs = 0;
 let frames = [];
 let segments = [];
 let turnIndex = -1;       // -1 until the first interviewer line
@@ -46,6 +50,14 @@ async function initLandmarker() {
     outputFaceBlendshapes: true,
     outputFacialTransformationMatrixes: true,
   });
+  poseLandmarker = await PoseLandmarker.createFromOptions(fileset, {
+    baseOptions: { modelAssetPath: CONFIG.POSE_MODEL_URL },
+    runningMode: "VIDEO", numPoses: 1,
+  });
+  handLandmarker = await HandLandmarker.createFromOptions(fileset, {
+    baseOptions: { modelAssetPath: CONFIG.HAND_MODEL_URL },
+    runningMode: "VIDEO", numHands: 2,
+  });
 }
 
 function pickBlendshapes(categories) {
@@ -74,7 +86,17 @@ function renderLoop(video, canvas, ctx, draw) {
     ? Array.from(result.facialTransformationMatrixes[0].data)
     : [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
 
-  frames.push({ t: now - sessionStart, turn: turnIndex, face: hasFace, bs, m });
+  const frame = { t: now - sessionStart, turn: turnIndex, face: hasFace, bs, m };
+
+  // Pose + hands are heavier — run them throttled and attach only on those frames.
+  if (now - lastBodyTs >= CONFIG.POSE_THROTTLE_MS) {
+    lastBodyTs = now;
+    try {
+      frame.pose = pickPose(poseLandmarker.detectForVideo(video, now));
+      frame.hands = pickHands(handLandmarker.detectForVideo(video, now));
+    } catch (e) { console.warn("[interview] body detect skipped:", e.message); }
+  }
+  frames.push(frame);
 
   $("hud-time").textContent = ((now - sessionStart) / 1000).toFixed(0) + "s";
   $("hud-question").textContent = "Q" + (turnIndex + 1);
@@ -169,11 +191,12 @@ function renderResults(data) {
   const ov = $("metrics-overall");
   clearChildren(ov);
   for (const text of [
-    `Eye contact: ${o.eye_contact_pct}%`,
-    `Steadiness: ${o.steadiness_score}/100`,
-    `Smiling: ${o.pct_smiling}% (peak ${o.peak_smile})`,
-    `Blinks: ${o.blink_count} (${o.blinks_per_min}/min)`,
-    `No-face: ${data.summary.no_face_pct}%`,
+    `Eye contact (gaze): ${o.gaze_eye_contact_pct}%`,
+    `Upright posture: ${o.upright_pct}%`,
+    `Steadiness: head ${o.steadiness_score}/100, body ${o.body_steadiness}/100`,
+    `Hand fidget: ${o.hand_fidget}  ·  face-touches: ${o.face_touch_count}`,
+    `Smiling: ${o.pct_smiling}% (peak ${o.peak_smile})  ·  blinks: ${o.blink_count}`,
+    `Lean (lateral): ${o.lean}°  ·  no-face: ${data.summary.no_face_pct}%`,
   ]) {
     const li = document.createElement("li");
     li.textContent = text;
@@ -184,9 +207,9 @@ function renderResults(data) {
   clearChildren(tb);
   for (const q of data.summary.per_question) {
     const tr = document.createElement("tr");
-    for (const cell of [q.question, `${q.metrics.eye_contact_pct}%`,
-                        `${q.metrics.steadiness_score}`, `${q.metrics.pct_smiling}%`,
-                        `${q.metrics.blink_count}`]) {
+    for (const cell of [q.question, `${q.metrics.gaze_eye_contact_pct}%`,
+                        `${q.metrics.upright_pct}%`, `${q.metrics.body_steadiness}`,
+                        `${q.metrics.face_touch_count}`]) {
       const td = document.createElement("td");
       td.textContent = cell;
       tr.appendChild(td);
