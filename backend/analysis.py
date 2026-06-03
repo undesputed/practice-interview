@@ -332,6 +332,15 @@ def integrity_metrics(frames: list[dict]) -> dict:
             "device_detected": device_pct > 0}
 
 
+def summarize_actions(events: list[dict]) -> dict:
+    """Tally action events by label; pass the raw list through for the report timeline."""
+    counts: dict = {}
+    for e in events:
+        label = e.get("label", "?")
+        counts[label] = counts.get(label, 0) + 1
+    return {"counts": counts, "total": len(events), "events": events}
+
+
 def questions_from_transcript(segments: list[dict]) -> dict:
     """Map interviewer turn index -> question text, in order of appearance."""
     questions: dict[int, str] = {}

@@ -342,3 +342,19 @@ def test_metric_block_empty_has_tension_keys():
     for k in ("eye_squint", "lip_press", "brow_down", "jaw_shift",
               "nose_sneer", "mouth_frown", "facial_tension"):
         assert m[k] == 0.0, f"missing/!=0: {k}"
+
+from backend.analysis import summarize_actions
+
+def test_summarize_actions_counts():
+    events = [
+        {"t": 1, "turn": 0, "kind": "gesture", "label": "Thumb Up", "icon": "👍"},
+        {"t": 2, "turn": 0, "kind": "expression", "label": "Smile", "icon": "🙂"},
+        {"t": 3, "turn": 1, "kind": "expression", "label": "Smile", "icon": "🙂"},
+    ]
+    out = summarize_actions(events)
+    assert out["total"] == 3
+    assert out["counts"] == {"Thumb Up": 1, "Smile": 2}
+    assert out["events"] == events
+
+def test_summarize_actions_empty():
+    assert summarize_actions([]) == {"counts": {}, "total": 0, "events": []}
