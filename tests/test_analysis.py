@@ -336,3 +336,9 @@ def test_expression_tension_fields():
     assert abs(out["lip_press"] - 0.4) < 1e-6
     assert abs(out["jaw_shift"] - 0.1) < 1e-6
     assert out["facial_tension"] == 40.0
+
+def test_metric_block_empty_has_tension_keys():
+    m = compute_metrics([])["overall"]
+    for k in ("eye_squint", "lip_press", "brow_down", "jaw_shift",
+              "nose_sneer", "mouth_frown", "facial_tension"):
+        assert m[k] == 0.0, f"missing/!=0: {k}"

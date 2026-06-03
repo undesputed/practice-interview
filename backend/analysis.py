@@ -62,6 +62,8 @@ def _metric_block(frames: list[dict]) -> dict:
                 "hand_fidget": 0.0, "face_touch_count": 0,
                 "face_presence_pct": 0.0, "eye_openness": 0.0, "mouth_open_mean": 0.0,
                 "speaking_pct": 0.0, "eyebrow_raise": 0.0,
+                "eye_squint": 0.0, "lip_press": 0.0, "brow_down": 0.0, "jaw_shift": 0.0,
+                "nose_sneer": 0.0, "mouth_frown": 0.0, "facial_tension": 0.0,
                 "gaze_breakdown": gaze_breakdown([]), "head_pose": head_pose_stats([]),
                 "attention": 0.0, "confidence": 0.0, "nervousness": 0.0, "composure": 0.0}
 
