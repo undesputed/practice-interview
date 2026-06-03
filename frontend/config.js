@@ -8,6 +8,7 @@ export const CONFIG = {
   // Blendshapes forwarded to the backend (smile, blink, brow, and 8 eyeLook* for gaze)
   BLENDSHAPES: ["mouthSmileLeft", "mouthSmileRight", "eyeBlinkLeft", "eyeBlinkRight", "browInnerUp",
     "eyeLookInLeft", "eyeLookInRight", "eyeLookOutLeft", "eyeLookOutRight",
-    "eyeLookUpLeft", "eyeLookUpRight", "eyeLookDownLeft", "eyeLookDownRight"],
+    "eyeLookUpLeft", "eyeLookUpRight", "eyeLookDownLeft", "eyeLookDownRight",
+    "jawOpen", "browOuterUpLeft", "browOuterUpRight"],
   ROLES: ["Software Engineer", "Product Manager", "Data Analyst", "Customer Support"],
 };
