@@ -211,7 +211,9 @@ def test_expression_detail_basic():
 
 def test_expression_detail_no_face_safe():
     out = expression_detail([_frame_x(i*100.0, face=False) for i in range(3)])
-    assert out == {"eye_openness": 0.0, "mouth_open_mean": 0.0, "speaking_pct": 0.0, "eyebrow_raise": 0.0}
+    assert out["eye_openness"] == 0.0 and out["mouth_open_mean"] == 0.0
+    assert out["speaking_pct"] == 0.0 and out["eyebrow_raise"] == 0.0
+    assert out["facial_tension"] == 0.0
 
 from backend.analysis import gaze_breakdown
 
@@ -317,3 +319,20 @@ def test_integrity_empty_safe():
     assert out["another_person_detected"] is False
     assert out["objects_seen"] == []
     assert out["device_detected"] is False
+
+def test_expression_tension_fields():
+    frames = []
+    for i in range(4):
+        f = _frame(i*100.0)
+        f["bs"]["eyeSquintLeft"] = 0.6; f["bs"]["eyeSquintRight"] = 0.6
+        f["bs"]["mouthPressLeft"] = 0.4; f["bs"]["mouthPressRight"] = 0.4
+        f["bs"]["browDownLeft"] = 0.2; f["bs"]["browDownRight"] = 0.2
+        f["bs"]["jawLeft"] = 0.1; f["bs"]["jawRight"] = 0.0
+        f["bs"]["noseSneerLeft"] = 0.0; f["bs"]["noseSneerRight"] = 0.0
+        f["bs"]["mouthFrownLeft"] = 0.0; f["bs"]["mouthFrownRight"] = 0.0
+        frames.append(f)
+    out = expression_detail(frames)
+    assert abs(out["eye_squint"] - 0.6) < 1e-6
+    assert abs(out["lip_press"] - 0.4) < 1e-6
+    assert abs(out["jaw_shift"] - 0.1) < 1e-6
+    assert out["facial_tension"] == 40.0

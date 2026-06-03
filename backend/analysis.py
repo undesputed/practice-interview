@@ -204,12 +204,15 @@ def hand_metrics(frames: list[dict]) -> dict:
 
 
 def expression_detail(frames: list[dict]) -> dict:
-    """Eye openness, mouth-open/speaking, eyebrow raise from face-bearing frames."""
+    """Eye/mouth openness, speaking, eyebrow raise, and facial-tension signals from face frames."""
     total = len(frames)
     face = [f for f in frames if f.get("face", False) and "bs" in f]
     if not face:
-        return {"eye_openness": 0.0, "mouth_open_mean": 0.0, "speaking_pct": 0.0, "eyebrow_raise": 0.0}
+        return {"eye_openness": 0.0, "mouth_open_mean": 0.0, "speaking_pct": 0.0, "eyebrow_raise": 0.0,
+                "eye_squint": 0.0, "lip_press": 0.0, "brow_down": 0.0, "jaw_shift": 0.0,
+                "nose_sneer": 0.0, "mouth_frown": 0.0, "facial_tension": 0.0}
     eye_open, mouth, brow, speaking = [], [], [], 0
+    squint, press, down, jaw, sneer, frown = [], [], [], [], [], []
     for f in face:
         bs = f["bs"]
         eye_open.append(1.0 - max(bs.get("eyeBlinkLeft", 0.0), bs.get("eyeBlinkRight", 0.0)))
@@ -219,11 +222,24 @@ def expression_detail(frames: list[dict]) -> dict:
             speaking += 1
         brow.append((bs.get("browInnerUp", 0.0) + bs.get("browOuterUpLeft", 0.0)
                      + bs.get("browOuterUpRight", 0.0)) / 3.0)
+        squint.append(max(bs.get("eyeSquintLeft", 0.0), bs.get("eyeSquintRight", 0.0)))
+        press.append(max(bs.get("mouthPressLeft", 0.0), bs.get("mouthPressRight", 0.0)))
+        down.append(max(bs.get("browDownLeft", 0.0), bs.get("browDownRight", 0.0)))
+        jaw.append(max(bs.get("jawLeft", 0.0), bs.get("jawRight", 0.0)))
+        sneer.append(max(bs.get("noseSneerLeft", 0.0), bs.get("noseSneerRight", 0.0)))
+        frown.append(max(bs.get("mouthFrownLeft", 0.0), bs.get("mouthFrownRight", 0.0)))
     n = len(face)
+    eye_squint = sum(squint) / n
+    lip_press = sum(press) / n
+    brow_down = sum(down) / n
     return {"eye_openness": round(sum(eye_open) / n, 3),
             "mouth_open_mean": round(sum(mouth) / n, 3),
             "speaking_pct": round(100.0 * speaking / total, 1),
-            "eyebrow_raise": round(sum(brow) / n, 3)}
+            "eyebrow_raise": round(sum(brow) / n, 3),
+            "eye_squint": round(eye_squint, 3), "lip_press": round(lip_press, 3),
+            "brow_down": round(brow_down, 3), "jaw_shift": round(sum(jaw) / n, 3),
+            "nose_sneer": round(sum(sneer) / n, 3), "mouth_frown": round(sum(frown) / n, 3),
+            "facial_tension": round(100.0 * (eye_squint + lip_press + brow_down) / 3.0, 1)}
 
 
 def gaze_breakdown(frames: list[dict]) -> dict:
