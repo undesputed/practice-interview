@@ -2,12 +2,13 @@
 import { CONFIG } from "./config.js";
 import { startVoiceAgent } from "./deepgram-client.js";
 import { pickPose, pickHands } from "./landmarks.js";
-import { FaceLandmarker, PoseLandmarker, HandLandmarker, FilesetResolver, DrawingUtils }
+import { FaceLandmarker, PoseLandmarker, HandLandmarker, GestureRecognizer, FilesetResolver, DrawingUtils }
   from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35";
 
 let landmarker = null;
 let poseLandmarker = null;
-let handLandmarker = null;
+let gestureRecognizer = null;
+let lastHandResult = null;   // cached for smooth every-frame drawing
 let lastBodyTs = 0;
 let frames = [];
 let segments = [];
@@ -54,8 +55,8 @@ async function initLandmarker() {
     baseOptions: { modelAssetPath: CONFIG.POSE_MODEL_URL },
     runningMode: "VIDEO", numPoses: 1,
   });
-  handLandmarker = await HandLandmarker.createFromOptions(fileset, {
-    baseOptions: { modelAssetPath: CONFIG.HAND_MODEL_URL },
+  gestureRecognizer = await GestureRecognizer.createFromOptions(fileset, {
+    baseOptions: { modelAssetPath: CONFIG.GESTURE_MODEL_URL },
     runningMode: "VIDEO", numHands: 2,
   });
 }
@@ -81,6 +82,24 @@ function renderLoop(video, canvas, ctx, draw) {
       FaceLandmarker.FACE_LANDMARKS_TESSELATION, { color: "#30FF9080", lineWidth: 0.5 });
   }
 
+  // Hand skeleton + gesture label, drawn every frame from the throttled cache (no flicker).
+  if (lastHandResult && lastHandResult.landmarks) {
+    const handed = lastHandResult.handedness || lastHandResult.handednesses || [];
+    for (let h = 0; h < lastHandResult.landmarks.length; h++) {
+      const lm = lastHandResult.landmarks[h];
+      draw.drawConnectors(lm, HandLandmarker.HAND_CONNECTIONS, { color: "#FFFFFFB0", lineWidth: 2 });
+      draw.drawLandmarks(lm, { color: "#30FF90", radius: 2 });
+      const g = lastHandResult.gestures && lastHandResult.gestures[h] && lastHandResult.gestures[h][0];
+      if (g && g.categoryName && g.categoryName !== "None") {
+        const handName = handed[h] && handed[h][0] && handed[h][0].categoryName;
+        const label = (handName ? handName + ": " : "") + g.categoryName + " " + g.score.toFixed(2);
+        ctx.fillStyle = "#30FF90";
+        ctx.font = "16px sans-serif";
+        ctx.fillText(label, lm[0].x * canvas.width, lm[0].y * canvas.height - 8);
+      }
+    }
+  }
+
   const bs = pickBlendshapes(hasFace ? result.faceBlendshapes?.[0]?.categories : null);
   const m = hasFace && result.facialTransformationMatrixes?.[0]
     ? Array.from(result.facialTransformationMatrixes[0].data)
@@ -93,7 +112,9 @@ function renderLoop(video, canvas, ctx, draw) {
     lastBodyTs = now;
     try {
       frame.pose = pickPose(poseLandmarker.detectForVideo(video, now));
-      frame.hands = pickHands(handLandmarker.detectForVideo(video, now));
+      const hr = gestureRecognizer.recognizeForVideo(video, now);
+      lastHandResult = (hr && hr.landmarks && hr.landmarks.length) ? hr : null;
+      frame.hands = pickHands(hr);
     } catch (e) { console.warn("[interview] body detect skipped:", e.message); }
   }
   frames.push(frame);
@@ -118,6 +139,7 @@ function onTranscript({ speaker, text }) {
 async function startInterview() {
   role = $("role-select").value || CONFIG.ROLES[0];
   frames = []; segments = []; turnIndex = -1;
+  lastHandResult = null; lastBodyTs = 0;
   show("screen-interview");
   console.log("[interview] starting; role=", role);
 
