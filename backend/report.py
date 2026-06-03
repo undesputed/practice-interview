@@ -65,21 +65,34 @@ def _build_charts(path: str, frames: list[dict]) -> None:
             upright_series.append(1 if (mid_y - p["nose"]["y"]) / width > UPRIGHT_RATIO else 0)
             ts_pose.append(f["t"] / 1000.0)
 
-    fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
-    ax1.plot(ts, smile, label="smile")
+    mouth, gaze_on, ts_face = [], [], []
+    for f in frames:
+        bs = f.get("bs", {})
+        mouth.append(bs.get("jawOpen", 0.0))
+        horiz = max(bs.get("eyeLookOutLeft", 0), bs.get("eyeLookOutRight", 0),
+                    bs.get("eyeLookInLeft", 0), bs.get("eyeLookInRight", 0))
+        vert = max(bs.get("eyeLookUpLeft", 0), bs.get("eyeLookUpRight", 0),
+                   bs.get("eyeLookDownLeft", 0), bs.get("eyeLookDownRight", 0))
+        gaze_on.append(1 if (f.get("face") and horiz < GAZE_MAX and vert < GAZE_MAX) else 0)
+        ts_face.append(f["t"] / 1000.0)
+
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(14, 11), sharex=True)
+    ax1.plot(ts, smile, label="smile"); ax1.plot(ts_face, mouth, label="mouth open", alpha=0.7)
     ax1.axhline(SMILE_THRESHOLD, ls="--", lw=0.8, color="gray")
-    ax1.set_ylabel("smile"); ax1.legend(loc="upper right")
+    ax1.set_ylabel("expression"); ax1.legend(loc="upper right")
     ax2.plot(ts, yaw_s, label="yaw"); ax2.plot(ts, pitch_s, label="pitch")
-    ax2.set_ylabel("degrees"); ax2.legend(loc="upper right")
+    ax2.set_ylabel("head °"); ax2.legend(loc="upper right")
     if ts_pose:
         ax3.step(ts_pose, upright_series, where="post", label="upright (1/0)")
-    ax3.set_ylabel("posture"); ax3.set_xlabel("seconds"); ax3.legend(loc="upper right")
+    ax3.set_ylabel("posture"); ax3.legend(loc="upper right")
+    ax4.step(ts_face, gaze_on, where="post", color="teal", label="gaze on-camera (1/0)")
+    ax4.set_ylabel("gaze"); ax4.set_xlabel("seconds"); ax4.legend(loc="upper right")
     for b in boundaries:
-        for ax in (ax1, ax2, ax3):
+        for ax in (ax1, ax2, ax3, ax4):
             ax.axvline(b, color="red", lw=0.6, alpha=0.5)
     fig.suptitle("Interview timeline (red = new question)")
     fig.tight_layout()
-    fig.savefig(path, dpi=100)
+    fig.savefig(path, dpi=120)
     plt.close(fig)
 
 
