@@ -13,6 +13,7 @@ EYE_CONTACT_MAX_DEG = 15.0
 SMILE_THRESHOLD = 0.3
 BLINK_THRESHOLD = 0.5
 STEADINESS_K = 4.0
+GAZE_MAX = 0.5  # eyeLook* magnitude above which gaze is "off camera"
 
 
 def matrix_to_euler(m: Sequence[float]) -> tuple[float, float, float]:
@@ -28,28 +29,41 @@ def matrix_to_euler(m: Sequence[float]) -> tuple[float, float, float]:
     return math.degrees(pitch), math.degrees(yaw), math.degrees(roll)
 
 
+def gaze_eye_contact_pct(frames: list[dict]) -> float:
+    """% of frames with a face whose gaze is on-camera (eyeLook* below GAZE_MAX). Denominator = total."""
+    total = len(frames)
+    if total == 0:
+        return 0.0
+    on = 0
+    for f in frames:
+        if not f.get("face", False):
+            continue
+        bs = f.get("bs", {})
+        horiz = max(bs.get("eyeLookOutLeft", 0.0), bs.get("eyeLookOutRight", 0.0),
+                    bs.get("eyeLookInLeft", 0.0), bs.get("eyeLookInRight", 0.0))
+        vert = max(bs.get("eyeLookUpLeft", 0.0), bs.get("eyeLookUpRight", 0.0),
+                   bs.get("eyeLookDownLeft", 0.0), bs.get("eyeLookDownRight", 0.0))
+        if horiz < GAZE_MAX and vert < GAZE_MAX:
+            on += 1
+    return round(100.0 * on / total, 1)
+
+
 def _metric_block(frames: list[dict]) -> dict:
     """Compute a MetricBlock for a list of frames (any subset)."""
     total = len(frames)
     if total == 0:
-        return {"eye_contact_pct": 0.0, "head_movement": 0.0, "steadiness_score": 0.0,
+        return {"gaze_eye_contact_pct": 0.0, "head_movement": 0.0, "steadiness_score": 0.0,
                 "mean_smile": 0.0, "pct_smiling": 0.0, "peak_smile": 0.0,
                 "blink_count": 0, "blinks_per_min": 0.0}
 
-    poses, smiles, on_camera = [], [], 0
+    poses, smiles = [], []
     for f in frames:
         if not f.get("face", False) or "m" not in f or "bs" not in f:
             continue
         pitch, yaw, roll = matrix_to_euler(f["m"])
         poses.append((pitch, yaw, roll))
-        if abs(yaw) <= EYE_CONTACT_MAX_DEG and abs(pitch) <= EYE_CONTACT_MAX_DEG:
-            on_camera += 1
         bs = f["bs"]
         smiles.append((bs.get("mouthSmileLeft", 0.0) + bs.get("mouthSmileRight", 0.0)) / 2.0)
-
-    # Denominator is TOTAL frames (not face-only): looking away or undetected
-    # faces intentionally reduce eye-contact and smiling scores.
-    eye_contact_pct = round(100.0 * on_camera / total, 1)
 
     # head movement: mean per-frame absolute change across consecutive face poses
     movement = 0.0
@@ -77,7 +91,7 @@ def _metric_block(frames: list[dict]) -> dict:
     duration_min = ((frames[-1]["t"] - frames[0]["t"]) / 1000.0 / 60.0) if total >= 2 else 0.0
     blinks_per_min = round(blink_count / duration_min, 1) if duration_min > 0 else 0.0
 
-    return {"eye_contact_pct": eye_contact_pct, "head_movement": round(movement, 2),
+    return {"gaze_eye_contact_pct": gaze_eye_contact_pct(frames), "head_movement": round(movement, 2),
             "steadiness_score": round(steadiness, 1), "mean_smile": mean_smile,
             "pct_smiling": pct_smiling, "peak_smile": peak_smile,
             "blink_count": blink_count, "blinks_per_min": blinks_per_min}
