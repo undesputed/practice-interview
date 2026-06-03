@@ -15,7 +15,7 @@ export function pickPose(result) {
 
 export function pickHands(result) {
   const hands = (result && result.landmarks) || [];
-  const labels = (result && result.handednesses) || [];
+  const labels = (result && (result.handedness || result.handednesses)) || [];
   return hands.map((lm, h) => {
     const pt = (i) => ({ x: lm[i].x, y: lm[i].y });
     return {
