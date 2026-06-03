@@ -24,3 +24,11 @@ export function pickHands(result) {
     };
   });
 }
+
+export function pickObjects(result) {
+  const dets = (result && result.detections) || [];
+  return dets
+    .map((d) => (d.categories && d.categories[0]
+      ? { label: d.categories[0].categoryName, score: d.categories[0].score } : null))
+    .filter(Boolean);
+}
