@@ -296,3 +296,25 @@ def questions_from_transcript(segments: list[dict]) -> dict:
             questions[idx] = seg.get("text", "")
             idx += 1
     return questions
+
+
+def transcript_metrics(segments: list[dict]) -> dict:
+    """Speaking-vs-listening split and response latencies from transcript segment timestamps (ms)."""
+    if not segments:
+        return {"speaking_pct": 0.0, "mean_response_sec": 0.0, "per_question_response_sec": []}
+    speak_ms, total_ms, responses = 0.0, 0.0, []
+    for i, seg in enumerate(segments):
+        t = seg.get("t", 0.0)
+        nxt = segments[i + 1].get("t", t) if i + 1 < len(segments) else t
+        dur = max(0.0, nxt - t)
+        total_ms += dur
+        if seg.get("speaker") == "candidate":
+            speak_ms += dur
+        if seg.get("speaker") == "interviewer":
+            for j in range(i + 1, len(segments)):
+                if segments[j].get("speaker") == "candidate":
+                    responses.append(round((segments[j].get("t", t) - t) / 1000.0, 2))
+                    break
+    return {"speaking_pct": round(100.0 * speak_ms / total_ms, 1) if total_ms > 0 else 0.0,
+            "mean_response_sec": round(sum(responses) / len(responses), 2) if responses else 0.0,
+            "per_question_response_sec": responses}

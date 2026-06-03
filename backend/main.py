@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from backend.analysis import compute_metrics, questions_from_transcript
+from backend.analysis import compute_metrics, questions_from_transcript, transcript_metrics
 from backend.report import save_session
 from backend.deepgram import build_agent_config, grant_ephemeral_token, DEEPGRAM_AGENT_URL
 from backend.anthropic_coach import generate_coaching
@@ -80,6 +80,7 @@ def session(req: SessionRequest):
         raise HTTPException(400, "no frames captured")
     questions = questions_from_transcript(req.transcript.get("segments", []))
     summary = compute_metrics(req.frames, questions)
+    summary["timing"] = transcript_metrics(req.transcript.get("segments", []))
 
     coaching = None
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")

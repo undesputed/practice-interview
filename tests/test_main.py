@@ -63,3 +63,13 @@ def test_session_empty_frames_returns_422_or_message():
     body = {"role": "X", "frames": [], "transcript": {"full_text": "", "segments": []}}
     resp = client.post("/api/session", json=body)
     assert resp.status_code == 400
+
+def test_session_summary_has_timing(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
+    body = {"role": "X", "frames": [_frame(i*100.0) for i in range(5)],
+            "transcript": {"full_text": "INTERVIEWER: hi",
+                           "segments": [{"speaker": "interviewer", "text": "hi", "t": 0.0},
+                                        {"speaker": "candidate", "text": "yo", "t": 1500.0}]}}
+    data = client.post("/api/session", json=body).json()
+    assert "timing" in data["summary"]
+    assert data["summary"]["timing"]["per_question_response_sec"] == [1.5]

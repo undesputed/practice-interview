@@ -274,3 +274,20 @@ def test_metric_block_empty_detailed_keys():
     assert m["eye_openness"] == 0.0 and m["attention"] == 0.0
     assert m["gaze_breakdown"]["center_pct"] == 0.0
     assert m["head_pose"]["pitch"] == {"mean": 0.0, "min": 0.0, "max": 0.0}
+
+from backend.analysis import transcript_metrics
+
+def test_transcript_metrics_timing():
+    segs = [
+        {"speaker": "interviewer", "text": "Q1", "t": 0.0},
+        {"speaker": "candidate", "text": "A1", "t": 2000.0},
+        {"speaker": "interviewer", "text": "Q2", "t": 6000.0},
+        {"speaker": "candidate", "text": "A2", "t": 9000.0},
+    ]
+    out = transcript_metrics(segs)
+    assert out["per_question_response_sec"] == [2.0, 3.0]
+    assert out["mean_response_sec"] == 2.5
+    assert out["speaking_pct"] > 0.0
+
+def test_transcript_metrics_empty():
+    assert transcript_metrics([]) == {"speaking_pct": 0.0, "mean_response_sec": 0.0, "per_question_response_sec": []}
