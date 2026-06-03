@@ -287,6 +287,33 @@ def composite_scores(m: dict) -> dict:
     }
 
 
+CONCERN_OBJECTS = {"cell phone", "laptop", "tv", "book", "remote", "keyboard"}
+
+
+def integrity_metrics(frames: list[dict]) -> dict:
+    """Session-level integrity signals: a second face, and objects/devices in frame."""
+    total = len(frames)
+    multi = sum(1 for f in frames if f.get("face_count", 0) > 1)
+    obj_frames = [f for f in frames if f.get("objects") is not None]
+    seen, device_frames = {}, 0
+    for f in obj_frames:
+        labels = {o["label"] for o in (f["objects"] or [])}
+        for lbl in labels:
+            seen[lbl] = seen.get(lbl, 0) + 1
+        if labels & CONCERN_OBJECTS:
+            device_frames += 1
+    n = len(obj_frames)
+    objects_seen = sorted(
+        ({"label": k, "pct": round(100.0 * v / n, 1)} for k, v in seen.items()),
+        key=lambda d: -d["pct"]) if n else []
+    device_pct = round(100.0 * device_frames / n, 1) if n else 0.0
+    return {"multi_face_pct": round(100.0 * multi / total, 1) if total else 0.0,
+            "another_person_detected": multi > 0,
+            "objects_seen": objects_seen,
+            "device_in_frame_pct": device_pct,
+            "device_detected": device_pct > 0}
+
+
 def questions_from_transcript(segments: list[dict]) -> dict:
     """Map interviewer turn index -> question text, in order of appearance."""
     questions: dict[int, str] = {}

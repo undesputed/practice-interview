@@ -291,3 +291,29 @@ def test_transcript_metrics_timing():
 
 def test_transcript_metrics_empty():
     assert transcript_metrics([]) == {"speaking_pct": 0.0, "mean_response_sec": 0.0, "per_question_response_sec": []}
+
+from backend.analysis import integrity_metrics
+
+def test_integrity_multi_face():
+    frames = [{"t": i*100.0, "turn": 0, "face": True, "face_count": (2 if i < 3 else 1)} for i in range(10)]
+    out = integrity_metrics(frames)
+    assert out["multi_face_pct"] == 30.0
+    assert out["another_person_detected"] is True
+
+def test_integrity_objects_and_device():
+    frames = [
+        {"t": 0, "turn": 0, "face": True, "face_count": 1, "objects": [{"label": "cell phone", "score": 0.8}]},
+        {"t": 1, "turn": 0, "face": True, "face_count": 1, "objects": [{"label": "cup", "score": 0.7}]},
+    ]
+    out = integrity_metrics(frames)
+    labels = {o["label"]: o["pct"] for o in out["objects_seen"]}
+    assert labels["cell phone"] == 50.0 and labels["cup"] == 50.0
+    assert out["device_in_frame_pct"] == 50.0
+    assert out["device_detected"] is True
+
+def test_integrity_empty_safe():
+    out = integrity_metrics([{"t": 0, "turn": 0, "face": True}])
+    assert out["multi_face_pct"] == 0.0
+    assert out["another_person_detected"] is False
+    assert out["objects_seen"] == []
+    assert out["device_detected"] is False
