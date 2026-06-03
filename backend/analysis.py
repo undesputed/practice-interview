@@ -59,7 +59,11 @@ def _metric_block(frames: list[dict]) -> dict:
                 "mean_smile": 0.0, "pct_smiling": 0.0, "peak_smile": 0.0,
                 "blink_count": 0, "blinks_per_min": 0.0,
                 "upright_pct": 0.0, "lean": 0.0, "body_steadiness": 0.0,
-                "hand_fidget": 0.0, "face_touch_count": 0}
+                "hand_fidget": 0.0, "face_touch_count": 0,
+                "face_presence_pct": 0.0, "eye_openness": 0.0, "mouth_open_mean": 0.0,
+                "speaking_pct": 0.0, "eyebrow_raise": 0.0,
+                "gaze_breakdown": gaze_breakdown([]), "head_pose": head_pose_stats([]),
+                "attention": 0.0, "confidence": 0.0, "nervousness": 0.0, "composure": 0.0}
 
     poses, smiles = [], []
     for f in frames:
@@ -96,12 +100,18 @@ def _metric_block(frames: list[dict]) -> dict:
     duration_min = ((frames[-1]["t"] - frames[0]["t"]) / 1000.0 / 60.0) if total >= 2 else 0.0
     blinks_per_min = round(blink_count / duration_min, 1) if duration_min > 0 else 0.0
 
+    faces = sum(1 for f in frames if f.get("face", False))
     block = {"gaze_eye_contact_pct": gaze_eye_contact_pct(frames),
              "head_movement": round(movement, 2), "steadiness_score": round(steadiness, 1),
              "mean_smile": mean_smile, "pct_smiling": pct_smiling, "peak_smile": peak_smile,
-             "blink_count": blink_count, "blinks_per_min": blinks_per_min}
+             "blink_count": blink_count, "blinks_per_min": blinks_per_min,
+             "face_presence_pct": round(100.0 * faces / total, 1)}
     block.update(pose_metrics(frames))
     block.update(hand_metrics(frames))
+    block.update(expression_detail(frames))
+    block["gaze_breakdown"] = gaze_breakdown(frames)
+    block["head_pose"] = head_pose_stats(frames)
+    block.update(composite_scores(block))
     return block
 
 

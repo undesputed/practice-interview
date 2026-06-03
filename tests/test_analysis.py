@@ -254,3 +254,23 @@ def test_composite_scores_ranges_and_logic():
     assert composite_scores(nervous)["nervousness"] > 70.0
     for k in ("attention", "confidence", "nervousness", "composure"):
         assert 0.0 <= composite_scores(nervous)[k] <= 100.0
+
+def test_metric_block_detailed_keys():
+    p = _pose(0.2)
+    frames = [_frame_x(i*100.0, jaw=0.4, brow=0.3) for i in range(4)]
+    for f in frames:
+        f["pose"] = p
+        f["hands"] = [_hand(0.4, 0.7)]
+    m = compute_metrics(frames)["overall"]
+    for k in ("face_presence_pct", "eye_openness", "mouth_open_mean", "speaking_pct",
+              "eyebrow_raise", "gaze_breakdown", "head_pose",
+              "attention", "confidence", "nervousness", "composure"):
+        assert k in m, f"missing {k}"
+    assert "center_pct" in m["gaze_breakdown"]
+    assert "mean" in m["head_pose"]["yaw"]
+
+def test_metric_block_empty_detailed_keys():
+    m = compute_metrics([])["overall"]
+    assert m["eye_openness"] == 0.0 and m["attention"] == 0.0
+    assert m["gaze_breakdown"]["center_pct"] == 0.0
+    assert m["head_pose"]["pitch"] == {"mean": 0.0, "min": 0.0, "max": 0.0}
