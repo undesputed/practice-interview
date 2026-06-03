@@ -84,8 +84,10 @@ function renderLoop(video, canvas, ctx, draw) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
   if (hasFace) {
-    draw.drawConnectors(result.faceLandmarks[0],
-      FaceLandmarker.FACE_LANDMARKS_TESSELATION, { color: "#30FF9080", lineWidth: 0.5 });
+    for (const fl of result.faceLandmarks) {
+      draw.drawConnectors(fl, FaceLandmarker.FACE_LANDMARKS_TESSELATION,
+        { color: "#30FF9080", lineWidth: 0.5 });
+    }
   }
 
   // Hand skeleton + gesture label, drawn every frame from the throttled cache (no flicker).
@@ -104,6 +106,17 @@ function renderLoop(video, canvas, ctx, draw) {
         const labelY = Math.max(20, lm[0].y * canvas.height - 8);
         ctx.fillText(label, lm[0].x * canvas.width, labelY);
       }
+    }
+  }
+
+  // Object detection boxes (from the throttled cache).
+  if (lastObjectResult && lastObjectResult.detections) {
+    ctx.strokeStyle = "#FFD23F"; ctx.lineWidth = 2; ctx.fillStyle = "#FFD23F"; ctx.font = "14px sans-serif";
+    for (const d of lastObjectResult.detections) {
+      const b = d.boundingBox; const c = d.categories && d.categories[0];
+      if (!b || !c) continue;
+      ctx.strokeRect(b.originX, b.originY, b.width, b.height);
+      ctx.fillText(`${c.categoryName} ${c.score.toFixed(2)}`, b.originX, Math.max(14, b.originY - 4));
     }
   }
 
@@ -256,6 +269,8 @@ function renderResults(data) {
     `Smile: mean ${o.mean_smile}, peak ${o.peak_smile} (${o.pct_smiling}% of time)`,
     `Eyebrow raise: ${o.eyebrow_raise}`,
     `Mouth open: ${o.mouth_open_mean} · speaking ${o.speaking_pct}%`,
+    `Facial tension: ${o.facial_tension}/100`,
+    `Tension signals — squint ${o.eye_squint} · lip-press ${o.lip_press} · brow-down ${o.brow_down} · jaw ${o.jaw_shift}`,
   ]);
   fillList("card-posture", [
     `Upright posture: ${o.upright_pct}%`,
@@ -267,9 +282,12 @@ function renderResults(data) {
     `Speaking vs listening: ${t.speaking_pct ?? 0}% speaking`,
     `Mean response time: ${t.mean_response_sec ?? 0}s`,
   ]);
+  const ig = s.integrity || {};
   fillList("card-presence", [
     `Face present: ${o.face_presence_pct}%`,
-    `No-face: ${s.no_face_pct}%`,
+    `Another person detected: ${ig.another_person_detected ? "yes" : "no"} (${ig.multi_face_pct ?? 0}% of frames)`,
+    `Device in frame: ${ig.device_detected ? "yes" : "no"} (${ig.device_in_frame_pct ?? 0}%)`,
+    `Objects seen: ${(ig.objects_seen || []).map((x) => x.label + " " + x.pct + "%").join(", ") || "none"}`,
   ]);
 
   const tb = $("metrics-per-question");
