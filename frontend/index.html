@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rehearsal — Mock Interview Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name">Rehearsal</span>
+    </div>
+    <span class="brand-tag">Mock Interview Studio</span>
+  </header>
+
+  <main class="stage">
+
+    <!-- ============ START SCREEN ============ -->
+    <section id="screen-start" class="screen screen-start">
+      <div class="start-grid">
+        <div class="start-copy">
+          <p class="eyebrow">Practice with presence</p>
+          <h1 class="display">
+            Rehearse the<br /><em>conversation</em><br />before it counts.
+          </h1>
+          <p class="lede">
+            A calm, camera-on space to practice answering real interview
+            questions out loud. We read your eye contact, composure, and
+            expression — then hand back honest, useful coaching.
+          </p>
+
+          <div class="start-controls">
+            <label class="field">
+              <span class="field-label">Choose your role</span>
+              <div class="select-wrap">
+                <select id="role-select" aria-label="Select interview role"></select>
+                <span class="select-chevron" aria-hidden="true"></span>
+              </div>
+            </label>
+            <button id="start-btn" class="btn btn-primary">
+              <span>Begin interview</span>
+              <span class="btn-arrow" aria-hidden="true"></span>
+            </button>
+          </div>
+
+          <ul class="start-notes">
+            <li><span class="dot" aria-hidden="true"></span> Camera &amp; microphone access required</li>
+            <li><span class="dot" aria-hidden="true"></span> Speak naturally — answer each question aloud</li>
+            <li><span class="dot" aria-hidden="true"></span> Click <strong>End</strong> when you're finished to see results</li>
+          </ul>
+        </div>
+
+        <aside class="start-aside" aria-hidden="true">
+          <div class="aside-card">
+            <div class="aside-eye">
+              <span class="iris"></span>
+            </div>
+            <p class="aside-metric">Eye contact</p>
+            <div class="aside-bar"><span style="width:78%"></span></div>
+            <p class="aside-metric">Steadiness</p>
+            <div class="aside-bar"><span style="width:64%"></span></div>
+            <p class="aside-metric">Expression</p>
+            <div class="aside-bar"><span style="width:52%"></span></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ INTERVIEW SCREEN ============ -->
+    <section id="screen-interview" class="screen screen-interview">
+      <div class="interview-grid">
+        <div class="stage-pane">
+          <div class="canvas-frame">
+            <canvas id="cam"></canvas>
+            <div class="rec-badge"><span class="rec-dot" aria-hidden="true"></span> LIVE</div>
+          </div>
+
+          <div class="hud">
+            <div class="hud-item">
+              <span class="hud-label">Elapsed</span>
+              <span id="hud-time" class="hud-value">0s</span>
+            </div>
+            <div class="hud-item">
+              <span class="hud-label">Question</span>
+              <span id="hud-question" class="hud-value">Q0</span>
+            </div>
+            <div class="hud-item">
+              <span class="hud-label">Tracking</span>
+              <span id="hud-face" class="hud-value">face ✗</span>
+            </div>
+            <button id="end-btn" class="btn btn-end">End interview</button>
+          </div>
+        </div>
+
+        <aside class="transcript-pane">
+          <div class="transcript-head">
+            <h2>Transcript</h2>
+            <span class="transcript-sub">Live conversation</span>
+          </div>
+          <div id="transcript" class="transcript"></div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ RESULTS SCREEN ============ -->
+    <section id="screen-results" class="screen screen-results">
+      <div class="results-wrap">
+        <header class="results-head">
+          <p class="eyebrow">Session debrief</p>
+          <h1 class="display results-title">How it <em>went</em>.</h1>
+        </header>
+
+        <div class="results-grid">
+          <div class="card card-overall">
+            <h2 class="card-title">At a glance</h2>
+            <ul id="metrics-overall" class="metrics-overall"></ul>
+          </div>
+
+          <div class="card card-chart">
+            <h2 class="card-title">Over time</h2>
+            <div class="chart-holder">
+              <img id="chart-img" alt="Interview metrics chart over time" />
+            </div>
+          </div>
+
+          <div class="card card-coaching">
+            <h2 class="card-title">Coaching</h2>
+            <div id="coaching" class="coaching"></div>
+          </div>
+
+          <div class="card card-table">
+            <h2 class="card-title">By question</h2>
+            <div class="table-scroll">
+              <table class="results-table">
+                <thead>
+                  <tr>
+                    <th>Question</th>
+                    <th>Eye contact</th>
+                    <th>Steadiness</th>
+                    <th>Smiling</th>
+                    <th>Blinks</th>
+                  </tr>
+                </thead>
+                <tbody id="metrics-per-question"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="results-actions">
+          <button id="newsession-btn" class="btn btn-primary">
+            <span>Start a new session</span>
+            <span class="btn-arrow" aria-hidden="true"></span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
