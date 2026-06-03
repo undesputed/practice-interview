@@ -97,10 +97,12 @@ async function startInterview() {
 
   if (!landmarker) await initLandmarker();
 
-  const tokenResp = await fetch("/api/interview/token", {
+  const tokenRes = await fetch("/api/interview/token", {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ role }),
-  }).then((r) => r.json());
+  });
+  const tokenResp = await tokenRes.json();
+  if (!tokenRes.ok) throw new Error(tokenResp.detail || ("token request failed: " + tokenRes.status));
 
   sessionStart = performance.now();
   running = true;
@@ -121,10 +123,16 @@ async function endInterview() {
     .map((s) => (s.speaker === "interviewer" ? "INTERVIEWER: " : "CANDIDATE: ") + s.text)
     .join("\n");
 
-  const resp = await fetch("/api/session", {
+  const r = await fetch("/api/session", {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ role, frames, transcript: { full_text, segments } }),
-  }).then((r) => r.json());
+  });
+  const resp = await r.json();
+  if (!r.ok) {
+    alert("Could not generate report: " + (resp.detail || r.status));
+    show("screen-start");
+    return;
+  }
 
   renderResults(resp);
   show("screen-results");
@@ -163,6 +171,7 @@ function renderResults(data) {
   }
 
   $("chart-img").src = data.charts_url;
+  $("saved-path").textContent = "Saved to sessions/" + data.session_id + "/";
 
   const co = $("coaching");
   clearChildren(co);
