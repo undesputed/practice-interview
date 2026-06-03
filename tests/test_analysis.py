@@ -112,3 +112,35 @@ def test_questions_from_transcript_maps_interviewer_turns():
     ]
     q = questions_from_transcript(segments)
     assert q == {0: "Tell me about yourself.", 1: "Describe a challenge."}
+
+from backend.analysis import pose_metrics
+
+def _pose(nose_y, ls=(0.4, 0.5), rs=(0.6, 0.5)):
+    return {"nose": {"x": 0.5, "y": nose_y, "visibility": 0.9},
+            "leftShoulder": {"x": ls[0], "y": ls[1], "visibility": 0.9},
+            "rightShoulder": {"x": rs[0], "y": rs[1], "visibility": 0.9},
+            "leftEar": {"x": 0.45, "y": 0.3}, "rightEar": {"x": 0.55, "y": 0.3},
+            "leftHip": {"x": 0.42, "y": 0.9}, "rightHip": {"x": 0.58, "y": 0.9}}
+
+def test_upright_vs_slouched():
+    upright = [_frame(i * 100.0, pose=_pose(0.2)) for i in range(5)]
+    assert pose_metrics(upright)["upright_pct"] == 100.0
+    slouch = [_frame(i * 100.0, pose=_pose(0.48)) for i in range(5)]
+    assert pose_metrics(slouch)["upright_pct"] == 0.0
+
+def test_lean_level_vs_tilted():
+    level = [_frame(i * 100.0, pose=_pose(0.2, ls=(0.4, 0.5), rs=(0.6, 0.5))) for i in range(5)]
+    assert pose_metrics(level)["lean"] == 0.0
+    tilted = [_frame(i * 100.0, pose=_pose(0.2, ls=(0.4, 0.45), rs=(0.6, 0.55))) for i in range(5)]
+    assert pose_metrics(tilted)["lean"] > 0.0
+
+def test_body_steadiness_still_vs_moving():
+    still = [_frame(i * 100.0, pose=_pose(0.2)) for i in range(5)]
+    assert pose_metrics(still)["body_steadiness"] == 100.0
+    moving = [_frame(i * 100.0, pose=_pose(0.2, ls=(0.4 + 0.05 * i, 0.5), rs=(0.6 + 0.05 * i, 0.5)))
+              for i in range(5)]
+    assert pose_metrics(moving)["body_steadiness"] < 100.0
+
+def test_pose_metrics_no_pose_safe():
+    out = pose_metrics([_frame(i * 100.0) for i in range(3)])
+    assert out == {"upright_pct": 0.0, "lean": 0.0, "body_steadiness": 0.0}

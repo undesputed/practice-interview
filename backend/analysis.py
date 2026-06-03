@@ -14,6 +14,8 @@ SMILE_THRESHOLD = 0.3
 BLINK_THRESHOLD = 0.5
 STEADINESS_K = 4.0
 GAZE_MAX = 0.5  # eyeLook* magnitude above which gaze is "off camera"
+UPRIGHT_RATIO = 0.5       # headRise / shoulderWidth above this = upright
+BODY_FIDGET_SCALE = 2000  # maps mean normalized body movement to a 0-100 steadiness drop
 
 
 def matrix_to_euler(m: Sequence[float]) -> tuple[float, float, float]:
@@ -119,6 +121,34 @@ def compute_metrics(frames: list[dict], questions: dict | None = None) -> dict:
     return {"duration_sec": duration_sec, "frame_count": total,
             "no_face_pct": no_face_pct, "overall": _metric_block(frames),
             "per_question": per_question}
+
+
+def pose_metrics(frames: list[dict]) -> dict:
+    """Posture/lean/steadiness from pose-bearing frames. Safe (zeros) when no pose present."""
+    poses = [f["pose"] for f in frames if f.get("pose")]
+    if not poses:
+        return {"upright_pct": 0.0, "lean": 0.0, "body_steadiness": 0.0}
+
+    upright, tilts, centers = 0, [], []
+    for p in poses:
+        ls, rs, nose = p["leftShoulder"], p["rightShoulder"], p["nose"]
+        mid_y = (ls["y"] + rs["y"]) / 2.0
+        width = abs(ls["x"] - rs["x"]) or 1e-6
+        if (mid_y - nose["y"]) / width > UPRIGHT_RATIO:
+            upright += 1
+        tilts.append(abs(math.degrees(math.atan2(rs["y"] - ls["y"], rs["x"] - ls["x"]))))
+        centers.append(((ls["x"] + rs["x"]) / 2.0, mid_y, nose["x"], nose["y"]))
+
+    movement = 0.0
+    if len(centers) >= 2:
+        d = [abs(b[0]-a[0]) + abs(b[1]-a[1]) + abs(b[2]-a[2]) + abs(b[3]-a[3])
+             for a, b in zip(centers, centers[1:])]
+        movement = sum(d) / len(d)
+    steadiness = max(0.0, min(100.0, 100.0 - BODY_FIDGET_SCALE * movement / 100.0))
+
+    return {"upright_pct": round(100.0 * upright / len(poses), 1),
+            "lean": round(sum(tilts) / len(tilts), 1),
+            "body_steadiness": round(steadiness, 1)}
 
 
 def questions_from_transcript(segments: list[dict]) -> dict:
