@@ -184,3 +184,9 @@ def test_metric_block_empty_has_new_keys():
     m = compute_metrics([])["overall"]
     assert m["upright_pct"] == 0.0 and m["hand_fidget"] == 0.0 and m["face_touch_count"] == 0
     assert m["gaze_eye_contact_pct"] == 0.0
+
+def test_hand_metrics_empty_hand_list_safe():
+    # hand detector ran but found no hands -> hands=[] (key present, list empty)
+    frames = [_frame(i * 100.0, hands=[]) for i in range(4)]
+    out = hand_metrics(frames)
+    assert out == {"hand_fidget": 0.0, "face_touch_count": 0}

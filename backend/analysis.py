@@ -9,7 +9,6 @@ from typing import Sequence
 #    "m": [16 floats]  # row-major 4x4 facial transformation matrix}
 
 # --- Tunable thresholds ---
-EYE_CONTACT_MAX_DEG = 15.0
 SMILE_THRESHOLD = 0.3
 BLINK_THRESHOLD = 0.5
 STEADINESS_K = 4.0
@@ -150,6 +149,7 @@ def pose_metrics(frames: list[dict]) -> dict:
         d = [abs(b[0]-a[0]) + abs(b[1]-a[1]) + abs(b[2]-a[2]) + abs(b[3]-a[3])
              for a, b in zip(centers, centers[1:])]
         movement = sum(d) / len(d)
+    # movement is in normalized image units/frame; BODY_FIDGET_SCALE/100 (=20) scales it to a 0-100 drop
     steadiness = max(0.0, min(100.0, 100.0 - BODY_FIDGET_SCALE * movement / 100.0))
 
     return {"upright_pct": round(100.0 * upright / len(poses), 1),
