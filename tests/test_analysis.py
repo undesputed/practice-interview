@@ -190,3 +190,25 @@ def test_hand_metrics_empty_hand_list_safe():
     frames = [_frame(i * 100.0, hands=[]) for i in range(4)]
     out = hand_metrics(frames)
     assert out == {"hand_fidget": 0.0, "face_touch_count": 0}
+
+from backend.analysis import expression_detail
+
+def _frame_x(t, face=True, blink=0.0, jaw=0.0, brow=0.0):
+    f = _frame(t, face=face, blinkL=blink, blinkR=blink)
+    f["bs"]["jawOpen"] = jaw
+    f["bs"]["browInnerUp"] = brow
+    f["bs"]["browOuterUpLeft"] = brow
+    f["bs"]["browOuterUpRight"] = brow
+    return f
+
+def test_expression_detail_basic():
+    frames = [_frame_x(i*100.0, blink=0.0, jaw=0.4, brow=0.5) for i in range(5)]
+    out = expression_detail(frames)
+    assert out["eye_openness"] == 1.0
+    assert out["speaking_pct"] == 100.0
+    assert abs(out["mouth_open_mean"] - 0.4) < 1e-6
+    assert abs(out["eyebrow_raise"] - 0.5) < 1e-6
+
+def test_expression_detail_no_face_safe():
+    out = expression_detail([_frame_x(i*100.0, face=False) for i in range(3)])
+    assert out == {"eye_openness": 0.0, "mouth_open_mean": 0.0, "speaking_pct": 0.0, "eyebrow_raise": 0.0}

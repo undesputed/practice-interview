@@ -16,6 +16,7 @@ GAZE_MAX = 0.5  # eyeLook* magnitude above which gaze is "off camera"
 UPRIGHT_RATIO = 0.5       # headRise / shoulderWidth above this = upright
 BODY_FIDGET_SCALE = 2000  # maps mean normalized body movement to a 0-100 steadiness drop
 FACE_TOUCH_RADIUS = 0.6   # × shoulder width: hand-point within this of the nose = touching
+SPEAKING_OPEN = 0.2  # jawOpen above this counts as mouth-open / speaking
 
 
 def matrix_to_euler(m: Sequence[float]) -> tuple[float, float, float]:
@@ -190,6 +191,29 @@ def hand_metrics(frames: list[dict]) -> dict:
         prev = touching
 
     return {"hand_fidget": round(fidget, 4), "face_touch_count": touches}
+
+
+def expression_detail(frames: list[dict]) -> dict:
+    """Eye openness, mouth-open/speaking, eyebrow raise from face-bearing frames."""
+    total = len(frames)
+    face = [f for f in frames if f.get("face", False) and "bs" in f]
+    if not face:
+        return {"eye_openness": 0.0, "mouth_open_mean": 0.0, "speaking_pct": 0.0, "eyebrow_raise": 0.0}
+    eye_open, mouth, brow, speaking = [], [], [], 0
+    for f in face:
+        bs = f["bs"]
+        eye_open.append(1.0 - max(bs.get("eyeBlinkLeft", 0.0), bs.get("eyeBlinkRight", 0.0)))
+        jo = bs.get("jawOpen", 0.0)
+        mouth.append(jo)
+        if jo > SPEAKING_OPEN:
+            speaking += 1
+        brow.append((bs.get("browInnerUp", 0.0) + bs.get("browOuterUpLeft", 0.0)
+                     + bs.get("browOuterUpRight", 0.0)) / 3.0)
+    n = len(face)
+    return {"eye_openness": round(sum(eye_open) / n, 3),
+            "mouth_open_mean": round(sum(mouth) / n, 3),
+            "speaking_pct": round(100.0 * speaking / total, 1),
+            "eyebrow_raise": round(sum(brow) / n, 3)}
 
 
 def questions_from_transcript(segments: list[dict]) -> dict:
