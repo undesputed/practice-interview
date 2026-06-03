@@ -236,3 +236,21 @@ def test_head_pose_stats():
 def test_head_pose_stats_empty():
     out = head_pose_stats([_frame(i*100.0, face=False) for i in range(2)])
     assert out["yaw"] == {"mean": 0.0, "min": 0.0, "max": 0.0}
+
+from backend.analysis import composite_scores
+
+def test_composite_scores_ranges_and_logic():
+    good = {"gaze_eye_contact_pct": 100.0, "steadiness_score": 100.0, "face_presence_pct": 100.0,
+            "upright_pct": 100.0, "body_steadiness": 100.0, "blinks_per_min": 5.0,
+            "face_touch_count": 0, "hand_fidget": 0.0}
+    s = composite_scores(good)
+    assert s["attention"] == 100.0
+    assert s["confidence"] == 100.0
+    assert s["composure"] == 100.0
+    assert s["nervousness"] < 40.0
+    nervous = {"gaze_eye_contact_pct": 10.0, "steadiness_score": 20.0, "face_presence_pct": 80.0,
+               "upright_pct": 30.0, "body_steadiness": 30.0, "blinks_per_min": 30.0,
+               "face_touch_count": 5, "hand_fidget": 0.05}
+    assert composite_scores(nervous)["nervousness"] > 70.0
+    for k in ("attention", "confidence", "nervousness", "composure"):
+        assert 0.0 <= composite_scores(nervous)[k] <= 100.0

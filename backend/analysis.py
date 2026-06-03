@@ -256,6 +256,27 @@ def head_pose_stats(frames: list[dict]) -> dict:
     return {"pitch": stats(p), "yaw": stats(y), "roll": stats(r)}
 
 
+def composite_scores(m: dict) -> dict:
+    """Heuristic 0-100 interview indicators derived from base metrics. Supplementary, tunable."""
+    def clamp(x):
+        return round(max(0.0, min(100.0, x)), 1)
+    gaze = m.get("gaze_eye_contact_pct", 0.0)
+    head = m.get("steadiness_score", 0.0)
+    body = m.get("body_steadiness", 0.0)
+    presence = m.get("face_presence_pct", 0.0)
+    upright = m.get("upright_pct", 0.0)
+    bpm = m.get("blinks_per_min", 0.0)
+    touch = m.get("face_touch_count", 0)
+    fidget = m.get("hand_fidget", 0.0)
+    return {
+        "attention": clamp(0.5 * gaze + 0.3 * head + 0.2 * presence),
+        "confidence": clamp(0.5 * upright + 0.5 * body),
+        "nervousness": clamp(0.3 * min(100.0, bpm * 5.0) + 0.3 * (100.0 - gaze)
+                             + 0.2 * min(100.0, touch * 20.0) + 0.2 * min(100.0, fidget * 2000.0)),
+        "composure": clamp((head + body) / 2.0),
+    }
+
+
 def questions_from_transcript(segments: list[dict]) -> dict:
     """Map interviewer turn index -> question text, in order of appearance."""
     questions: dict[int, str] = {}
