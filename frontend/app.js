@@ -85,6 +85,8 @@ function renderLoop(video, canvas, ctx, draw) {
   // Hand skeleton + gesture label, drawn every frame from the throttled cache (no flicker).
   if (lastHandResult && lastHandResult.landmarks) {
     const handed = lastHandResult.handedness || lastHandResult.handednesses || [];
+    ctx.fillStyle = "#30FF90";
+    ctx.font = "16px sans-serif";
     for (let h = 0; h < lastHandResult.landmarks.length; h++) {
       const lm = lastHandResult.landmarks[h];
       draw.drawConnectors(lm, HandLandmarker.HAND_CONNECTIONS, { color: "#FFFFFFB0", lineWidth: 2 });
@@ -93,9 +95,8 @@ function renderLoop(video, canvas, ctx, draw) {
       if (g && g.categoryName && g.categoryName !== "None") {
         const handName = handed[h] && handed[h][0] && handed[h][0].categoryName;
         const label = (handName ? handName + ": " : "") + g.categoryName + " " + g.score.toFixed(2);
-        ctx.fillStyle = "#30FF90";
-        ctx.font = "16px sans-serif";
-        ctx.fillText(label, lm[0].x * canvas.width, lm[0].y * canvas.height - 8);
+        const labelY = Math.max(20, lm[0].y * canvas.height - 8);
+        ctx.fillText(label, lm[0].x * canvas.width, labelY);
       }
     }
   }
