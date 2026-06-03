@@ -48,7 +48,7 @@ def test_eye_contact_half_looking_away():
     assert out["overall"]["eye_contact_pct"] == 50.0
 
 def test_no_face_counts_against_contact():
-    frames = [_frame(t * 100.0, face=(t % 2 == 0)) for t in range(10)]
+    frames = [_frame(t * 100.0, face=(t % 2 == 0), yaw_deg=0.0) for t in range(10)]
     out = compute_metrics(frames)
     assert out["no_face_pct"] == 50.0
     assert out["overall"]["eye_contact_pct"] == 50.0
@@ -82,3 +82,16 @@ def test_empty_frames_safe():
     assert out["frame_count"] == 0
     assert out["overall"]["eye_contact_pct"] == 0.0
     assert out["per_question"] == []
+
+def test_pitch_30_degrees():
+    a = math.radians(30)
+    c, s = math.cos(a), math.sin(a)
+    # Row-major rotation about X by +30°
+    m = [1, 0, 0, 0,
+         0, c, -s, 0,
+         0, s, c, 0,
+         0, 0, 0, 1]
+    pitch, yaw, roll = matrix_to_euler(m)
+    assert abs(pitch - 30) < 1e-3
+    assert abs(yaw) < 1e-3
+    assert abs(roll) < 1e-3

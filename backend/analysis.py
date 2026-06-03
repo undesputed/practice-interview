@@ -3,6 +3,11 @@ from __future__ import annotations  # PEP 604 (X | Y) on Python 3.9
 import math
 from typing import Sequence
 
+# A "frame" dict has the shape:
+#   {"t": float_ms, "turn": int, "face": bool,
+#    "bs": {"mouthSmileLeft","mouthSmileRight","eyeBlinkLeft","eyeBlinkRight","browInnerUp" -> float},
+#    "m": [16 floats]  # row-major 4x4 facial transformation matrix}
+
 # --- Tunable thresholds ---
 EYE_CONTACT_MAX_DEG = 15.0
 SMILE_THRESHOLD = 0.3
@@ -11,7 +16,10 @@ STEADINESS_K = 4.0
 
 
 def matrix_to_euler(m: Sequence[float]) -> tuple[float, float, float]:
-    """Decompose a row-major 4x4 transform's rotation into (pitch, yaw, roll) degrees."""
+    """Decompose a row-major 4x4 transform's rotation into (pitch, yaw, roll) degrees.
+
+    `m` must have 16 elements (row-major). Near-vertical poses (gimbal lock) yield degenerate yaw/roll.
+    """
     def R(i, j):  # row-major: element at row i, col j
         return m[i * 4 + j]
     pitch = math.atan2(R(2, 1), R(2, 2))
@@ -30,7 +38,7 @@ def _metric_block(frames: list[dict]) -> dict:
 
     poses, smiles, on_camera = [], [], 0
     for f in frames:
-        if not f.get("face", False):
+        if not f.get("face", False) or "m" not in f or "bs" not in f:
             continue
         pitch, yaw, roll = matrix_to_euler(f["m"])
         poses.append((pitch, yaw, roll))
@@ -39,6 +47,8 @@ def _metric_block(frames: list[dict]) -> dict:
         bs = f["bs"]
         smiles.append((bs.get("mouthSmileLeft", 0.0) + bs.get("mouthSmileRight", 0.0)) / 2.0)
 
+    # Denominator is TOTAL frames (not face-only): looking away or undetected
+    # faces intentionally reduce eye-contact and smiling scores.
     eye_contact_pct = round(100.0 * on_camera / total, 1)
 
     # head movement: mean per-frame absolute change across consecutive face poses
@@ -57,7 +67,7 @@ def _metric_block(frames: list[dict]) -> dict:
     # blinks: rising edges of max(eyeBlinkLeft, eyeBlinkRight) crossing BLINK_THRESHOLD
     blink_count, prev_closed = 0, False
     for f in frames:
-        bs = f["bs"]
+        bs = f.get("bs", {})
         val = max(bs.get("eyeBlinkLeft", 0.0), bs.get("eyeBlinkRight", 0.0))
         closed = val >= BLINK_THRESHOLD
         if closed and not prev_closed:
