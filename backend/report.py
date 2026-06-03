@@ -8,7 +8,7 @@ from backend.analysis import matrix_to_euler, SMILE_THRESHOLD
 
 
 def _write_csv(path: str, frames: list[dict]) -> None:
-    with open(path, "w", newline="") as fh:
+    with open(path, "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
         w.writerow(["t", "turn", "face", "pitch", "yaw", "roll",
                     "smileL", "smileR", "blinkL", "blinkR"])
@@ -56,12 +56,12 @@ def save_session(session_dir: str, frames: list[dict], transcript: dict,
                  summary: dict, coaching: dict | None) -> None:
     os.makedirs(session_dir, exist_ok=True)
     _write_csv(os.path.join(session_dir, "data.csv"), frames)
-    with open(os.path.join(session_dir, "data.json"), "w") as fh:
+    with open(os.path.join(session_dir, "data.json"), "w", encoding="utf-8") as fh:
         json.dump(frames, fh)
     out = dict(summary)
     out["coaching"] = coaching
-    with open(os.path.join(session_dir, "summary.json"), "w") as fh:
+    with open(os.path.join(session_dir, "summary.json"), "w", encoding="utf-8") as fh:
         json.dump(out, fh, indent=2)
-    with open(os.path.join(session_dir, "transcript.txt"), "w") as fh:
+    with open(os.path.join(session_dir, "transcript.txt"), "w", encoding="utf-8") as fh:
         fh.write(transcript.get("full_text", ""))
     _build_charts(os.path.join(session_dir, "charts.png"), frames)
