@@ -44,15 +44,24 @@ async def interview_token(req: TokenRequest):
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code == 403:
             # The key can't mint ephemeral tokens (needs grant permission).
-            # For LOCAL dev, fall back to the long-lived key — the Voice Agent
-            # WebSocket accepts it directly. This exposes the key to the browser,
-            # so for an EC2 deploy use a Deepgram key WITH grant permission instead.
-            logging.warning(
-                "Deepgram /auth/grant returned 403 (insufficient permissions); "
-                "falling back to the long-lived key. LOCAL DEV ONLY — the key is "
-                "sent to the browser. Use a key with grant permission before deploying."
-            )
-            token = api_key
+            # SAFE BY DEFAULT: never send the long-lived key to the browser.
+            # Only fall back to it when the operator explicitly opts in for LOCAL
+            # dev via DEEPGRAM_ALLOW_BROWSER_KEY=1 (must never be set on a deploy).
+            if os.getenv("DEEPGRAM_ALLOW_BROWSER_KEY") == "1":
+                logging.warning(
+                    "Deepgram /auth/grant 403; DEEPGRAM_ALLOW_BROWSER_KEY=1 is set, so "
+                    "falling back to the long-lived key. LOCAL DEV ONLY — the key is "
+                    "sent to the browser. Do NOT set this on a deployed server."
+                )
+                token = api_key
+            else:
+                logging.error("Deepgram /auth/grant 403 — key lacks grant permission.")
+                raise HTTPException(
+                    500,
+                    "Deepgram key lacks permission to mint ephemeral tokens. Use a key "
+                    "with grant permission, or set DEEPGRAM_ALLOW_BROWSER_KEY=1 for LOCAL "
+                    "dev only (sends the key to the browser — never on a deployment).",
+                )
         else:
             raise HTTPException(502, f"Deepgram token grant failed: {exc.response.status_code}")
     return {"url": DEEPGRAM_AGENT_URL, "token": token,
