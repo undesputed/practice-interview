@@ -52,3 +52,33 @@ def test_no_face_counts_against_contact():
     out = compute_metrics(frames)
     assert out["no_face_pct"] == 50.0
     assert out["overall"]["eye_contact_pct"] == 50.0
+
+def test_positivity_smile():
+    frames = [_frame(t * 100.0, smileL=0.6, smileR=0.6) for t in range(5)]
+    frames += [_frame((t + 5) * 100.0, smileL=0.0, smileR=0.0) for t in range(5)]
+    out = compute_metrics(frames)
+    assert out["overall"]["pct_smiling"] == 50.0
+    assert out["overall"]["peak_smile"] == 0.6
+    assert abs(out["overall"]["mean_smile"] - 0.3) < 1e-6
+
+def test_blink_count_rising_edges():
+    # two distinct blinks: closed, open, closed
+    seq = [0.0, 0.0, 0.8, 0.8, 0.0, 0.0, 0.9, 0.0]
+    frames = [_frame(i * 100.0, blinkL=v, blinkR=v) for i, v in enumerate(seq)]
+    out = compute_metrics(frames)
+    assert out["overall"]["blink_count"] == 2
+
+def test_per_question_segmentation():
+    frames = [_frame(t * 100.0, turn=0) for t in range(5)]
+    frames += [_frame((t + 5) * 100.0, turn=1, yaw_deg=40.0) for t in range(5)]
+    out = compute_metrics(frames, questions={0: "Tell me about yourself", 1: "A challenge?"})
+    assert len(out["per_question"]) == 2
+    assert out["per_question"][0]["question"] == "Tell me about yourself"
+    assert out["per_question"][0]["metrics"]["eye_contact_pct"] == 100.0
+    assert out["per_question"][1]["metrics"]["eye_contact_pct"] == 0.0
+
+def test_empty_frames_safe():
+    out = compute_metrics([])
+    assert out["frame_count"] == 0
+    assert out["overall"]["eye_contact_pct"] == 0.0
+    assert out["per_question"] == []
