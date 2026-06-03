@@ -169,3 +169,18 @@ def test_face_touch_counts_rising_edges():
 def test_hand_metrics_no_hands_safe():
     out = hand_metrics([_frame(i * 100.0) for i in range(3)])
     assert out == {"hand_fidget": 0.0, "face_touch_count": 0}
+
+def test_metric_block_has_all_new_keys():
+    p = _pose(0.2)
+    frames = [_frame(i * 100.0, pose=p, hands=[_hand(0.4, 0.7)]) for i in range(4)]
+    m = compute_metrics(frames)["overall"]
+    for k in ("gaze_eye_contact_pct", "upright_pct", "lean", "body_steadiness",
+              "hand_fidget", "face_touch_count", "head_movement", "steadiness_score",
+              "mean_smile", "pct_smiling", "peak_smile", "blink_count", "blinks_per_min"):
+        assert k in m, f"missing {k}"
+    assert "eye_contact_pct" not in m   # head-pose metric removed
+
+def test_metric_block_empty_has_new_keys():
+    m = compute_metrics([])["overall"]
+    assert m["upright_pct"] == 0.0 and m["hand_fidget"] == 0.0 and m["face_touch_count"] == 0
+    assert m["gaze_eye_contact_pct"] == 0.0
