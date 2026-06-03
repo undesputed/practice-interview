@@ -32,7 +32,8 @@ def build_agent_config(role: str) -> dict:
         },
         "agent": {
             "language": "en",
-            "listen": {"provider": {"type": "deepgram", "model": "nova-3"}},
+            "listen": {"provider": {"type": "deepgram", "model": "nova-3",
+                                    "keyterms": ["STAR", "behavioral", "strengths", "weaknesses", role]}},
             "think": {
                 "provider": {"type": "anthropic", "model": THINK_MODEL},
                 "prompt": build_interviewer_prompt(role),

@@ -11,3 +11,10 @@ def test_agent_config_has_required_sections():
 
 def test_greeting_mentions_interview():
     assert "interview" in build_greeting("Software Engineer").lower()
+
+def test_agent_config_includes_keyterms_with_role():
+    cfg = build_agent_config("Data Analyst")
+    kt = cfg["agent"]["listen"]["provider"].get("keyterms")
+    assert isinstance(kt, list)
+    assert "Data Analyst" in kt        # role is boosted
+    assert "STAR" in kt                # generic interview term
