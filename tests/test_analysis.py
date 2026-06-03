@@ -144,3 +144,28 @@ def test_body_steadiness_still_vs_moving():
 def test_pose_metrics_no_pose_safe():
     out = pose_metrics([_frame(i * 100.0) for i in range(3)])
     assert out == {"upright_pct": 0.0, "lean": 0.0, "body_steadiness": 0.0}
+
+from backend.analysis import hand_metrics
+
+def _hand(wx, wy, ix=None, iy=None):
+    ix = wx if ix is None else ix
+    iy = wy if iy is None else iy
+    return {"handedness": "Right", "wrist": {"x": wx, "y": wy},
+            "indexTip": {"x": ix, "y": iy}, "middleTip": {"x": ix, "y": iy}}
+
+def test_hand_fidget_still_vs_moving():
+    still = [_frame(i * 100.0, hands=[_hand(0.4, 0.7)]) for i in range(5)]
+    assert hand_metrics(still)["hand_fidget"] == 0.0
+    moving = [_frame(i * 100.0, hands=[_hand(0.4 + 0.05 * i, 0.7)]) for i in range(5)]
+    assert hand_metrics(moving)["hand_fidget"] > 0.0
+
+def test_face_touch_counts_rising_edges():
+    p = _pose(0.3)
+    away = _frame(0.0, pose=p, hands=[_hand(0.9, 0.9)])
+    near = _frame(100.0, pose=p, hands=[_hand(0.5, 0.32)])
+    seq = [away, near, away, near]
+    assert hand_metrics(seq)["face_touch_count"] == 2
+
+def test_hand_metrics_no_hands_safe():
+    out = hand_metrics([_frame(i * 100.0) for i in range(3)])
+    assert out == {"hand_fidget": 0.0, "face_touch_count": 0}

@@ -16,6 +16,7 @@ STEADINESS_K = 4.0
 GAZE_MAX = 0.5  # eyeLook* magnitude above which gaze is "off camera"
 UPRIGHT_RATIO = 0.5       # headRise / shoulderWidth above this = upright
 BODY_FIDGET_SCALE = 2000  # maps mean normalized body movement to a 0-100 steadiness drop
+FACE_TOUCH_RADIUS = 0.6   # × shoulder width: hand-point within this of the nose = touching
 
 
 def matrix_to_euler(m: Sequence[float]) -> tuple[float, float, float]:
@@ -149,6 +150,41 @@ def pose_metrics(frames: list[dict]) -> dict:
     return {"upright_pct": round(100.0 * upright / len(poses), 1),
             "lean": round(sum(tilts) / len(tilts), 1),
             "body_steadiness": round(steadiness, 1)}
+
+
+def hand_metrics(frames: list[dict]) -> dict:
+    """Hand fidget + face-touch onset count from hand-bearing frames. Safe (zeros) when absent."""
+    hand_frames = [f for f in frames if f.get("hands") is not None]
+    if not hand_frames:
+        return {"hand_fidget": 0.0, "face_touch_count": 0}
+
+    # fidget: mean wrist (first hand) displacement across consecutive frames that have a hand
+    wrists = [(f["hands"][0]["wrist"] if f["hands"] else None) for f in hand_frames]
+    seq = [w for w in wrists if w is not None]
+    fidget = 0.0
+    if len(seq) >= 2:
+        d = [abs(b["x"] - a["x"]) + abs(b["y"] - a["y"]) for a, b in zip(seq, seq[1:])]
+        fidget = sum(d) / len(d)
+
+    # face-touch: hand point within radius of nose; count rising edges
+    touches, prev = 0, False
+    for f in hand_frames:
+        hands = f.get("hands") or []
+        pose = f.get("pose")
+        touching = False
+        if hands and pose:
+            nose = pose["nose"]; ls = pose["leftShoulder"]; rs = pose["rightShoulder"]
+            radius = FACE_TOUCH_RADIUS * (abs(ls["x"] - rs["x"]) or 1e-6)
+            for h in hands:
+                for key in ("wrist", "indexTip", "middleTip"):
+                    pt = h.get(key)
+                    if pt and math.hypot(pt["x"] - nose["x"], pt["y"] - nose["y"]) <= radius:
+                        touching = True
+        if touching and not prev:
+            touches += 1
+        prev = touching
+
+    return {"hand_fidget": round(fidget, 4), "face_touch_count": touches}
 
 
 def questions_from_transcript(segments: list[dict]) -> dict:
