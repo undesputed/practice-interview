@@ -26,6 +26,17 @@ async function errorDetail(res) {
   try { return JSON.parse(body).detail || body; } catch (_) { return body || String(res.status); }
 }
 
+// Append a non-speaker status/error line to the live transcript.
+function systemLine(text) {
+  const el = $("transcript");
+  if (!el) return;
+  const div = document.createElement("div");
+  div.className = "line system";
+  div.textContent = text;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
 async function initLandmarker() {
   const fileset = await FilesetResolver.forVisionTasks(CONFIG.WASM_BASE);
   landmarker = await FaceLandmarker.createFromOptions(fileset, {
@@ -116,7 +127,9 @@ async function startInterview() {
 
   agent = startVoiceAgent({
     url: tokenResp.url, token: tokenResp.token, config: tokenResp.config,
-    micStream: mediaStream, onTranscript, onClose: () => {},
+    micStream: mediaStream, onTranscript,
+    onError: (m) => { console.error("[interview]", m); systemLine("⚠ " + m); },
+    onClose: () => { if (running) systemLine("Voice connection closed."); },
   });
 }
 

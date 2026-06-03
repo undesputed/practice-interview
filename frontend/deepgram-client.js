@@ -1,6 +1,6 @@
 // frontend/deepgram-client.js
 // Live voice-agent client. Ported from ai-interview-v2 InCall.tsx audio pipeline.
-export function startVoiceAgent({ url, token, config, micStream, onTranscript, onClose }) {
+export function startVoiceAgent({ url, token, config, micStream, onTranscript, onError, onClose }) {
   const ws = new WebSocket(url, ["token", token]);
   ws.binaryType = "arraybuffer";
 
@@ -51,12 +51,14 @@ export function startVoiceAgent({ url, token, config, micStream, onTranscript, o
           speaker: msg.role === "assistant" ? "interviewer" : "candidate",
           text: msg.content,
         });
+      } else if (msg.type === "Error" || msg.type === "Warning") {
+        if (onError) onError(msg.description || msg.message || msg.type);
       }
     }
   };
 
-  ws.onclose = () => { if (onClose) onClose(); };
-  ws.onerror = () => { if (onClose) onClose(); };
+  ws.onclose = (e) => { if (onClose) onClose(e); };
+  ws.onerror = () => { if (onError) onError("voice connection error"); };
 
   return {
     stop() {
