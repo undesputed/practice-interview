@@ -66,11 +66,9 @@ def session(req: SessionRequest):
 # static mounts last so /api routes win
 app.mount("/sessions", StaticFiles(directory=SESSIONS_DIR), name="sessions")
 
-
-@app.get("/")
-def index():
-    return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
-
-
 if os.path.isdir(FRONTEND_DIR):
+    @app.get("/")
+    def index():
+        return FileResponse(os.path.join(FRONTEND_DIR, "index.html"))
+
     app.mount("/", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
