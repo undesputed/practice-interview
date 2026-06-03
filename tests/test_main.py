@@ -85,3 +85,13 @@ def test_session_summary_has_integrity(monkeypatch):
     assert "integrity" in data["summary"]
     assert data["summary"]["integrity"]["another_person_detected"] is True
     assert data["summary"]["integrity"]["device_detected"] is True
+
+def test_session_summary_has_actions(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "")
+    body = {"role": "X", "frames": [_frame(i*100.0) for i in range(3)],
+            "transcript": {"full_text": "", "segments": []},
+            "events": [{"t": 1, "turn": 0, "kind": "gesture", "label": "Smile", "icon": "🙂"},
+                       {"t": 2, "turn": 0, "kind": "gesture", "label": "Smile", "icon": "🙂"}]}
+    data = client.post("/api/session", json=body).json()
+    assert data["summary"]["actions"]["total"] == 2
+    assert data["summary"]["actions"]["counts"]["Smile"] == 2

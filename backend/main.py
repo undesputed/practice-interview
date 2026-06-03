@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from backend.analysis import compute_metrics, questions_from_transcript, transcript_metrics, integrity_metrics
+from backend.analysis import compute_metrics, questions_from_transcript, transcript_metrics, integrity_metrics, summarize_actions
 from backend.report import save_session
 from backend.deepgram import build_agent_config, grant_ephemeral_token, DEEPGRAM_AGENT_URL
 from backend.anthropic_coach import generate_coaching
@@ -33,6 +33,7 @@ class SessionRequest(BaseModel):
     role: str = "Software Engineer"
     frames: list[dict]
     transcript: dict
+    events: list = []
 
 
 @app.post("/api/interview/token")
@@ -82,6 +83,7 @@ def session(req: SessionRequest):
     summary = compute_metrics(req.frames, questions)
     summary["timing"] = transcript_metrics(req.transcript.get("segments", []))
     summary["integrity"] = integrity_metrics(req.frames)
+    summary["actions"] = summarize_actions(req.events)
 
     coaching = None
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
