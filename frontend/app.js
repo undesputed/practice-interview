@@ -130,31 +130,60 @@ async function endInterview() {
   show("screen-results");
 }
 
+function clearChildren(el) { while (el.firstChild) el.removeChild(el.firstChild); }
+
 function renderResults(data) {
   const o = data.summary.overall;
-  $("metrics-overall").innerHTML =
-    `<li>Eye contact: ${o.eye_contact_pct}%</li>` +
-    `<li>Steadiness: ${o.steadiness_score}/100</li>` +
-    `<li>Smiling: ${o.pct_smiling}% (peak ${o.peak_smile})</li>` +
-    `<li>Blinks: ${o.blink_count} (${o.blinks_per_min}/min)</li>` +
-    `<li>No-face: ${data.summary.no_face_pct}%</li>`;
+  const ov = $("metrics-overall");
+  clearChildren(ov);
+  for (const text of [
+    `Eye contact: ${o.eye_contact_pct}%`,
+    `Steadiness: ${o.steadiness_score}/100`,
+    `Smiling: ${o.pct_smiling}% (peak ${o.peak_smile})`,
+    `Blinks: ${o.blink_count} (${o.blinks_per_min}/min)`,
+    `No-face: ${data.summary.no_face_pct}%`,
+  ]) {
+    const li = document.createElement("li");
+    li.textContent = text;
+    ov.appendChild(li);
+  }
 
-  $("metrics-per-question").innerHTML = data.summary.per_question.map((q) =>
-    `<tr><td>${q.question}</td><td>${q.metrics.eye_contact_pct}%</td>` +
-    `<td>${q.metrics.steadiness_score}</td><td>${q.metrics.pct_smiling}%</td>` +
-    `<td>${q.metrics.blink_count}</td></tr>`).join("");
+  const tb = $("metrics-per-question");
+  clearChildren(tb);
+  for (const q of data.summary.per_question) {
+    const tr = document.createElement("tr");
+    for (const cell of [q.question, `${q.metrics.eye_contact_pct}%`,
+                        `${q.metrics.steadiness_score}`, `${q.metrics.pct_smiling}%`,
+                        `${q.metrics.blink_count}`]) {
+      const td = document.createElement("td");
+      td.textContent = cell;
+      tr.appendChild(td);
+    }
+    tb.appendChild(tr);
+  }
 
   $("chart-img").src = data.charts_url;
 
+  const co = $("coaching");
+  clearChildren(co);
   if (data.coaching) {
     const c = data.coaching;
-    $("coaching").innerHTML =
-      `<p><strong>Score:</strong> ${c.score ?? "—"}/10</p>` +
-      `<p>${c.summary}</p>` +
-      `<p><strong>Strengths:</strong> ${(c.strengths || []).join("; ")}</p>` +
-      `<p><strong>Improve:</strong> ${(c.improvements || []).join("; ")}</p>`;
+    const mk = (label, value) => {
+      const p = document.createElement("p");
+      const strong = document.createElement("strong");
+      strong.textContent = label;
+      p.appendChild(strong);
+      p.appendChild(document.createTextNode(" " + value));
+      return p;
+    };
+    co.appendChild(mk("Score:", `${c.score ?? "—"}/10`));
+    const summary = document.createElement("p");
+    summary.textContent = c.summary || "";
+    co.appendChild(summary);
+    co.appendChild(mk("Strengths:", (c.strengths || []).join("; ")));
+    co.appendChild(mk("Improve:", (c.improvements || []).join("; ")));
   } else {
-    $("coaching").textContent = "Coaching not available (no Anthropic key or empty transcript).";
+    co.textContent = "Coaching not available (no Anthropic key or empty transcript).";
   }
 }
 
