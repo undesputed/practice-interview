@@ -20,6 +20,12 @@ function show(screen) {
     $(s).style.display = (s === screen) ? "" : "none";
 }
 
+// Read an error body safely: prefer JSON {detail}, fall back to raw text/status.
+async function errorDetail(res) {
+  const body = await res.text().catch(() => "");
+  try { return JSON.parse(body).detail || body; } catch (_) { return body || String(res.status); }
+}
+
 async function initLandmarker() {
   const fileset = await FilesetResolver.forVisionTasks(CONFIG.WASM_BASE);
   landmarker = await FaceLandmarker.createFromOptions(fileset, {
@@ -101,8 +107,8 @@ async function startInterview() {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ role }),
   });
+  if (!tokenRes.ok) throw new Error("token request failed: " + (await errorDetail(tokenRes)));
   const tokenResp = await tokenRes.json();
-  if (!tokenRes.ok) throw new Error(tokenResp.detail || ("token request failed: " + tokenRes.status));
 
   sessionStart = performance.now();
   running = true;
@@ -127,12 +133,12 @@ async function endInterview() {
     method: "POST", headers: { "content-type": "application/json" },
     body: JSON.stringify({ role, frames, transcript: { full_text, segments } }),
   });
-  const resp = await r.json();
   if (!r.ok) {
-    alert("Could not generate report: " + (resp.detail || r.status));
+    alert("Could not generate report: " + (await errorDetail(r)));
     show("screen-start");
     return;
   }
+  const resp = await r.json();
 
   renderResults(resp);
   show("screen-results");

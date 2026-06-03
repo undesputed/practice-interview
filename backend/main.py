@@ -1,6 +1,8 @@
 # backend/main.py
+import logging
 import os
 from datetime import datetime
+import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
@@ -37,7 +39,22 @@ async def interview_token(req: TokenRequest):
     api_key = os.getenv("DEEPGRAM_API_KEY")
     if not api_key:
         raise HTTPException(500, "DEEPGRAM_API_KEY is not set")
-    token = await grant_ephemeral_token(api_key)
+    try:
+        token = await grant_ephemeral_token(api_key)
+    except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 403:
+            # The key can't mint ephemeral tokens (needs grant permission).
+            # For LOCAL dev, fall back to the long-lived key — the Voice Agent
+            # WebSocket accepts it directly. This exposes the key to the browser,
+            # so for an EC2 deploy use a Deepgram key WITH grant permission instead.
+            logging.warning(
+                "Deepgram /auth/grant returned 403 (insufficient permissions); "
+                "falling back to the long-lived key. LOCAL DEV ONLY — the key is "
+                "sent to the browser. Use a key with grant permission before deploying."
+            )
+            token = api_key
+        else:
+            raise HTTPException(502, f"Deepgram token grant failed: {exc.response.status_code}")
     return {"url": DEEPGRAM_AGENT_URL, "token": token,
             "config": build_agent_config(req.role)}
 
