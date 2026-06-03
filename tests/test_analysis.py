@@ -212,3 +212,14 @@ def test_expression_detail_basic():
 def test_expression_detail_no_face_safe():
     out = expression_detail([_frame_x(i*100.0, face=False) for i in range(3)])
     assert out == {"eye_openness": 0.0, "mouth_open_mean": 0.0, "speaking_pct": 0.0, "eyebrow_raise": 0.0}
+
+from backend.analysis import gaze_breakdown
+
+def test_gaze_breakdown_center_and_left():
+    center = [_frame(i*100.0, look_out=0.0) for i in range(5)]
+    out = gaze_breakdown(center)
+    assert out["center_pct"] == 100.0
+    left = [_frame(i*100.0, look_out=0.8) for i in range(5)]
+    out2 = gaze_breakdown(left)
+    assert out2["left_pct"] == 100.0
+    assert out2["center_pct"] == 0.0

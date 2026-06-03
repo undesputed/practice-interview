@@ -216,6 +216,29 @@ def expression_detail(frames: list[dict]) -> dict:
             "eyebrow_raise": round(sum(brow) / n, 3)}
 
 
+def gaze_breakdown(frames: list[dict]) -> dict:
+    """% of frames per dominant gaze direction (center/left/right/up/down). Denominator = total."""
+    counts = {"center": 0, "left": 0, "right": 0, "up": 0, "down": 0}
+    total = len(frames)
+    if total == 0:
+        return {k + "_pct": 0.0 for k in counts}
+    for f in frames:
+        if not f.get("face", False):
+            continue
+        bs = f.get("bs", {})
+        dirs = {
+            "left": max(bs.get("eyeLookOutLeft", 0.0), bs.get("eyeLookInRight", 0.0)),
+            "right": max(bs.get("eyeLookOutRight", 0.0), bs.get("eyeLookInLeft", 0.0)),
+            "up": max(bs.get("eyeLookUpLeft", 0.0), bs.get("eyeLookUpRight", 0.0)),
+            "down": max(bs.get("eyeLookDownLeft", 0.0), bs.get("eyeLookDownRight", 0.0)),
+        }
+        if max(dirs.values()) < GAZE_MAX:
+            counts["center"] += 1
+        else:
+            counts[max(dirs, key=dirs.get)] += 1
+    return {k + "_pct": round(100.0 * v / total, 1) for k, v in counts.items()}
+
+
 def questions_from_transcript(segments: list[dict]) -> dict:
     """Map interviewer turn index -> question text, in order of appearance."""
     questions: dict[int, str] = {}
