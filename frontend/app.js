@@ -2,6 +2,7 @@
 import { CONFIG } from "./config.js";
 import { startVoiceAgent } from "./deepgram-client.js";
 import { pickPose, pickHands, pickObjects } from "./landmarks.js";
+import { createActionDetector } from "./actions.js";
 import { FaceLandmarker, PoseLandmarker, HandLandmarker, GestureRecognizer, ObjectDetector, FilesetResolver, DrawingUtils }
   from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35";
 
@@ -13,6 +14,8 @@ let objectDetector = null;
 let lastObjectResult = null;
 let lastBodyTs = 0;
 let frames = [];
+let events = [];
+let actionDetector = null;
 let segments = [];
 let turnIndex = -1;       // -1 until the first interviewer line
 let sessionStart = 0;
@@ -31,6 +34,22 @@ function show(screen) {
 async function errorDetail(res) {
   const body = await res.text().catch(() => "");
   try { return JSON.parse(body).detail || body; } catch (_) { return body || String(res.status); }
+}
+
+function fmtTime(ms) {
+  const mm = String(Math.floor(ms / 60000)).padStart(2, "0");
+  const ss = String(Math.floor((ms % 60000) / 1000)).padStart(2, "0");
+  return `${mm}:${ss}`;
+}
+
+function appendAction(ev) {
+  const el = $("actions");
+  if (!el) return;
+  const div = document.createElement("div");
+  div.className = "action-line";
+  div.textContent = `${fmtTime(ev.t)} · ${ev.icon} ${ev.label}`;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
 }
 
 // Append a non-speaker status/error line to the live transcript.
@@ -143,6 +162,16 @@ function renderLoop(video, canvas, ctx, draw) {
   }
   frames.push(frame);
 
+  if (actionDetector) {
+    const gestureNames = (lastHandResult && lastHandResult.gestures)
+      ? lastHandResult.gestures.map((g) => g && g[0] && g[0].categoryName)
+      : [];
+    for (const ev of actionDetector.feed({ t: frame.t, turn: turnIndex, bs, gestures: gestureNames, m, face: hasFace })) {
+      events.push(ev);
+      appendAction(ev);
+    }
+  }
+
   $("hud-time").textContent = ((now - sessionStart) / 1000).toFixed(0) + "s";
   $("hud-question").textContent = "Q" + (turnIndex + 1);
   $("hud-face").textContent = hasFace ? "face ✓" : "face ✗";
@@ -162,7 +191,8 @@ function onTranscript({ speaker, text }) {
 
 async function startInterview() {
   role = $("role-select").value || CONFIG.ROLES[0];
-  frames = []; segments = []; turnIndex = -1;
+  frames = []; segments = []; turnIndex = -1; events = [];
+  actionDetector = createActionDetector();
   lastHandResult = null; lastObjectResult = null; lastBodyTs = 0;
   show("screen-interview");
   console.log("[interview] starting; role=", role);
@@ -217,7 +247,7 @@ async function endInterview() {
 
   const r = await fetch("/api/session", {
     method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ role, frames, transcript: { full_text, segments } }),
+    body: JSON.stringify({ role, frames, transcript: { full_text, segments }, events }),
   });
   if (!r.ok) {
     alert("Could not generate report: " + (await errorDetail(r)));
@@ -308,6 +338,18 @@ function renderResults(data) {
 
   $("chart-img").src = data.charts_url;
   $("saved-path").textContent = "Saved to sessions/" + data.session_id + "/";
+
+  const act = data.summary.actions || { counts: {}, events: [] };
+  fillList("card-actions", Object.entries(act.counts).map(([k, v]) => `${k} ×${v}`));
+  const tl = $("actions-timeline");
+  if (tl) {
+    while (tl.firstChild) tl.removeChild(tl.firstChild);
+    for (const ev of (act.events || [])) {
+      const li = document.createElement("li");
+      li.textContent = `${fmtTime(ev.t)} · ${ev.icon} ${ev.label}`;
+      tl.appendChild(li);
+    }
+  }
 
   const co = $("coaching");
   while (co.firstChild) co.removeChild(co.firstChild);
