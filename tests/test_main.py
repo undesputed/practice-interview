@@ -1,8 +1,38 @@
 import math
+import httpx
 from fastapi.testclient import TestClient
 from backend.main import app
 
 client = TestClient(app)
+
+
+def _raise_grant_403(*_a, **_k):
+    req = httpx.Request("POST", "https://api.deepgram.com/v1/auth/grant")
+    raise httpx.HTTPStatusError("403", request=req, response=httpx.Response(403, request=req))
+
+
+def test_token_uses_bearer_scheme_for_ephemeral(monkeypatch):
+    import backend.main as main
+    monkeypatch.setenv("DEEPGRAM_API_KEY", "rawkey")
+
+    async def fake_grant(_key, ttl_seconds=300):
+        return "eph-token"
+    monkeypatch.setattr(main, "grant_ephemeral_token", fake_grant)
+
+    data = client.post("/api/interview/token", json={"role": "X"}).json()
+    assert data["token"] == "eph-token"
+    assert data["scheme"] == "bearer"   # ephemeral tokens MUST use the bearer subprotocol
+
+
+def test_token_uses_token_scheme_on_browser_key_fallback(monkeypatch):
+    import backend.main as main
+    monkeypatch.setenv("DEEPGRAM_API_KEY", "rawkey")
+    monkeypatch.setenv("DEEPGRAM_ALLOW_BROWSER_KEY", "1")
+    monkeypatch.setattr(main, "grant_ephemeral_token", _raise_grant_403)
+
+    data = client.post("/api/interview/token", json={"role": "X"}).json()
+    assert data["token"] == "rawkey"
+    assert data["scheme"] == "token"   # a raw API key uses the token subprotocol
 
 def _frame(t, turn=0):
     m = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]

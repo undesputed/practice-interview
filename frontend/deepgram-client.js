@@ -1,7 +1,12 @@
 // frontend/deepgram-client.js
 // Live voice-agent client. Ported from ai-interview-v2 InCall.tsx audio pipeline.
-export function startVoiceAgent({ url, token, config, micStream, onTranscript, onError, onClose }) {
-  const ws = new WebSocket(url, ["token", token]);
+//
+// Auth scheme matters: a raw Deepgram API key uses the "token" subprotocol;
+// an ephemeral token (from /v1/auth/grant) uses "bearer". The backend tells us which.
+export function startVoiceAgent({ url, token, scheme, config, micStream, onTranscript, onError, onClose }) {
+  const sub = scheme || "token";
+  console.log(`[dg] connecting: scheme=${sub} tokenLen=${(token || "").length} url=${url}`);
+  const ws = new WebSocket(url, [sub, token]);
   ws.binaryType = "arraybuffer";
 
   const inCtx = new AudioContext({ sampleRate: 48000 });
@@ -9,8 +14,13 @@ export function startVoiceAgent({ url, token, config, micStream, onTranscript, o
   let nextStart = 0;
   let processor = null;
   let source = null;
+  let audioChunks = 0;
 
   ws.onopen = () => {
+    console.log("[dg] ws OPEN — sending Settings; inCtx=%s outCtx=%s", inCtx.state, outCtx.state);
+    // Browsers may start an AudioContext suspended; resume so TTS is audible.
+    inCtx.resume().catch(() => {});
+    outCtx.resume().catch(() => {});
     ws.send(JSON.stringify(config)); // Settings first
 
     source = inCtx.createMediaStreamSource(micStream);
@@ -32,6 +42,8 @@ export function startVoiceAgent({ url, token, config, micStream, onTranscript, o
   ws.onmessage = (event) => {
     if (event.data instanceof ArrayBuffer) {
       // binary = TTS audio (24kHz int16 mono)
+      audioChunks += 1;
+      if (audioChunks === 1) console.log("[dg] first TTS audio chunk received");
       const int16 = new Int16Array(event.data);
       const f32 = new Float32Array(int16.length);
       for (let i = 0; i < int16.length; i++) f32[i] = int16[i] / 32768;
@@ -46,22 +58,31 @@ export function startVoiceAgent({ url, token, config, micStream, onTranscript, o
       nextStart = start + buf.duration;
     } else {
       const msg = JSON.parse(event.data);
+      console.log("[dg] <-", msg.type);
       if (msg.type === "ConversationText") {
         onTranscript({
           speaker: msg.role === "assistant" ? "interviewer" : "candidate",
           text: msg.content,
         });
       } else if (msg.type === "Error" || msg.type === "Warning") {
+        console.error("[dg] agent message:", msg);
         if (onError) onError(msg.description || msg.message || msg.type);
       }
     }
   };
 
-  ws.onclose = (e) => { if (onClose) onClose(e); };
-  ws.onerror = () => { if (onError) onError("voice connection error"); };
+  ws.onclose = (e) => {
+    console.warn(`[dg] ws CLOSED code=${e.code} reason="${e.reason}" — audioChunks=${audioChunks}`);
+    if (onClose) onClose(e);
+  };
+  ws.onerror = (ev) => {
+    console.error("[dg] ws ERROR", ev);
+    if (onError) onError("voice connection error");
+  };
 
   return {
     stop() {
+      console.log("[dg] stopping agent");
       try { if (processor) processor.disconnect(); } catch (_) {}
       try { if (source) source.disconnect(); } catch (_) {}
       try { inCtx.close(); } catch (_) {}

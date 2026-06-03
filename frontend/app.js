@@ -97,12 +97,15 @@ async function startInterview() {
   role = $("role-select").value || CONFIG.ROLES[0];
   frames = []; segments = []; turnIndex = -1;
   show("screen-interview");
+  console.log("[interview] starting; role=", role);
 
   mediaStream = await navigator.mediaDevices.getUserMedia({
     video: { width: 1280, height: 720, facingMode: "user" },
     audio: { sampleRate: 48000, channelCount: 1,
              echoCancellation: true, noiseSuppression: true, autoGainControl: true },
   });
+  console.log("[interview] getUserMedia OK; audio tracks=%d video tracks=%d",
+              mediaStream.getAudioTracks().length, mediaStream.getVideoTracks().length);
 
   const video = document.createElement("video");
   video.srcObject = mediaStream; video.muted = true; await video.play();
@@ -112,7 +115,8 @@ async function startInterview() {
   const ctx = canvas.getContext("2d");
   const draw = new DrawingUtils(ctx);
 
-  if (!landmarker) await initLandmarker();
+  if (!landmarker) { console.log("[interview] loading MediaPipe model…"); await initLandmarker(); }
+  console.log("[interview] landmarker ready");
 
   const tokenRes = await fetch("/api/interview/token", {
     method: "POST", headers: { "content-type": "application/json" },
@@ -120,13 +124,14 @@ async function startInterview() {
   });
   if (!tokenRes.ok) throw new Error("token request failed: " + (await errorDetail(tokenRes)));
   const tokenResp = await tokenRes.json();
+  console.log("[interview] token OK; scheme=%s tokenLen=%d", tokenResp.scheme, (tokenResp.token || "").length);
 
   sessionStart = performance.now();
   running = true;
   renderLoop(video, canvas, ctx, draw);
 
   agent = startVoiceAgent({
-    url: tokenResp.url, token: tokenResp.token, config: tokenResp.config,
+    url: tokenResp.url, token: tokenResp.token, scheme: tokenResp.scheme, config: tokenResp.config,
     micStream: mediaStream, onTranscript,
     onError: (m) => { console.error("[interview]", m); systemLine("⚠ " + m); },
     onClose: () => { if (running) systemLine("Voice connection closed."); },

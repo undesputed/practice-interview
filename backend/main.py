@@ -15,6 +15,7 @@ from backend.deepgram import build_agent_config, grant_ephemeral_token, DEEPGRAM
 from backend.anthropic_coach import generate_coaching
 
 load_dotenv()
+logging.basicConfig(level=logging.INFO)  # ensure our INFO/WARNING logs reach the console
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SESSIONS_DIR = os.path.join(ROOT, "sessions")
@@ -41,6 +42,10 @@ async def interview_token(req: TokenRequest):
         raise HTTPException(500, "DEEPGRAM_API_KEY is not set")
     try:
         token = await grant_ephemeral_token(api_key)
+        # Ephemeral tokens authenticate to the agent WebSocket with the "bearer"
+        # subprotocol; a raw API key uses "token". The scheme MUST match the token type.
+        scheme = "bearer"
+        logging.info("Deepgram token issued via grant (ephemeral, scheme=bearer).")
     except httpx.HTTPStatusError as exc:
         if exc.response.status_code == 403:
             # The key can't mint ephemeral tokens (needs grant permission).
@@ -50,10 +55,11 @@ async def interview_token(req: TokenRequest):
             if os.getenv("DEEPGRAM_ALLOW_BROWSER_KEY") == "1":
                 logging.warning(
                     "Deepgram /auth/grant 403; DEEPGRAM_ALLOW_BROWSER_KEY=1 is set, so "
-                    "falling back to the long-lived key. LOCAL DEV ONLY — the key is "
-                    "sent to the browser. Do NOT set this on a deployed server."
+                    "falling back to the long-lived key (scheme=token). LOCAL DEV ONLY — "
+                    "the key is sent to the browser. Do NOT set this on a deployed server."
                 )
                 token = api_key
+                scheme = "token"
             else:
                 logging.error("Deepgram /auth/grant 403 — key lacks grant permission.")
                 raise HTTPException(
@@ -64,7 +70,7 @@ async def interview_token(req: TokenRequest):
                 )
         else:
             raise HTTPException(502, f"Deepgram token grant failed: {exc.response.status_code}")
-    return {"url": DEEPGRAM_AGENT_URL, "token": token,
+    return {"url": DEEPGRAM_AGENT_URL, "token": token, "scheme": scheme,
             "config": build_agent_config(req.role)}
 
 
