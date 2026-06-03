@@ -209,29 +209,67 @@ async function endInterview() {
 
 function clearChildren(el) { while (el.firstChild) el.removeChild(el.firstChild); }
 
-function renderResults(data) {
-  const o = data.summary.overall;
-  const ov = $("metrics-overall");
-  clearChildren(ov);
-  for (const text of [
-    `Eye contact (gaze): ${o.gaze_eye_contact_pct}%`,
-    `Upright posture: ${o.upright_pct}%`,
-    `Steadiness: head ${o.steadiness_score}/100, body ${o.body_steadiness}/100`,
-    `Hand fidget: ${o.hand_fidget}  ·  face-touches: ${o.face_touch_count}`,
-    `Smiling: ${o.pct_smiling}% (peak ${o.peak_smile})  ·  blinks: ${o.blink_count}`,
-    `Lean (lateral): ${o.lean}°  ·  no-face: ${data.summary.no_face_pct}%`,
-  ]) {
+function fillList(id, lines) {
+  const el = $(id);
+  if (!el) return;
+  while (el.firstChild) el.removeChild(el.firstChild);
+  for (const text of lines) {
     const li = document.createElement("li");
     li.textContent = text;
-    ov.appendChild(li);
+    el.appendChild(li);
   }
+}
+
+function renderResults(data) {
+  const s = data.summary, o = s.overall, t = s.timing || {};
+  const setChip = (id, v) => { const e = $(id); if (e) e.textContent = (v == null ? "—" : v); };
+  setChip("chip-attention", o.attention);
+  setChip("chip-confidence", o.confidence);
+  setChip("chip-nervousness", o.nervousness);
+  setChip("chip-composure", o.composure);
+
+  const gb = o.gaze_breakdown || {};
+  const hp = o.head_pose || { pitch: {}, yaw: {}, roll: {} };
+  fillList("card-eye", [
+    `Eye contact (gaze): ${o.gaze_eye_contact_pct}%`,
+    `Gaze — center ${gb.center_pct}% · L ${gb.left_pct}% · R ${gb.right_pct}% · U ${gb.up_pct}% · D ${gb.down_pct}%`,
+    `Blinks: ${o.blink_count} (${o.blinks_per_min}/min)`,
+    `Eye openness: ${o.eye_openness}`,
+  ]);
+  fillList("card-head", [
+    `Pitch: ${hp.pitch.mean}° (${hp.pitch.min}…${hp.pitch.max})`,
+    `Yaw: ${hp.yaw.mean}° (${hp.yaw.min}…${hp.yaw.max})`,
+    `Roll: ${hp.roll.mean}° (${hp.roll.min}…${hp.roll.max})`,
+    `Head steadiness: ${o.steadiness_score}/100 (movement ${o.head_movement})`,
+  ]);
+  fillList("card-expression", [
+    `Smile: mean ${o.mean_smile}, peak ${o.peak_smile} (${o.pct_smiling}% of time)`,
+    `Eyebrow raise: ${o.eyebrow_raise}`,
+    `Mouth open: ${o.mouth_open_mean} · speaking ${o.speaking_pct}%`,
+  ]);
+  fillList("card-posture", [
+    `Upright posture: ${o.upright_pct}%`,
+    `Lateral lean: ${o.lean}°`,
+    `Body steadiness: ${o.body_steadiness}/100`,
+    `Hand fidget: ${o.hand_fidget} · face-touches: ${o.face_touch_count}`,
+  ]);
+  fillList("card-engagement", [
+    `Speaking vs listening: ${t.speaking_pct ?? 0}% speaking`,
+    `Mean response time: ${t.mean_response_sec ?? 0}s`,
+  ]);
+  fillList("card-presence", [
+    `Face present: ${o.face_presence_pct}%`,
+    `No-face: ${s.no_face_pct}%`,
+  ]);
 
   const tb = $("metrics-per-question");
-  clearChildren(tb);
-  for (const q of data.summary.per_question) {
+  while (tb.firstChild) tb.removeChild(tb.firstChild);
+  const rt = t.per_question_response_sec || [];
+  for (const q of s.per_question) {
     const tr = document.createElement("tr");
     for (const cell of [q.question, `${q.metrics.gaze_eye_contact_pct}%`,
-                        `${q.metrics.upright_pct}%`, `${q.metrics.body_steadiness}`,
+                        `${q.metrics.upright_pct}%`, `${q.metrics.composure}`,
+                        rt[q.turn] != null ? `${rt[q.turn]}s` : "—",
                         `${q.metrics.face_touch_count}`]) {
       const td = document.createElement("td");
       td.textContent = cell;
@@ -244,21 +282,17 @@ function renderResults(data) {
   $("saved-path").textContent = "Saved to sessions/" + data.session_id + "/";
 
   const co = $("coaching");
-  clearChildren(co);
+  while (co.firstChild) co.removeChild(co.firstChild);
   if (data.coaching) {
     const c = data.coaching;
     const mk = (label, value) => {
       const p = document.createElement("p");
-      const strong = document.createElement("strong");
-      strong.textContent = label;
-      p.appendChild(strong);
-      p.appendChild(document.createTextNode(" " + value));
+      const b = document.createElement("strong"); b.textContent = label;
+      p.appendChild(b); p.appendChild(document.createTextNode(" " + value));
       return p;
     };
     co.appendChild(mk("Score:", `${c.score ?? "—"}/10`));
-    const summary = document.createElement("p");
-    summary.textContent = c.summary || "";
-    co.appendChild(summary);
+    const sum = document.createElement("p"); sum.textContent = c.summary || ""; co.appendChild(sum);
     co.appendChild(mk("Strengths:", (c.strengths || []).join("; ")));
     co.appendChild(mk("Improve:", (c.improvements || []).join("; ")));
   } else {
