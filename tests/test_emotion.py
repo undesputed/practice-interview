@@ -38,3 +38,20 @@ def test_aggregate_ignores_unknown_dominant_class():
     assert out["available"] is True
     assert "contempt" not in out["overall_distribution"]
     assert out["overall_distribution"]["neutral"] == 50.0  # 1 of 2 shots; unknown still counts in denominator
+
+from backend import emotion as emotion_mod
+
+def test_score_emotions_raises_when_deepface_missing(monkeypatch):
+    # Simulate DeepFace not installed: the lazy import inside score_emotions fails.
+    import builtins
+    real_import = builtins.__import__
+
+    def fake_import(name, *a, **k):
+        if name == "deepface" or name.startswith("deepface."):
+            raise ImportError("No module named 'deepface'")
+        return real_import(name, *a, **k)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+    import pytest
+    with pytest.raises(ImportError):
+        emotion_mod.score_emotions([b"not-a-real-jpeg"])

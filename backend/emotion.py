@@ -46,3 +46,33 @@ def aggregate_emotions(shots: list[dict]) -> dict:
 
     return {"available": True, "dominant": dominant, "overall_distribution": overall,
             "per_question": per_question, "timeline": timeline}
+
+
+def score_emotions(images: list[bytes]) -> list[dict | None]:
+    """Run DeepFace emotion analysis on each JPEG byte string.
+
+    Returns a list aligned with `images`; each element is
+    {"dominant": str, "scores": {class: 0-100}} or None if that shot failed.
+    Lazy-imports DeepFace (and cv2/numpy) so the app boots without them; raises
+    ImportError if DeepFace is unavailable. Images are never written to disk.
+    """
+    from deepface import DeepFace  # lazy, heavy (TensorFlow)
+    import numpy as np
+    import cv2
+
+    out: list[dict | None] = []
+    for buf in images:
+        try:
+            arr = cv2.imdecode(np.frombuffer(buf, np.uint8), cv2.IMREAD_COLOR)
+            if arr is None:
+                raise ValueError("could not decode image")
+            res = DeepFace.analyze(arr, actions=["emotion"], detector_backend="skip",
+                                   enforce_detection=False, silent=True)
+            r = res[0] if isinstance(res, list) else res
+            emo = r["emotion"]
+            out.append({"dominant": r["dominant_emotion"],
+                        "scores": {c: round(float(emo.get(c, 0.0)), 1) for c in EMOTION_CLASSES}})
+        except Exception as exc:  # one bad frame must not sink the batch
+            logging.warning("emotion shot skipped: %s", exc)
+            out.append(None)
+    return out
