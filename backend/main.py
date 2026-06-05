@@ -5,6 +5,7 @@ import json
 from datetime import datetime
 import httpx
 from dotenv import load_dotenv
+from typing import Optional
 from fastapi import FastAPI, HTTPException, File, Form, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -36,6 +37,7 @@ class SessionRequest(BaseModel):
     frames: list[dict]
     transcript: dict
     events: list = []
+    emotion: Optional[dict] = None
 
 
 @app.post("/api/interview/token")
@@ -118,6 +120,7 @@ def session(req: SessionRequest):
     summary["timing"] = transcript_metrics(req.transcript.get("segments", []))
     summary["integrity"] = integrity_metrics(req.frames)
     summary["actions"] = summarize_actions(req.events)
+    summary["emotion"] = req.emotion if (req.emotion and req.emotion.get("available")) else {"available": False}
 
     coaching = None
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
@@ -129,8 +132,11 @@ def session(req: SessionRequest):
     save_session(os.path.join(SESSIONS_DIR, session_id),
                  req.frames, req.transcript, summary, coaching)
 
+    emotion_chart_url = (f"/sessions/{session_id}/emotion.png"
+                         if summary["emotion"].get("available") else None)
     return {"session_id": session_id, "summary": summary, "coaching": coaching,
-            "charts_url": f"/sessions/{session_id}/charts.png"}
+            "charts_url": f"/sessions/{session_id}/charts.png",
+            "emotion_chart_url": emotion_chart_url}
 
 
 # static mounts last so /api routes win

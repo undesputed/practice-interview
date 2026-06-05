@@ -100,3 +100,41 @@ def test_emotion_endpoint_unavailable_when_scoring_raises(monkeypatch):
     data = {"meta": json.dumps([{"t": 0.0, "turn": 0}])}
     resp = _client.post("/api/emotion", data=data, files=files)
     assert resp.json() == {"available": False}
+
+
+def _frame(t, turn=0):
+    m = [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]
+    return {"t": t, "turn": turn, "face": True,
+            "bs": {"mouthSmileLeft": 0.1, "mouthSmileRight": 0.1,
+                   "eyeBlinkLeft": 0.0, "eyeBlinkRight": 0.0, "browInnerUp": 0.0},
+            "m": m}
+
+def test_session_includes_emotion_and_chart_url(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)  # skip coaching
+    emotion_summary = {
+        "available": True, "dominant": "neutral",
+        "overall_distribution": {c: (100.0 if c == "neutral" else 0.0) for c in EMOTION_CLASSES},
+        "per_question": [{"turn": 0, "dominant": "neutral",
+                          "distribution": {c: (100.0 if c == "neutral" else 0.0) for c in EMOTION_CLASSES}}],
+        "timeline": [{"t": 0.0, "turn": 0, "dominant": "neutral",
+                      "scores": {c: (90.0 if c == "neutral" else 0.0) for c in EMOTION_CLASSES}}],
+    }
+    body = {"role": "Software Engineer",
+            "frames": [_frame(i * 100.0) for i in range(5)],
+            "transcript": {"full_text": "", "segments": [
+                {"speaker": "interviewer", "text": "hi", "t": 0}]},
+            "emotion": emotion_summary}
+    resp = _client.post("/api/session", json=body)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["summary"]["emotion"]["dominant"] == "neutral"
+    assert data["emotion_chart_url"].endswith("emotion.png")
+
+def test_session_emotion_absent_is_unavailable(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    body = {"role": "Software Engineer",
+            "frames": [_frame(0.0)],
+            "transcript": {"full_text": "", "segments": []}}
+    data = _client.post("/api/session", json=body).json()
+    assert data["summary"]["emotion"] == {"available": False}
+    assert data["emotion_chart_url"] is None
