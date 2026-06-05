@@ -429,7 +429,9 @@ function renderResults(data) {
     const dist = Object.entries(emo.overall_distribution || {})
       .sort((a, b) => b[1] - a[1])
       .map(([k, v]) => `${k} ${v}%`).join(" · ");
-    fillList("card-emotion", [`Dominant emotion: ${emo.dominant}`, `Distribution: ${dist}`]);
+    const lines = [`Dominant emotion: ${emo.dominant || "—"}`];
+    if (dist) lines.push(`Distribution: ${dist}`);
+    fillList("card-emotion", lines);
     if (emoImg && data.emotion_chart_url) { emoImg.src = data.emotion_chart_url; emoImg.style.display = ""; }
   } else {
     fillList("card-emotion", ["Emotion analysis not available"]);
