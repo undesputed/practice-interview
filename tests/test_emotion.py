@@ -55,3 +55,48 @@ def test_score_emotions_raises_when_deepface_missing(monkeypatch):
     import pytest
     with pytest.raises(ImportError):
         emotion_mod.score_emotions([b"not-a-real-jpeg"])
+
+import json
+from fastapi.testclient import TestClient
+from backend.main import app
+
+_client = TestClient(app)
+
+def _canned_scores(dominant):
+    s = {c: 0.0 for c in EMOTION_CLASSES}
+    s[dominant] = 88.0
+    return {"dominant": dominant, "scores": s}
+
+def test_emotion_endpoint_disabled_returns_unavailable(monkeypatch):
+    monkeypatch.delenv("EMOTION_ANALYSIS", raising=False)
+    files = [("images", ("f.jpg", b"x", "image/jpeg"))]
+    data = {"meta": json.dumps([{"t": 0.0, "turn": 0}])}
+    resp = _client.post("/api/emotion", data=data, files=files)
+    assert resp.status_code == 200
+    assert resp.json() == {"available": False}
+
+def test_emotion_endpoint_aggregates_when_enabled(monkeypatch):
+    monkeypatch.setenv("EMOTION_ANALYSIS", "1")
+    import backend.main as main
+    monkeypatch.setattr(main, "score_emotions",
+                        lambda bufs: [_canned_scores("happy") for _ in bufs])
+    files = [("images", ("a.jpg", b"x", "image/jpeg")),
+             ("images", ("b.jpg", b"y", "image/jpeg"))]
+    data = {"meta": json.dumps([{"t": 0.0, "turn": 0}, {"t": 100.0, "turn": 0}])}
+    resp = _client.post("/api/emotion", data=data, files=files)
+    assert resp.status_code == 200
+    out = resp.json()
+    assert out["available"] is True
+    assert out["dominant"] == "happy"
+    assert out["overall_distribution"]["happy"] == 100.0
+
+def test_emotion_endpoint_unavailable_when_scoring_raises(monkeypatch):
+    monkeypatch.setenv("EMOTION_ANALYSIS", "1")
+    import backend.main as main
+    def boom(_bufs):
+        raise ImportError("no deepface")
+    monkeypatch.setattr(main, "score_emotions", boom)
+    files = [("images", ("a.jpg", b"x", "image/jpeg"))]
+    data = {"meta": json.dumps([{"t": 0.0, "turn": 0}])}
+    resp = _client.post("/api/emotion", data=data, files=files)
+    assert resp.json() == {"available": False}

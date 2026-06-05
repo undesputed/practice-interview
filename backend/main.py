@@ -1,10 +1,11 @@
 # backend/main.py
 import logging
 import os
+import json
 from datetime import datetime
 import httpx
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, File, Form, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -13,6 +14,7 @@ from backend.analysis import compute_metrics, questions_from_transcript, transcr
 from backend.report import save_session
 from backend.deepgram import build_agent_config, grant_ephemeral_token, DEEPGRAM_AGENT_URL
 from backend.anthropic_coach import generate_coaching
+from backend.emotion import score_emotions, aggregate_emotions
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)  # ensure our INFO/WARNING logs reach the console
@@ -73,6 +75,35 @@ async def interview_token(req: TokenRequest):
             raise HTTPException(502, f"Deepgram token grant failed: {exc.response.status_code}")
     return {"url": DEEPGRAM_AGENT_URL, "token": token, "scheme": scheme,
             "config": build_agent_config(req.role)}
+
+
+@app.post("/api/emotion")
+async def emotion(meta: str = Form(...), images: list[UploadFile] = File(default=[])):
+    """Score buffered face crops with DeepFace and return the aggregated emotion summary.
+
+    Optional + graceful: returns {"available": False} when EMOTION_ANALYSIS != "1",
+    no images were sent, or DeepFace is unavailable. Images are scored in memory and
+    never written to disk.
+    """
+    if os.getenv("EMOTION_ANALYSIS") != "1" or not images:
+        return {"available": False}
+    try:
+        metas = json.loads(meta)
+    except (ValueError, TypeError):
+        raise HTTPException(400, "invalid meta JSON")
+    bufs = [await im.read() for im in images]
+    try:
+        scored = score_emotions(bufs)
+    except Exception as exc:  # DeepFace import/runtime failure -> degrade
+        logging.warning("emotion scoring unavailable: %s", exc)
+        return {"available": False}
+    shots = []
+    for md, sc in zip(metas, scored):
+        if sc is None:
+            continue
+        shots.append({"t": md.get("t", 0.0), "turn": md.get("turn", -1),
+                      "dominant": sc["dominant"], "scores": sc["scores"]})
+    return aggregate_emotions(shots)
 
 
 @app.post("/api/session")
