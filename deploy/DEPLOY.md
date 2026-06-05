@@ -16,6 +16,14 @@ pip install -r backend/requirements.txt
 printf "DEEPGRAM_API_KEY=...\nANTHROPIC_API_KEY=...\n" > .env
 ```
 
+### Optional: DeepFace emotion analysis
+Emotion analysis is off by default. To enable it:
+```bash
+pip install -r backend/requirements-emotion.txt   # heavy: pulls TensorFlow
+```
+Add `EMOTION_ANALYSIS=1` to `.env`. First run downloads the ~5 MB emotion model.
+Leave it unset to disable (the app and reports work normally without it).
+
 ## 3. Run the app (systemd)
 Create `/etc/systemd/system/interview.service`:
 ```ini
