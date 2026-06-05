@@ -283,9 +283,22 @@ async function endInterview() {
     .map((s) => (s.speaker === "interviewer" ? "INTERVIEWER: " : "CANDIDATE: ") + s.text)
     .join("\n");
 
+  let emotion = null;
+  if (emotionShots.length) {
+    try {
+      const fd = new FormData();
+      fd.append("meta", JSON.stringify(emotionShots.map((s) => ({ t: s.t, turn: s.turn }))));
+      for (const s of emotionShots) fd.append("images", s.blob, "crop.jpg");
+      const er = await fetch("/api/emotion", { method: "POST", body: fd });
+      if (er.ok) emotion = await er.json();
+    } catch (e) {
+      console.warn("[interview] emotion upload failed:", e.message);
+    }
+  }
+
   const r = await fetch("/api/session", {
     method: "POST", headers: { "content-type": "application/json" },
-    body: JSON.stringify({ role, frames, transcript: { full_text, segments }, events }),
+    body: JSON.stringify({ role, frames, transcript: { full_text, segments }, events, emotion }),
   });
   if (!r.ok) {
     alert("Could not generate report: " + (await errorDetail(r)));
