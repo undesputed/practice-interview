@@ -6,6 +6,7 @@ matplotlib.use("Agg")  # headless backend — no display needed
 import matplotlib.pyplot as plt
 from backend.analysis import (matrix_to_euler, SMILE_THRESHOLD, GAZE_MAX,
                               UPRIGHT_RATIO, FRAME_ASPECT)
+from backend.emotion import EMOTION_CLASSES
 
 
 def _write_csv(path: str, frames: list[dict]) -> None:
@@ -97,6 +98,27 @@ def _build_charts(path: str, frames: list[dict]) -> None:
     plt.close(fig)
 
 
+def _build_emotion_chart(path: str, emotion: dict) -> None:
+    """Line-per-emotion score over time, with red lines at question boundaries."""
+    timeline = emotion.get("timeline", [])
+    if not timeline:
+        return
+    ts = [s["t"] / 1000.0 for s in timeline]
+    boundaries = [timeline[i]["t"] / 1000.0 for i in range(1, len(timeline))
+                  if timeline[i]["turn"] != timeline[i - 1]["turn"]]
+    fig, ax = plt.subplots(figsize=(14, 4))
+    for c in EMOTION_CLASSES:
+        ax.plot(ts, [s["scores"].get(c, 0.0) for s in timeline], label=c, lw=1.0)
+    for b in boundaries:
+        ax.axvline(b, color="red", lw=0.6, alpha=0.5)
+    ax.set_xlabel("seconds"); ax.set_ylabel("emotion score (0-100)")
+    ax.legend(loc="upper right", ncol=4, fontsize=8)
+    fig.suptitle("Emotion over time (red = new question)")
+    fig.tight_layout()
+    fig.savefig(path, dpi=120)
+    plt.close(fig)
+
+
 def save_session(session_dir: str, frames: list[dict], transcript: dict,
                  summary: dict, coaching: dict | None) -> None:
     os.makedirs(session_dir, exist_ok=True)
@@ -110,3 +132,6 @@ def save_session(session_dir: str, frames: list[dict], transcript: dict,
     with open(os.path.join(session_dir, "transcript.txt"), "w", encoding="utf-8") as fh:
         fh.write(transcript.get("full_text", ""))
     _build_charts(os.path.join(session_dir, "charts.png"), frames)
+    emotion = summary.get("emotion") or {}
+    if emotion.get("available"):
+        _build_emotion_chart(os.path.join(session_dir, "emotion.png"), emotion)

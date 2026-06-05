@@ -30,6 +30,7 @@ def test_save_session_writes_all_files(tmp_path):
 
 
 import csv as _csv
+from backend.emotion import EMOTION_CLASSES
 
 def _pose(nose_y=0.2):
     return {"nose": {"x": 0.5, "y": nose_y}, "leftShoulder": {"x": 0.4, "y": 0.5},
@@ -51,3 +52,29 @@ def test_csv_has_body_columns(tmp_path):
         header = next(_csv.reader(fh))
     for col in ("gaze_on", "pose_present", "upright", "hands_present"):
         assert col in header
+
+
+def _emotion_summary():
+    def dist(dom): return {c: (100.0 if c == dom else 0.0) for c in EMOTION_CLASSES}
+    def scores(dom): return {c: (90.0 if c == dom else 1.0) for c in EMOTION_CLASSES}
+    return {"available": True, "dominant": "neutral",
+            "overall_distribution": dist("neutral"),
+            "per_question": [{"turn": 0, "dominant": "neutral", "distribution": dist("neutral")}],
+            "timeline": [{"t": i * 1000.0, "turn": 0, "dominant": "neutral",
+                          "scores": scores("neutral")} for i in range(4)]}
+
+def test_save_session_writes_emotion_png_when_available(tmp_path):
+    frames = [_frame(i * 100.0) for i in range(5)]
+    summary = {"duration_sec": 0.5, "frame_count": 5, "no_face_pct": 0.0,
+               "overall": {}, "per_question": [], "emotion": _emotion_summary()}
+    d = str(tmp_path / "s")
+    save_session(d, frames, {"full_text": "", "segments": []}, summary, None)
+    assert os.path.exists(os.path.join(d, "emotion.png"))
+
+def test_save_session_skips_emotion_png_when_unavailable(tmp_path):
+    frames = [_frame(i * 100.0) for i in range(5)]
+    summary = {"duration_sec": 0.5, "frame_count": 5, "no_face_pct": 0.0,
+               "overall": {}, "per_question": [], "emotion": {"available": False}}
+    d = str(tmp_path / "s2")
+    save_session(d, frames, {"full_text": "", "segments": []}, summary, None)
+    assert not os.path.exists(os.path.join(d, "emotion.png"))
