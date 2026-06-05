@@ -97,6 +97,9 @@ async def emotion(meta: str = Form(...), images: list[UploadFile] = File(default
     except Exception as exc:  # DeepFace import/runtime failure -> degrade
         logging.warning("emotion scoring unavailable: %s", exc)
         return {"available": False}
+    if len(metas) != len(scored):
+        logging.warning("emotion meta/image count mismatch: %d meta vs %d images",
+                        len(metas), len(scored))
     shots = []
     for md, sc in zip(metas, scored):
         if sc is None:
