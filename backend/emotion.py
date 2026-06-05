@@ -18,7 +18,8 @@ def aggregate_emotions(shots: list[dict]) -> dict:
     n = len(shots)
     dom_counts = {c: 0 for c in EMOTION_CLASSES}
     for s in shots:
-        dom_counts[s["dominant"]] = dom_counts.get(s["dominant"], 0) + 1
+        if s["dominant"] in dom_counts:
+            dom_counts[s["dominant"]] += 1
     overall = {c: round(100.0 * dom_counts[c] / n, 1) for c in EMOTION_CLASSES}
     dominant = max(dom_counts, key=dom_counts.get)
 
@@ -30,7 +31,8 @@ def aggregate_emotions(shots: list[dict]) -> dict:
         group = by_turn[turn]
         c = {cl: 0 for cl in EMOTION_CLASSES}
         for s in group:
-            c[s["dominant"]] += 1
+            if s["dominant"] in c:
+                c[s["dominant"]] += 1
         m = len(group)
         per_question.append({
             "turn": turn,

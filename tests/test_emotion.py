@@ -30,3 +30,11 @@ def test_aggregate_timeline_is_time_sorted():
     shots = [_shot(300.0, 1, "sad"), _shot(0.0, 0, "happy")]
     out = aggregate_emotions(shots)
     assert [s["t"] for s in out["timeline"]] == [0.0, 300.0]
+
+def test_aggregate_ignores_unknown_dominant_class():
+    shots = [_shot(0.0, 0, "neutral"),
+             {"t": 100.0, "turn": 0, "dominant": "contempt", "scores": _scores("neutral")}]
+    out = aggregate_emotions(shots)
+    assert out["available"] is True
+    assert "contempt" not in out["overall_distribution"]
+    assert out["overall_distribution"]["neutral"] == 50.0  # 1 of 2 shots; unknown still counts in denominator
