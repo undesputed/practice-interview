@@ -4,7 +4,8 @@ import csv, json, os
 import matplotlib
 matplotlib.use("Agg")  # headless backend — no display needed
 import matplotlib.pyplot as plt
-from backend.analysis import matrix_to_euler, SMILE_THRESHOLD, GAZE_MAX, UPRIGHT_RATIO
+from backend.analysis import (matrix_to_euler, SMILE_THRESHOLD, GAZE_MAX,
+                              UPRIGHT_RATIO, FRAME_ASPECT)
 
 
 def _write_csv(path: str, frames: list[dict]) -> None:
@@ -26,9 +27,9 @@ def _write_csv(path: str, frames: list[dict]) -> None:
             if p:
                 width = abs(p["leftShoulder"]["x"] - p["rightShoulder"]["x"]) or 1e-6
                 mid_y = (p["leftShoulder"]["y"] + p["rightShoulder"]["y"]) / 2.0
-                upright = int((mid_y - p["nose"]["y"]) / width > UPRIGHT_RATIO)
+                upright = int(((mid_y - p["nose"]["y"]) / FRAME_ASPECT) / width > UPRIGHT_RATIO)
                 tilt = round(abs(_m.degrees(_m.atan2(
-                    p["rightShoulder"]["y"] - p["leftShoulder"]["y"],
+                    (p["rightShoulder"]["y"] - p["leftShoulder"]["y"]) / FRAME_ASPECT,
                     p["rightShoulder"]["x"] - p["leftShoulder"]["x"]))), 2)
             else:
                 upright, tilt = "", ""
@@ -62,7 +63,7 @@ def _build_charts(path: str, frames: list[dict]) -> None:
         if p:
             width = abs(p["leftShoulder"]["x"] - p["rightShoulder"]["x"]) or 1e-6
             mid_y = (p["leftShoulder"]["y"] + p["rightShoulder"]["y"]) / 2.0
-            upright_series.append(1 if (mid_y - p["nose"]["y"]) / width > UPRIGHT_RATIO else 0)
+            upright_series.append(1 if ((mid_y - p["nose"]["y"]) / FRAME_ASPECT) / width > UPRIGHT_RATIO else 0)
             ts_pose.append(f["t"] / 1000.0)
 
     mouth, gaze_on, ts_face = [], [], []

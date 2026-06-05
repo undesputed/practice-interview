@@ -13,7 +13,12 @@ SMILE_THRESHOLD = 0.3
 BLINK_THRESHOLD = 0.5
 STEADINESS_K = 4.0
 GAZE_MAX = 0.5  # eyeLook* magnitude above which gaze is "off camera"
-UPRIGHT_RATIO = 0.5       # headRise / shoulderWidth above this = upright
+# Capture is 1280x720 (16:9). MediaPipe normalizes x by width and y by height
+# independently, so a normalized y-unit spans fewer pixels than an x-unit. Posture
+# geometry must convert y-deltas into x (width) units before mixing axes, or vertical
+# distances/angles are inflated by W/H. Scale y by (H/W) = 1/FRAME_ASPECT.
+FRAME_ASPECT = 16.0 / 9.0
+UPRIGHT_RATIO = 0.35      # aspect-corrected headRise / shoulderWidth above this = upright
 BODY_FIDGET_SCALE = 2000  # maps mean normalized body movement to a 0-100 steadiness drop
 FACE_TOUCH_RADIUS = 0.6   # × shoulder width: hand-point within this of the nose = touching
 SPEAKING_OPEN = 0.2  # jawOpen above this counts as mouth-open / speaking
@@ -152,9 +157,11 @@ def pose_metrics(frames: list[dict]) -> dict:
         ls, rs, nose = p["leftShoulder"], p["rightShoulder"], p["nose"]
         mid_y = (ls["y"] + rs["y"]) / 2.0
         width = abs(ls["x"] - rs["x"]) or 1e-6
-        if (mid_y - nose["y"]) / width > UPRIGHT_RATIO:
+        # convert the vertical head-rise into width units before dividing by width
+        if ((mid_y - nose["y"]) / FRAME_ASPECT) / width > UPRIGHT_RATIO:
             upright += 1
-        tilts.append(abs(math.degrees(math.atan2(rs["y"] - ls["y"], rs["x"] - ls["x"]))))
+        tilts.append(abs(math.degrees(math.atan2(
+            (rs["y"] - ls["y"]) / FRAME_ASPECT, rs["x"] - ls["x"]))))
         centers.append(((ls["x"] + rs["x"]) / 2.0, mid_y, nose["x"], nose["y"]))
 
     movement = 0.0

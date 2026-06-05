@@ -134,6 +134,12 @@ def test_lean_level_vs_tilted():
     tilted = [_frame(i * 100.0, pose=_pose(0.2, ls=(0.4, 0.45), rs=(0.6, 0.55))) for i in range(5)]
     assert pose_metrics(tilted)["lean"] > 0.0
 
+def test_lean_is_aspect_corrected():
+    # Shoulders dx=0.20, dy=0.10 (normalized) on a 16:9 frame. The true image-space
+    # tilt is atan2(0.10*9/16, 0.20) ≈ 15.7°, NOT the aspect-distorted atan2(0.10,0.20)=26.6°.
+    tilted = [_frame(i * 100.0, pose=_pose(0.2, ls=(0.4, 0.45), rs=(0.6, 0.55))) for i in range(5)]
+    assert abs(pose_metrics(tilted)["lean"] - 15.7) < 0.3
+
 def test_body_steadiness_still_vs_moving():
     still = [_frame(i * 100.0, pose=_pose(0.2)) for i in range(5)]
     assert pose_metrics(still)["body_steadiness"] == 100.0
