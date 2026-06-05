@@ -78,3 +78,17 @@ def test_save_session_skips_emotion_png_when_unavailable(tmp_path):
     d = str(tmp_path / "s2")
     save_session(d, frames, {"full_text": "", "segments": []}, summary, None)
     assert not os.path.exists(os.path.join(d, "emotion.png"))
+
+
+def test_save_session_survives_malformed_emotion(tmp_path):
+    frames = [_frame(i * 100.0) for i in range(5)]
+    bad_emotion = {"available": True, "dominant": "neutral",
+                   "overall_distribution": {}, "per_question": [],
+                   "timeline": [{"t": 0.0, "turn": 0}]}  # missing "scores" -> chart would raise
+    summary = {"duration_sec": 0.5, "frame_count": 5, "no_face_pct": 0.0,
+               "overall": {}, "per_question": [], "emotion": bad_emotion}
+    d = str(tmp_path / "bad")
+    save_session(d, frames, {"full_text": "", "segments": []}, summary, None)  # must NOT raise
+    assert os.path.exists(os.path.join(d, "data.csv"))
+    assert os.path.exists(os.path.join(d, "charts.png"))
+    assert not os.path.exists(os.path.join(d, "emotion.png"))  # chart skipped on error

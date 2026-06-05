@@ -1,6 +1,6 @@
 # backend/report.py
 from __future__ import annotations  # PEP 604 (X | Y) on Python 3.9
-import csv, json, os
+import csv, json, logging, os
 import matplotlib
 matplotlib.use("Agg")  # headless backend — no display needed
 import matplotlib.pyplot as plt
@@ -134,4 +134,7 @@ def save_session(session_dir: str, frames: list[dict], transcript: dict,
     _build_charts(os.path.join(session_dir, "charts.png"), frames)
     emotion = summary.get("emotion") or {}
     if emotion.get("available"):
-        _build_emotion_chart(os.path.join(session_dir, "emotion.png"), emotion)
+        try:
+            _build_emotion_chart(os.path.join(session_dir, "emotion.png"), emotion)
+        except Exception as exc:  # a malformed emotion payload must not lose the session
+            logging.warning("emotion chart skipped: %s", exc)
