@@ -52,6 +52,7 @@
 
           <ul class="start-notes">
             <li><span class="dot" aria-hidden="true"></span> Camera &amp; microphone access required</li>
+            <li><span class="dot" aria-hidden="true"></span> Facial expressions are analyzed; face snapshots are processed and immediately discarded</li>
             <li><span class="dot" aria-hidden="true"></span> Speak naturally — answer each question aloud</li>
             <li><span class="dot" aria-hidden="true"></span> Click <strong>End</strong> when you're finished to see results</li>
           </ul>
@@ -186,6 +187,7 @@
                   <th>Eye contact</th>
                   <th>Upright</th>
                   <th>Composure</th>
+                  <th>Emotion</th>
                   <th>Response</th>
                   <th>Face-touch</th>
                 </tr>
@@ -200,6 +202,15 @@
           <h2 class="card-title">Over time</h2>
           <div class="chart-holder chart-holder-big">
             <img id="chart-img" alt="Interview metrics chart over time" />
+          </div>
+        </div>
+
+        <!-- 4b. Emotion (DeepFace) -->
+        <div class="card card-emotion-section">
+          <h2 class="card-title">Emotion (DeepFace)</h2>
+          <ul id="card-emotion" class="card-list"></ul>
+          <div class="chart-holder chart-holder-big">
+            <img id="emotion-img" alt="Emotion over time chart" style="display:none" />
           </div>
         </div>
 

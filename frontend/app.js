@@ -326,6 +326,9 @@ function fillList(id, lines) {
 
 function renderResults(data) {
   const s = data.summary, o = s.overall, t = s.timing || {};
+  const emo = s.emotion || { available: false };
+  const emoByTurn = {};
+  (emo.per_question || []).forEach((q) => { emoByTurn[q.turn] = q.dominant; });
   const setChip = (id, v) => { const e = $(id); if (e) e.textContent = (v == null ? "—" : v); };
   setChip("chip-attention", o.attention);
   setChip("chip-confidence", o.confidence);
@@ -378,6 +381,7 @@ function renderResults(data) {
     const tr = document.createElement("tr");
     for (const cell of [q.question, `${q.metrics.gaze_eye_contact_pct}%`,
                         `${q.metrics.upright_pct}%`, `${q.metrics.composure}`,
+                        emoByTurn[q.turn] || "—",
                         rt[q.turn] != null ? `${rt[q.turn]}s` : "—",
                         `${q.metrics.face_touch_count}`]) {
       const td = document.createElement("td");
@@ -418,6 +422,18 @@ function renderResults(data) {
     co.appendChild(mk("Improve:", (c.improvements || []).join("; ")));
   } else {
     co.textContent = "Coaching not available (no Anthropic key or empty transcript).";
+  }
+
+  const emoImg = $("emotion-img");
+  if (emo.available) {
+    const dist = Object.entries(emo.overall_distribution || {})
+      .sort((a, b) => b[1] - a[1])
+      .map(([k, v]) => `${k} ${v}%`).join(" · ");
+    fillList("card-emotion", [`Dominant emotion: ${emo.dominant}`, `Distribution: ${dist}`]);
+    if (emoImg && data.emotion_chart_url) { emoImg.src = data.emotion_chart_url; emoImg.style.display = ""; }
+  } else {
+    fillList("card-emotion", ["Emotion analysis not available"]);
+    if (emoImg) emoImg.style.display = "none";
   }
 }
 
