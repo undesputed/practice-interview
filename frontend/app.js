@@ -14,6 +14,9 @@ let objectDetector = null;
 let lastObjectResult = null;
 let lastBodyTs = 0;
 let frames = [];
+let emotionShots = [];
+let lastEmotionTs = 0;
+const cropCanvas = document.createElement("canvas");
 let events = [];
 let actionDetector = null;
 let segments = [];
@@ -40,6 +43,22 @@ function fmtTime(ms) {
   const mm = String(Math.floor(ms / 60000)).padStart(2, "0");
   const ss = String(Math.floor((ms % 60000) / 1000)).padStart(2, "0");
   return `${mm}:${ss}`;
+}
+
+// Derive a padded pixel bounding box around the face from normalized landmarks.
+function faceBox(landmarks, w, h, pad = 0.2) {
+  let minX = 1, minY = 1, maxX = 0, maxY = 0;
+  for (const p of landmarks) {
+    if (p.x < minX) minX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y > maxY) maxY = p.y;
+  }
+  const bw = maxX - minX, bh = maxY - minY;
+  minX -= bw * pad; maxX += bw * pad; minY -= bh * pad; maxY += bh * pad;
+  const sx = Math.max(0, minX * w), sy = Math.max(0, minY * h);
+  const sw = Math.min(w, maxX * w) - sx, sh = Math.min(h, maxY * h) - sy;
+  return { sx, sy, sw, sh };
 }
 
 function appendAction(ev) {
@@ -162,6 +181,24 @@ function renderLoop(video, canvas, ctx, draw) {
   }
   frames.push(frame);
 
+  // Emotion: throttled face crop buffered for batch DeepFace analysis at end.
+  if (hasFace && now - lastEmotionTs >= CONFIG.EMOTION_THROTTLE_MS
+      && emotionShots.length < CONFIG.EMOTION_MAX_SHOTS) {
+    lastEmotionTs = now;
+    const box = faceBox(result.faceLandmarks[0], video.videoWidth, video.videoHeight);
+    if (box.sw > 4 && box.sh > 4) {
+      cropCanvas.width = CONFIG.EMOTION_CROP_PX;
+      cropCanvas.height = CONFIG.EMOTION_CROP_PX;
+      const cctx = cropCanvas.getContext("2d");
+      cctx.drawImage(video, box.sx, box.sy, box.sw, box.sh,
+                     0, 0, CONFIG.EMOTION_CROP_PX, CONFIG.EMOTION_CROP_PX);
+      const capturedT = frame.t, capturedTurn = turnIndex;
+      cropCanvas.toBlob((blob) => {
+        if (blob) emotionShots.push({ t: capturedT, turn: capturedTurn, blob });
+      }, "image/jpeg", 0.8);
+    }
+  }
+
   if (actionDetector) {
     const gestureNames = (lastHandResult && lastHandResult.gestures)
       ? lastHandResult.gestures.map((g) => g && g[0] && g[0].categoryName)
@@ -192,6 +229,7 @@ function onTranscript({ speaker, text }) {
 async function startInterview() {
   role = $("role-select").value || CONFIG.ROLES[0];
   frames = []; segments = []; turnIndex = -1; events = [];
+  emotionShots = []; lastEmotionTs = 0;
   actionDetector = createActionDetector();
   lastHandResult = null; lastObjectResult = null; lastBodyTs = 0;
   show("screen-interview");
