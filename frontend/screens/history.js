@@ -63,6 +63,10 @@ async function onClick(e){
 }
 
 export function history(){
+  // Reset filter/sort each visit so the (freshly blank) controls and the
+  // rendered table never disagree from leftover module-level state.
+  QUERY = '';
+  SORT = 'newest';
   queueMicrotask(async () => {
     const root = document.getElementById('history-body');
     if (!root) return;
