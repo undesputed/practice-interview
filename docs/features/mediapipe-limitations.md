@@ -16,7 +16,7 @@ stack. They are intentionally **omitted** from the review page rather than faked
 ## Emotion & Expression
 | Wanted | Why not | What we do instead |
 |--------|---------|--------------------|
-| Labeled basic emotions (happy/sad/angry/surprised/fearful/disgusted/neutral/contempt) | MediaPipe ships **no** emotion classifier — only blendshape *coefficients*. A custom classifier could be trained on blendshape vectors via **MediaPipe Model Maker**, but it is not available out of the box, and emotion-from-face is accuracy/bias-prone and legally restricted in hiring. | Show raw expression signals: smile intensity, eyebrow raise, mouth/eye openness. |
+| Labeled basic emotions (happy/sad/angry/surprised/fearful/disgusted/neutral/contempt) | MediaPipe ships **no native** emotion classifier — only blendshape *coefficients*. We add a **heuristic EMFACS mapping** (`backend/analysis.py:emotion_from_blendshapes`) that infers the 7 classes from those coefficients, shown **beside** the DeepFace track for comparison. It is an inference (accuracy/bias-prone, legally restricted in hiring), labeled as supplementary and **never used for scoring**. | Raw expression signals (smile intensity, eyebrow raise, mouth/eye openness) **plus** the labeled heuristic track, both transparent. |
 | Emotion confidence scores | No emotion classifier → no class probabilities. | — |
 | Micro-expressions | Require specialized high-FPS detection; not provided. | — |
 | Facial Action Units (validated FACS) | Blendshapes are ARKit-style coefficients — related to AUs but not validated FACS. | Surface the blendshape signals directly. |
