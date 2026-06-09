@@ -1,6 +1,7 @@
 import { placeholder } from './placeholder.js';
 import { dashboard } from './dashboard.js';
 import { history } from './history.js';
+import { report } from './report.js';
 
 // Route pattern -> render(params) => htmlString. Phase 1 = placeholders.
 export const screens = [
@@ -9,7 +10,7 @@ export const screens = [
   ['/progress',    placeholder('Progress', 'Trends across all sessions.')],
   ['/new',         placeholder('New interview', 'Camera/mic check and role pick.')],
   ['/live',        placeholder('Live interview', 'The recording screen.')],
-  ['/session/:id', placeholder('Session report', 'A single saved session report.')],
+  ['/session/:id', report],
   ['/facial',      placeholder('Facial Analysis', 'Live MediaPipe instrument (Face / Pose / Hands).')],
   ['/audio',       placeholder('Audio & Transcript Analysis', 'Live Deepgram instrument.')],
   ['/settings',    placeholder('Settings', 'Toggles and preferences.')],
