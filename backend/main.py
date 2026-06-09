@@ -130,6 +130,8 @@ def session(req: SessionRequest):
         coaching = generate_coaching(anthropic_key, full_text, req.role)
 
     session_id = datetime.now().strftime("%Y-%m-%dT%H%M%S")
+    summary["role"] = req.role
+    summary["created_at"] = datetime.strptime(session_id, "%Y-%m-%dT%H%M%S").isoformat()
     save_session(os.path.join(SESSIONS_DIR, session_id),
                  req.frames, req.transcript, summary, coaching)
 
