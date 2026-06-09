@@ -16,6 +16,9 @@ export const CONFIG = {
     "jawOpen", "browOuterUpLeft", "browOuterUpRight",
     "eyeSquintLeft", "eyeSquintRight", "mouthPressLeft", "mouthPressRight",
     "browDownLeft", "browDownRight", "jawLeft", "jawRight",
-    "noseSneerLeft", "noseSneerRight", "mouthFrownLeft", "mouthFrownRight"],
+    "noseSneerLeft", "noseSneerRight", "mouthFrownLeft", "mouthFrownRight",
+    // emotion-relevant (added for the MediaPipe emotion track)
+    "cheekSquintLeft", "cheekSquintRight", "mouthUpperUpLeft", "mouthUpperUpRight",
+    "eyeWideLeft", "eyeWideRight", "mouthStretchLeft", "mouthStretchRight"],
   ROLES: ["Software Engineer", "Product Manager", "Data Analyst", "Customer Support"],
 };
