@@ -29,7 +29,11 @@ export function mountShell(root){
 }
 
 export function renderSidebar(sidebar, activePath){
-  const isActive = (p) => p === '/' ? activePath === '/' : activePath.startsWith(p);
+  // Match on a path boundary, not a raw string prefix, so '/lib' never lights up
+  // for '/library' (and vice versa) once prefix-overlapping routes exist.
+  const isActive = (p) => p === '/'
+    ? activePath === '/'
+    : (activePath === p || activePath.startsWith(p + '/'));
   const html = ['<div class="brand">Rehearsal</div>'];
   for (const sec of NAV){
     if (sec.group) html.push('<div class="nav-group">' + sec.group + '</div>');
