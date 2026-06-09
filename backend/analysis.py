@@ -332,10 +332,15 @@ NEUTRAL_BASE = 0.15  # neutral floor; expressive activation eats into it
 
 
 def _bs_avg(bs: dict, name: str) -> float:
-    """Read a blendshape, averaging Left/Right variants when present, else the bare key."""
-    left, right = bs.get(name + "Left"), bs.get(name + "Right")
-    if left is not None or right is not None:
-        return ((left or 0.0) + (right or 0.0)) / 2.0
+    """Read a blendshape, averaging the Left/Right variants that are present.
+
+    Only the sides actually supplied are averaged, so a one-sided value counts at
+    full strength (averaging 0.0 with a missing side would wrongly halve it). Falls
+    back to the bare key, then 0.0, for blendshapes with no Left/Right split.
+    """
+    sides = [v for v in (bs.get(name + "Left"), bs.get(name + "Right")) if v is not None]
+    if sides:
+        return sum(sides) / len(sides)
     return bs.get(name, 0.0)
 
 

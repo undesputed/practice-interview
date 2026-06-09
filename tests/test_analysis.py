@@ -415,3 +415,12 @@ def test_emotion_blendshapes_tolerates_missing_keys():
     assert out["dominant"] == "neutral"
     dist = out["overall_distribution"]
     assert set(dist) == set(EMOTION_CLASSES)
+
+def test_emotion_blendshapes_one_sided_value_not_halved():
+    # A blendshape present on only one side must count at full strength. Here a
+    # one-sided strong smile (0.9) must beat a weaker bilateral disgust signal;
+    # if the smile were halved to 0.45 it would lose and disgust would dominate.
+    out = emotion_from_blendshapes([_ef(mouthSmileLeft=0.9,
+                                        noseSneerLeft=0.4, noseSneerRight=0.4,
+                                        mouthUpperUpLeft=0.4, mouthUpperUpRight=0.4)])
+    assert out["dominant"] == "happy"
