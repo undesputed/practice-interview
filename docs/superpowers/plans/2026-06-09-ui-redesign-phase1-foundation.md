@@ -24,6 +24,7 @@
 - `frontend/screens/registry.js` — maps each route pattern to its render function (placeholders in Phase 1).
 - `frontend/main.js` — bootstrap: mount shell, register routes, start router.
 - `frontend/api.js` — data-layer fetch wrappers for the (Phase 2) backend endpoints.
+- `frontend/util.js` — shared helpers; exports `esc()` to HTML-escape dynamic/user-controlled values before interpolating into `innerHTML`. **Convention for all later phases:** any dynamic value (session id, role name, transcript text) put into an HTML string MUST be wrapped in `esc()`.
 - `frontend/legacy.html` — verbatim copy of the current interview app (preserves the working flow).
 - `tests/test_shell.py` — backend serving tests for the new shell + preserved legacy app.
 
