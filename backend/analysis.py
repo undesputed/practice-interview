@@ -2,6 +2,7 @@
 from __future__ import annotations  # PEP 604 (X | Y) on Python 3.9
 import math
 from typing import Sequence
+from backend.emotion import aggregate_emotions, EMOTION_CLASSES
 
 # A "frame" dict has the shape:
 #   {"t": float_ms, "turn": int, "face": bool,
@@ -310,6 +311,59 @@ def composite_scores(m: dict) -> dict:
                              + 0.2 * min(100.0, touch * 20.0) + 0.2 * min(100.0, fidget * 2000.0)),
         "composure": clamp((head + body) / 2.0),
     }
+
+
+# --- Blendshape-derived emotion (heuristic EMFACS mapping) ---
+# MediaPipe blendshapes are ARKit-style Action Unit proxies. Each emotion is the
+# weighted sum of its diagnostic AUs (Ekman/EMFACS). Weights are tunable, like the
+# threshold block at the top of this file. Neutral is derived from low overall
+# activation, not weighted. This is an INFERENCE shown beside DeepFace, never
+# ground truth — see docs/features/mediapipe-limitations.md.
+EMOTION_WEIGHTS = {
+    "happy":    {"mouthSmile": 1.0, "cheekSquint": 0.6},
+    "sad":      {"mouthFrown": 1.0, "browInnerUp": 0.6, "browDown": 0.3},
+    "angry":    {"browDown": 1.0, "mouthPress": 0.6, "eyeSquint": 0.5},
+    "surprise": {"browInnerUp": 0.7, "browOuterUp": 0.7, "eyeWide": 0.8, "jawOpen": 0.6},
+    "fear":     {"browInnerUp": 0.6, "browOuterUp": 0.6, "browDown": 0.5,
+                 "eyeWide": 0.7, "mouthStretch": 0.7, "jawOpen": 0.4},
+    "disgust":  {"noseSneer": 1.0, "mouthUpperUp": 0.8},
+}
+NEUTRAL_BASE = 0.15  # neutral floor; expressive activation eats into it
+
+
+def _bs_avg(bs: dict, name: str) -> float:
+    """Read a blendshape, averaging Left/Right variants when present, else the bare key."""
+    left, right = bs.get(name + "Left"), bs.get(name + "Right")
+    if left is not None or right is not None:
+        return ((left or 0.0) + (right or 0.0)) / 2.0
+    return bs.get(name, 0.0)
+
+
+def _frame_emotion_scores(bs: dict) -> dict:
+    """7-class 0-100 distribution for one frame's blendshapes."""
+    raw = {emo: sum(w * _bs_avg(bs, name) for name, w in weights.items())
+           for emo, weights in EMOTION_WEIGHTS.items()}
+    raw["neutral"] = max(0.0, NEUTRAL_BASE - max(raw.values(), default=0.0))
+    total = sum(raw.values())
+    if total <= 0:
+        return {c: (100.0 if c == "neutral" else 0.0) for c in EMOTION_CLASSES}
+    return {c: round(100.0 * raw.get(c, 0.0) / total, 1) for c in EMOTION_CLASSES}
+
+
+def emotion_from_blendshapes(frames: list[dict]) -> dict:
+    """Heuristic emotion track derived from MediaPipe blendshapes (no pixels).
+
+    Emits the same shape as the DeepFace track (via aggregate_emotions) so the two
+    render side by side. Returns {"available": False} when no usable face frames exist.
+    """
+    shots = []
+    for f in frames:
+        if not f.get("face", False) or "bs" not in f:
+            continue
+        scores = _frame_emotion_scores(f["bs"])
+        shots.append({"t": f.get("t", 0.0), "turn": f.get("turn", -1),
+                      "dominant": max(scores, key=scores.get), "scores": scores})
+    return aggregate_emotions(shots)
 
 
 CONCERN_OBJECTS = {"cell phone", "laptop", "tv", "book", "remote", "keyboard"}

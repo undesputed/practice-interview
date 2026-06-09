@@ -364,3 +364,54 @@ def test_summarize_actions_counts():
 
 def test_summarize_actions_empty():
     assert summarize_actions([]) == {"counts": {}, "total": 0, "events": []}
+
+from backend.analysis import emotion_from_blendshapes, EMOTION_CLASSES
+
+def _ef(t=0.0, turn=0, **bs):
+    """A face frame carrying only the given blendshape values."""
+    return {"t": t, "turn": turn, "face": True, "bs": dict(bs)}
+
+def test_emotion_blendshapes_happy():
+    out = emotion_from_blendshapes([_ef(mouthSmileLeft=0.9, mouthSmileRight=0.9,
+                                        cheekSquintLeft=0.7, cheekSquintRight=0.7)])
+    assert out["available"] is True
+    assert out["dominant"] == "happy"
+
+def test_emotion_blendshapes_angry():
+    out = emotion_from_blendshapes([_ef(browDownLeft=0.9, browDownRight=0.9,
+                                        mouthPressLeft=0.6, mouthPressRight=0.6,
+                                        eyeSquintLeft=0.5, eyeSquintRight=0.5)])
+    assert out["dominant"] == "angry"
+
+def test_emotion_blendshapes_surprise():
+    out = emotion_from_blendshapes([_ef(browInnerUp=0.8, browOuterUpLeft=0.8,
+                                        browOuterUpRight=0.8, eyeWideLeft=0.8,
+                                        eyeWideRight=0.8, jawOpen=0.7)])
+    assert out["dominant"] == "surprise"
+
+def test_emotion_blendshapes_fear_beats_surprise_with_browdown_and_stretch():
+    out = emotion_from_blendshapes([_ef(browInnerUp=0.7, browOuterUpLeft=0.7,
+                                        browOuterUpRight=0.7, browDownLeft=0.8,
+                                        browDownRight=0.8, eyeWideLeft=0.7, eyeWideRight=0.7,
+                                        mouthStretchLeft=0.8, mouthStretchRight=0.8, jawOpen=0.5)])
+    assert out["dominant"] == "fear"
+
+def test_emotion_blendshapes_disgust():
+    out = emotion_from_blendshapes([_ef(noseSneerLeft=0.9, noseSneerRight=0.9,
+                                        mouthUpperUpLeft=0.8, mouthUpperUpRight=0.8)])
+    assert out["dominant"] == "disgust"
+
+def test_emotion_blendshapes_neutral_when_flat():
+    out = emotion_from_blendshapes([_ef(mouthSmileLeft=0.0, browDownLeft=0.0)])
+    assert out["dominant"] == "neutral"
+
+def test_emotion_blendshapes_empty_or_no_face_is_unavailable():
+    assert emotion_from_blendshapes([]) == {"available": False}
+    assert emotion_from_blendshapes([{"t": 0.0, "turn": 0, "face": False}]) == {"available": False}
+
+def test_emotion_blendshapes_tolerates_missing_keys():
+    out = emotion_from_blendshapes([_ef()])  # empty bs dict
+    assert out["available"] is True
+    assert out["dominant"] == "neutral"
+    dist = out["overall_distribution"]
+    assert set(dist) == set(EMOTION_CLASSES)
