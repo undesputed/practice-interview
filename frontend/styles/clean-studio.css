@@ -1,0 +1,42 @@
+/* Clean Studio — design tokens + base + shell. See spec §4. */
+:root{
+  --bg:#f7f8f7; --card:#ffffff; --ink:#11150f; --ink-2:#3a403c; --ink-3:#7c837d;
+  --line:#e6e8e6; --line-2:#eceeec; --green:#157a4c; --green-soft:#eef6f0; --green-deep:#0f5c39;
+  --amber:#b4791f; --red:#c0492f; --blue:#2f6fb4;
+  --radius:12px; --radius-sm:9px;
+  --shadow:0 14px 36px -28px rgba(17,21,15,.4);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:'Inter',system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased; line-height:1.5; letter-spacing:-.005em;
+}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.muted{color:var(--ink-3)}
+
+/* shell */
+.app-shell{display:grid;grid-template-columns:200px 1fr;min-height:100vh}
+.sidebar{background:var(--card);border-right:1px solid var(--line-2);padding:18px 14px;position:sticky;top:0;height:100vh;overflow:auto}
+.sidebar .brand{font-weight:700;font-size:17px;letter-spacing:-.02em;margin-bottom:18px;padding:0 8px}
+.sidebar .nav-group{font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);font-weight:700;margin:14px 8px 6px}
+.sidebar .nav-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;font-size:13px;color:var(--ink-2);text-decoration:none;font-weight:500;margin-bottom:2px}
+.sidebar .nav-item:hover{background:var(--bg)}
+.sidebar .nav-item.on{background:var(--green-soft);color:var(--green-deep);font-weight:600}
+.sidebar .nav-ic{width:16px;text-align:center;opacity:.9}
+.content{padding:26px 30px}
+
+/* screen scaffolding */
+.screen{max-width:1080px;margin:0 auto}
+.screen-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}
+.screen-head h1{font-size:24px;font-weight:700;letter-spacing:-.02em}
+.placeholder-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:26px;box-shadow:var(--shadow)}
+.placeholder-card p{color:var(--ink-2);margin-bottom:6px}
+
+/* shared components (used in later phases) */
+.btn{border:none;border-radius:var(--radius-sm);padding:9px 15px;font-family:inherit;font-weight:600;font-size:12.5px;cursor:pointer}
+.btn-green{background:var(--green);color:#fff}
+.btn-ghost{background:var(--card);color:var(--ink-2);border:1px solid var(--line)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius)}
+.pill{font-size:10.5px;font-weight:600;border-radius:100px;padding:2px 9px;background:var(--green-soft);color:var(--green-deep)}
