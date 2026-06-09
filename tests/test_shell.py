@@ -21,7 +21,8 @@ def test_router_and_shell_modules_served():
     for path in ("/router.js", "/shell.js", "/main.js",
                  "/api.js", "/screens/registry.js", "/screens/placeholder.js", "/util.js",
                  "/format.js", "/charts.js", "/screens/dashboard.js",
-                 "/screens/history.js", "/screens/report.js"):
+                 "/screens/history.js", "/screens/report.js",
+                 "/emotion.js", "/vision.js", "/screens/facial.js"):
         assert client.get(path).status_code == 200, path
 
 
