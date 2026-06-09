@@ -138,3 +138,26 @@ def test_session_emotion_absent_is_unavailable(monkeypatch):
     data = _client.post("/api/session", json=body).json()
     assert data["summary"]["emotion"] == {"available": False}
     assert data["emotion_chart_url"] is None
+
+def test_session_includes_mediapipe_emotion(monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)  # skip coaching
+
+    def happy_frame(t):
+        return {"t": t, "turn": 0, "face": True,
+                "bs": {"mouthSmileLeft": 0.9, "mouthSmileRight": 0.9,
+                       "cheekSquintLeft": 0.7, "cheekSquintRight": 0.7},
+                "m": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]}
+
+    body = {"role": "Software Engineer",
+            "frames": [happy_frame(i * 100.0) for i in range(5)],
+            "transcript": {"full_text": "", "segments": [
+                {"speaker": "interviewer", "text": "hi", "t": 0}]}}
+    data = _client.post("/api/session", json=body).json()
+
+    mp = data["summary"]["emotion_mediapipe"]
+    assert mp["available"] is True
+    assert mp["dominant"] == "happy"
+    assert data["emotion_mediapipe_chart_url"].endswith("emotion_mediapipe.png")
+    # DeepFace track is independent and absent (no crops sent here)
+    assert data["summary"]["emotion"] == {"available": False}
+    assert data["emotion_chart_url"] is None

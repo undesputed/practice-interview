@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from backend.analysis import compute_metrics, questions_from_transcript, transcript_metrics, integrity_metrics, summarize_actions
+from backend.analysis import compute_metrics, questions_from_transcript, transcript_metrics, integrity_metrics, summarize_actions, emotion_from_blendshapes
 from backend.report import save_session
 from backend.deepgram import build_agent_config, grant_ephemeral_token, DEEPGRAM_AGENT_URL
 from backend.anthropic_coach import generate_coaching
@@ -121,6 +121,7 @@ def session(req: SessionRequest):
     summary["integrity"] = integrity_metrics(req.frames)
     summary["actions"] = summarize_actions(req.events)
     summary["emotion"] = req.emotion if (req.emotion and req.emotion.get("available")) else {"available": False}
+    summary["emotion_mediapipe"] = emotion_from_blendshapes(req.frames)
 
     coaching = None
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
@@ -134,9 +135,12 @@ def session(req: SessionRequest):
 
     emotion_chart_url = (f"/sessions/{session_id}/emotion.png"
                          if summary["emotion"].get("available") else None)
+    emotion_mp_chart_url = (f"/sessions/{session_id}/emotion_mediapipe.png"
+                            if summary["emotion_mediapipe"].get("available") else None)
     return {"session_id": session_id, "summary": summary, "coaching": coaching,
             "charts_url": f"/sessions/{session_id}/charts.png",
-            "emotion_chart_url": emotion_chart_url}
+            "emotion_chart_url": emotion_chart_url,
+            "emotion_mediapipe_chart_url": emotion_mp_chart_url}
 
 
 # static mounts last so /api routes win
