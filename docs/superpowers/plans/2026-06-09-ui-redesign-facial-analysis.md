@@ -169,6 +169,8 @@ git commit -m "feat(ui): add live emotion scorer (ported) and facial-analysis st
 **Files:**
 - Create: `frontend/vision.js`
 
+> **Post-review note (applied):** the `start()`/`stop()` below were hardened after code review (commit `54f14de`) with an in-flight start token (so a double-Start supersedes and releases the older stream instead of leaking a webcam track + running two loops) and a `try/catch` that releases the camera if model loading throws. The loop body moved into a `launch()` helper. The shipped `frontend/vision.js` is the source of truth; the **Audio twin must reuse `vision.js`'s lifecycle**, not re-implement it.
+
 - [ ] **Step 1: Create `frontend/vision.js`**
 
 ```js
