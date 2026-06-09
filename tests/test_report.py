@@ -80,6 +80,24 @@ def test_save_session_skips_emotion_png_when_unavailable(tmp_path):
     assert not os.path.exists(os.path.join(d, "emotion.png"))
 
 
+def test_save_session_writes_mediapipe_emotion_png(tmp_path):
+    frames = [_frame(i * 100.0) for i in range(5)]
+    summary = {"duration_sec": 0.5, "frame_count": 5, "no_face_pct": 0.0,
+               "overall": {}, "per_question": [],
+               "emotion_mediapipe": _emotion_summary()}
+    d = str(tmp_path / "smp")
+    save_session(d, frames, {"full_text": "", "segments": []}, summary, None)
+    assert os.path.exists(os.path.join(d, "emotion_mediapipe.png"))
+
+def test_save_session_skips_mediapipe_emotion_png_when_unavailable(tmp_path):
+    frames = [_frame(i * 100.0) for i in range(5)]
+    summary = {"duration_sec": 0.5, "frame_count": 5, "no_face_pct": 0.0,
+               "overall": {}, "per_question": [],
+               "emotion_mediapipe": {"available": False}}
+    d = str(tmp_path / "smp2")
+    save_session(d, frames, {"full_text": "", "segments": []}, summary, None)
+    assert not os.path.exists(os.path.join(d, "emotion_mediapipe.png"))
+
 def test_save_session_survives_malformed_emotion(tmp_path):
     frames = [_frame(i * 100.0) for i in range(5)]
     bad_emotion = {"available": True, "dominant": "neutral",

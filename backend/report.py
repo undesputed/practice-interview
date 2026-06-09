@@ -138,3 +138,9 @@ def save_session(session_dir: str, frames: list[dict], transcript: dict,
             _build_emotion_chart(os.path.join(session_dir, "emotion.png"), emotion)
         except Exception as exc:  # a malformed emotion payload must not lose the session
             logging.warning("emotion chart skipped: %s", exc)
+    emotion_mp = summary.get("emotion_mediapipe") or {}
+    if emotion_mp.get("available"):
+        try:
+            _build_emotion_chart(os.path.join(session_dir, "emotion_mediapipe.png"), emotion_mp)
+        except Exception as exc:  # a malformed payload must not lose the session
+            logging.warning("mediapipe emotion chart skipped: %s", exc)
