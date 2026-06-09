@@ -1,8 +1,9 @@
 import { placeholder } from './placeholder.js';
+import { dashboard } from './dashboard.js';
 
 // Route pattern -> render(params) => htmlString. Phase 1 = placeholders.
 export const screens = [
-  ['/',            placeholder('Dashboard', 'Overview, headline stats, and recent sessions.')],
+  ['/',            dashboard],
   ['/history',     placeholder('History', 'All saved sessions in a sortable table.')],
   ['/progress',    placeholder('Progress', 'Trends across all sessions.')],
   ['/new',         placeholder('New interview', 'Camera/mic check and role pick.')],
