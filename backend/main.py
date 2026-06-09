@@ -16,6 +16,7 @@ from backend.report import save_session
 from backend.deepgram import build_agent_config, grant_ephemeral_token, DEEPGRAM_AGENT_URL
 from backend.anthropic_coach import generate_coaching
 from backend.emotion import score_emotions, aggregate_emotions
+from backend import sessions_store
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)  # ensure our INFO/WARNING logs reach the console
@@ -38,6 +39,10 @@ class SessionRequest(BaseModel):
     transcript: dict
     events: list = []
     emotion: Optional[dict] = None
+
+
+class LabelRequest(BaseModel):
+    label: str
 
 
 @app.post("/api/interview/token")
@@ -143,6 +148,34 @@ def session(req: SessionRequest):
             "charts_url": f"/sessions/{session_id}/charts.png",
             "emotion_chart_url": emotion_chart_url,
             "emotion_mediapipe_chart_url": emotion_mp_chart_url}
+
+
+@app.get("/api/sessions")
+def list_sessions_endpoint():
+    return {"sessions": sessions_store.list_sessions(SESSIONS_DIR)}
+
+
+@app.get("/api/sessions/{session_id}")
+def get_session_endpoint(session_id: str):
+    data = sessions_store.load_session(SESSIONS_DIR, session_id)
+    if data is None:
+        raise HTTPException(404, "session not found")
+    return data
+
+
+@app.delete("/api/sessions/{session_id}")
+def delete_session_endpoint(session_id: str):
+    if not sessions_store.delete_session(SESSIONS_DIR, session_id):
+        raise HTTPException(404, "session not found")
+    return {"deleted": session_id}
+
+
+@app.patch("/api/sessions/{session_id}")
+def rename_session_endpoint(session_id: str, req: LabelRequest):
+    data = sessions_store.set_label(SESSIONS_DIR, session_id, req.label)
+    if data is None:
+        raise HTTPException(404, "session not found")
+    return data
 
 
 # static mounts last so /api routes win
