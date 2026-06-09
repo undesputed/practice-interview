@@ -63,7 +63,8 @@ def test_load_missing_returns_none(tmp_path):
 
 def test_invalid_id_is_rejected_path_traversal(tmp_path):
     # An id that isn't a clean timestamp must never resolve to a path.
-    for bad in ("../secret", "..", "foo/bar", "2026-06-01T100000/../x", ""):
+    for bad in ("../secret", "..", "foo/bar", "2026-06-01T100000/../x", "",
+                "2026-06-01T100000\n"):  # trailing newline must not pass the guard
         assert sessions_store.load_session(str(tmp_path), bad) is None
         assert sessions_store.delete_session(str(tmp_path), bad) is False
 

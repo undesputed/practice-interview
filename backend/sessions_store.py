@@ -10,8 +10,9 @@ import shutil
 from datetime import datetime
 
 # Session ids are timestamps like "2026-06-09T114547". Matching this regex both
-# parses the date and blocks path traversal — no slashes, dots, or "..".
-_ID_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{6}$")
+# parses the date and blocks path traversal — no slashes, dots, or "..". \Z (not
+# $) anchors the very end, so a trailing newline can't sneak through the guard.
+_ID_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{6}\Z")
 
 
 def _created_at(session_id):
