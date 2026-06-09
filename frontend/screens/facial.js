@@ -53,8 +53,10 @@ function setStatus(out){
 function onFrame(out){ setStatus(out); paintPanel(out); }
 
 async function startCamera(){
+  const btn = document.getElementById('fa-start');
   const canvas = document.getElementById('fa-canvas');
   const ph = document.getElementById('fa-ph');
+  if (btn) btn.disabled = true;   // block a double-Start during the multi-second model load
   if (ph) ph.textContent = 'Loading model…';
   try {
     await vision.start(canvas, mode, onFrame);
@@ -62,6 +64,8 @@ async function startCamera(){
     setStatus(null);
   } catch (e){
     if (ph){ ph.style.display = ''; ph.textContent = 'Camera unavailable: ' + (e && e.message ? e.message : e); }
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 

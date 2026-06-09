@@ -38,8 +38,15 @@ export function isRunning(){ return !!(session && session.running); }
 
 export function setMode(mode){ if (session) session.mode = mode; }
 
-// Stop the camera + loop and release the webcam. Idempotent.
+// Identifies the most recent start() in flight. A newer start() (or any stop())
+// supersedes older in-flight attempts so they release their camera and bail —
+// this prevents a double-Start from leaking a stream and running two loops.
+let starting = null;
+
+// Stop the camera + loop and release the webcam. Idempotent. Also invalidates
+// any start() still in flight.
 export function stop(){
+  starting = null;
   if (!session) return;
   session.running = false;
   if (session.rafId) cancelAnimationFrame(session.rafId);
@@ -51,17 +58,40 @@ export function stop(){
 // is called once per frame; `blendshapes` is non-null only in face mode.
 export async function start(canvas, mode, onFrame){
   stop();
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: { width: 1280, height: 720, facingMode: 'user' }, audio: false,
-  });
-  const video = document.createElement('video');
-  video.srcObject = stream; video.muted = true; video.playsInline = true;
-  await video.play();
-  await ensureTasks();
-  if (!document.body.contains(canvas)){   // navigated away during model load
-    stream.getTracks().forEach((t) => t.stop());
-    return;
+  const myToken = {};
+  starting = myToken;
+  // From here on, always release `stream` unless THIS call is the one that wins
+  // and hands it to `session`. `superseded()` is true if a newer start()/stop()
+  // ran while we were awaiting.
+  const superseded = () => starting !== myToken;
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: 1280, height: 720, facingMode: 'user' }, audio: false,
+    });
+    if (superseded()){ stream.getTracks().forEach((t) => t.stop()); return; }
+    const video = document.createElement('video');
+    video.srcObject = stream; video.muted = true; video.playsInline = true;
+    await video.play();
+    if (superseded()){ stream.getTracks().forEach((t) => t.stop()); return; }
+    await ensureTasks();
+    // superseded, or navigated away during model load
+    if (superseded() || !document.body.contains(canvas)){
+      stream.getTracks().forEach((t) => t.stop());
+      return;
+    }
+    return launch(canvas, video, stream, mode, onFrame);
+  } catch (e){
+    if (stream) stream.getTracks().forEach((t) => t.stop());  // release on any failure after the camera opened
+    if (starting === myToken) starting = null;
+    throw e;
   }
+}
+
+// Build the session and run the loop. Split out so start()'s try/catch only
+// guards the async setup, not the per-frame loop.
+function launch(canvas, video, stream, mode, onFrame){
+  starting = null;
   canvas.width = 1280; canvas.height = 720;
   const ctx = canvas.getContext('2d');
   const draw = new DrawingUtils(ctx);
