@@ -54,7 +54,8 @@ export function captureFaceCrop(sizePx){
     if (p.y > maxY) maxY = p.y;
   }
   const vw = video.videoWidth, vh = video.videoHeight;
-  const padX = (maxX - minX) * 0.2, padY = (maxY - minY) * 0.2;
+  // Generous padding so a server-side detector has margin to find + align the face.
+  const padX = (maxX - minX) * 0.4, padY = (maxY - minY) * 0.4;
   const sx = Math.max(0, (minX - padX) * vw);
   const sy = Math.max(0, (minY - padY) * vh);
   const sw = Math.min(vw - sx, (maxX - minX + 2 * padX) * vw);

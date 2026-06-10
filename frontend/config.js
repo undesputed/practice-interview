@@ -10,6 +10,7 @@ export const CONFIG = {
   EMOTION_CROP_PX: 112,       // square crop size sent to the backend
   EMOTION_MAX_SHOTS: 200,     // hard cap on buffered crops per interview
   DEEPFACE_LIVE_MS: 2000,     // live Facial screen: snapshot for DeepFace every ~2s
+  DEEPFACE_CROP_PX: 256,      // larger crop for the live DeepFace path (detector needs detail)
   // Blendshapes forwarded to the backend (smile, blink, brow, and 8 eyeLook* for gaze)
   BLENDSHAPES: ["mouthSmileLeft", "mouthSmileRight", "eyeBlinkLeft", "eyeBlinkRight", "browInnerUp",
     "eyeLookInLeft", "eyeLookInRight", "eyeLookOutLeft", "eyeLookOutRight",

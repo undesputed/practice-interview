@@ -61,7 +61,7 @@ let lastFrame = null;
 async function deepfaceTick(){
   if (!dfRunning){ return; }
   if (vision.isRunning()){
-    const blob = await vision.captureFaceCrop(CONFIG.EMOTION_CROP_PX);
+    const blob = await vision.captureFaceCrop(CONFIG.DEEPFACE_CROP_PX);
     if (blob){
       if (dfStatus === 'warming' || dfStatus === 'off') dfStatus = 'measuring';
       const res = await api.scoreEmotionFrame(blob);

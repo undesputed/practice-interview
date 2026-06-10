@@ -48,11 +48,16 @@ def aggregate_emotions(shots: list[dict]) -> dict:
             "per_question": per_question, "timeline": timeline}
 
 
-def score_emotions(images: list[bytes]) -> list[dict | None]:
+def score_emotions(images: list[bytes], detector_backend: str = "skip") -> list[dict | None]:
     """Run DeepFace emotion analysis on each JPEG byte string.
 
     Returns a list aligned with `images`; each element is
     {"dominant": str, "scores": {class: 0-100}} or None if that shot failed.
+    `detector_backend` controls DeepFace's face detection + alignment: "skip" trusts
+    the caller's crop (fast — the batch path), while a real backend like "retinaface"
+    or "opencv" detects and eye-aligns the face before scoring, which is markedly more
+    accurate on rough crops (the live single-frame path). With enforce_detection=False
+    a failed detect falls back to the whole image, so a real backend is never worse.
     Lazy-imports DeepFace (and cv2/numpy) so the app boots without them; raises
     ImportError if DeepFace is unavailable. Images are never written to disk.
     """
@@ -66,7 +71,7 @@ def score_emotions(images: list[bytes]) -> list[dict | None]:
             arr = cv2.imdecode(np.frombuffer(buf, np.uint8), cv2.IMREAD_COLOR)
             if arr is None:
                 raise ValueError("could not decode image")
-            res = DeepFace.analyze(arr, actions=["emotion"], detector_backend="skip",
+            res = DeepFace.analyze(arr, actions=["emotion"], detector_backend=detector_backend,
                                    enforce_detection=False, silent=True)
             r = res[0] if isinstance(res, list) else res
             emo = r["emotion"]

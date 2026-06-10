@@ -153,7 +153,7 @@ def test_emotion_frame_scores_when_enabled(monkeypatch):
     scores = {c: 0.0 for c in EMOTION_CLASSES}
     scores["fear"] = 80.0
     monkeypatch.setattr(main, "score_emotions",
-                        lambda bufs: [{"dominant": "fear", "scores": scores}])
+                        lambda bufs, **kw: [{"dominant": "fear", "scores": scores}])
     resp = _client.post("/api/emotion/frame",
                         files={"image": ("crop.jpg", b"x", "image/jpeg")})
     assert resp.status_code == 200
@@ -166,7 +166,7 @@ def test_emotion_frame_scores_when_enabled(monkeypatch):
 def test_emotion_frame_unavailable_when_scoring_raises(monkeypatch):
     monkeypatch.setenv("EMOTION_ANALYSIS", "1")
     import backend.main as main
-    def boom(bufs):
+    def boom(bufs, **kw):
         raise ImportError("no deepface")
     monkeypatch.setattr(main, "score_emotions", boom)
     resp = _client.post("/api/emotion/frame",
@@ -177,7 +177,7 @@ def test_emotion_frame_unavailable_when_scoring_raises(monkeypatch):
 def test_emotion_frame_unavailable_when_no_face(monkeypatch):
     monkeypatch.setenv("EMOTION_ANALYSIS", "1")
     import backend.main as main
-    monkeypatch.setattr(main, "score_emotions", lambda bufs: [None])
+    monkeypatch.setattr(main, "score_emotions", lambda bufs, **kw: [None])
     resp = _client.post("/api/emotion/frame",
                         files={"image": ("crop.jpg", b"x", "image/jpeg")})
     assert resp.json() == {"available": False}

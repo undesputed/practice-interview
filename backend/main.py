@@ -121,12 +121,14 @@ async def emotion_frame(image: UploadFile = File(...)):
     """Score ONE pre-cropped face image with DeepFace for the live Facial screen.
     Optional + graceful: returns {"available": False} when EMOTION_ANALYSIS != "1",
     DeepFace is unavailable, or no usable face was scored. The image is scored in
-    memory and never written to disk."""
+    memory and never written to disk. Unlike the batch path, this uses a real face
+    detector (EMOTION_DETECTOR, default "retinaface") so DeepFace aligns the face for
+    better accuracy on the live webcam crop; set EMOTION_DETECTOR=opencv for speed."""
     if os.getenv("EMOTION_ANALYSIS") != "1":
         return {"available": False}
     buf = await image.read()
     try:
-        scored = score_emotions([buf])
+        scored = score_emotions([buf], detector_backend=os.getenv("EMOTION_DETECTOR", "retinaface"))
     except Exception as exc:  # DeepFace import/runtime failure -> degrade
         logging.warning("emotion frame scoring unavailable: %s", exc)
         return {"available": False}
