@@ -139,6 +139,50 @@ def test_session_emotion_absent_is_unavailable(monkeypatch):
     assert data["summary"]["emotion"] == {"available": False}
     assert data["emotion_chart_url"] is None
 
+def test_emotion_frame_disabled_returns_unavailable(monkeypatch):
+    monkeypatch.delenv("EMOTION_ANALYSIS", raising=False)
+    resp = _client.post("/api/emotion/frame",
+                        files={"image": ("crop.jpg", b"\xff\xd8\xff", "image/jpeg")})
+    assert resp.status_code == 200
+    assert resp.json() == {"available": False}
+
+
+def test_emotion_frame_scores_when_enabled(monkeypatch):
+    monkeypatch.setenv("EMOTION_ANALYSIS", "1")
+    import backend.main as main
+    scores = {c: 0.0 for c in EMOTION_CLASSES}
+    scores["fear"] = 80.0
+    monkeypatch.setattr(main, "score_emotions",
+                        lambda bufs: [{"dominant": "fear", "scores": scores}])
+    resp = _client.post("/api/emotion/frame",
+                        files={"image": ("crop.jpg", b"x", "image/jpeg")})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["available"] is True
+    assert data["dominant"] == "fear"
+    assert data["scores"]["fear"] == 80.0
+
+
+def test_emotion_frame_unavailable_when_scoring_raises(monkeypatch):
+    monkeypatch.setenv("EMOTION_ANALYSIS", "1")
+    import backend.main as main
+    def boom(bufs):
+        raise ImportError("no deepface")
+    monkeypatch.setattr(main, "score_emotions", boom)
+    resp = _client.post("/api/emotion/frame",
+                        files={"image": ("crop.jpg", b"x", "image/jpeg")})
+    assert resp.json() == {"available": False}
+
+
+def test_emotion_frame_unavailable_when_no_face(monkeypatch):
+    monkeypatch.setenv("EMOTION_ANALYSIS", "1")
+    import backend.main as main
+    monkeypatch.setattr(main, "score_emotions", lambda bufs: [None])
+    resp = _client.post("/api/emotion/frame",
+                        files={"image": ("crop.jpg", b"x", "image/jpeg")})
+    assert resp.json() == {"available": False}
+
+
 def test_session_includes_mediapipe_emotion(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)  # skip coaching
 

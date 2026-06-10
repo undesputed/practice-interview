@@ -116,6 +116,26 @@ async def emotion(meta: str = Form(...), images: list[UploadFile] = File(default
     return aggregate_emotions(shots)
 
 
+@app.post("/api/emotion/frame")
+async def emotion_frame(image: UploadFile = File(...)):
+    """Score ONE pre-cropped face image with DeepFace for the live Facial screen.
+    Optional + graceful: returns {"available": False} when EMOTION_ANALYSIS != "1",
+    DeepFace is unavailable, or no usable face was scored. The image is scored in
+    memory and never written to disk."""
+    if os.getenv("EMOTION_ANALYSIS") != "1":
+        return {"available": False}
+    buf = await image.read()
+    try:
+        scored = score_emotions([buf])
+    except Exception as exc:  # DeepFace import/runtime failure -> degrade
+        logging.warning("emotion frame scoring unavailable: %s", exc)
+        return {"available": False}
+    r = scored[0] if scored else None
+    if not r:
+        return {"available": False}
+    return {"available": True, "dominant": r["dominant"], "scores": r["scores"]}
+
+
 @app.post("/api/session")
 def session(req: SessionRequest):
     if not req.frames:
