@@ -50,8 +50,8 @@ export function renderSidebar(sidebar, activePath){
   html.push(
     '<div class="side-foot">' +
       '<button class="theme-toggle" data-theme-toggle type="button">' +
-        '<span class="tt-ic">' + (dark ? '☾' : '☀') + '</span>' +
-        '<span>' + (dark ? 'Dark' : 'Light') + ' mode</span>' +
+        '<span class="tt-ic">' + (dark ? '☀' : '☾') + '</span>' +
+        '<span>' + (dark ? 'Light' : 'Dark') + ' mode</span>' +
       '</button>' +
     '</div>'
   );

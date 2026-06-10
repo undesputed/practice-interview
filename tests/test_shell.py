@@ -11,6 +11,7 @@ def test_root_serves_new_shell():
     assert "/main.js" in r.text
     assert "Bricolage+Grotesque" in r.text
     assert "Hanken+Grotesk" in r.text
+    assert "prefers-color-scheme:dark" in r.text  # inline anti-FOUC theme guard
 
 
 def test_clean_studio_css_served():
