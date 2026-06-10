@@ -38,6 +38,34 @@ export function isRunning(){ return !!(session && session.running); }
 
 export function setMode(mode){ if (session) session.mode = mode; }
 
+// Capture a square JPEG crop of the current face from the live video for server-side
+// emotion scoring. Returns a Promise<Blob|null>; null when not running, not in face
+// mode, no face is detected, or the box is too small. Crops from the raw (un-mirrored)
+// video, padded ~20% around the face landmark bounds.
+export function captureFaceCrop(sizePx){
+  if (!session || !session.running || session.mode !== 'face') return Promise.resolve(null);
+  const lm = session._face, video = session.video;
+  if (!lm || !video || !video.videoWidth) return Promise.resolve(null);
+  let minX = 1, minY = 1, maxX = 0, maxY = 0;
+  for (const p of lm){
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
+  const vw = video.videoWidth, vh = video.videoHeight;
+  const padX = (maxX - minX) * 0.2, padY = (maxY - minY) * 0.2;
+  const sx = Math.max(0, (minX - padX) * vw);
+  const sy = Math.max(0, (minY - padY) * vh);
+  const sw = Math.min(vw - sx, (maxX - minX + 2 * padX) * vw);
+  const sh = Math.min(vh - sy, (maxY - minY + 2 * padY) * vh);
+  if (sw < 8 || sh < 8) return Promise.resolve(null);
+  const c = document.createElement('canvas');
+  c.width = sizePx; c.height = sizePx;
+  c.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, sizePx, sizePx);
+  return new Promise((resolve) => c.toBlob((b) => resolve(b), 'image/jpeg', 0.8));
+}
+
 // Identifies the most recent start() in flight. A newer start() (or any stop())
 // supersedes older in-flight attempts so they release their camera and bail —
 // this prevents a double-Start from leaking a stream and running two loops.
@@ -95,7 +123,7 @@ function launch(canvas, video, stream, mode, onFrame){
   canvas.width = 1280; canvas.height = 720;
   const ctx = canvas.getContext('2d');
   const draw = new DrawingUtils(ctx);
-  session = { stream, video, mode, running: true, rafId: 0, fps: 0, _t: performance.now(), _n: 0 };
+  session = { stream, video, mode, running: true, rafId: 0, fps: 0, _t: performance.now(), _n: 0, _face: null };
 
   const loop = () => {
     if (!session || !session.running) return;
@@ -110,6 +138,7 @@ function launch(canvas, video, stream, mode, onFrame){
         const r = tasks.face.detectForVideo(video, now);
         const faces = r.faceLandmarks || [];
         out.detections = faces.length;
+        session._face = faces[0] || null;
         for (const fl of faces){
           draw.drawConnectors(fl, FaceLandmarker.FACE_LANDMARKS_TESSELATION, { color: '#15794c66', lineWidth: 0.5 });
         }
