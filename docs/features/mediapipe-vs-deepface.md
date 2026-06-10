@@ -155,6 +155,19 @@ and liveness genuinely need DeepFace (or an equivalent recognition stack) server
 
 ---
 
+### Status — live emotion implemented (2026-06-10)
+
+The **labeled-emotion** contribution (#1 above) is now wired into the live **Facial Analysis**
+screen: selecting the **DeepFace** engine snapshots a face crop ~every 2s to
+`POST /api/emotion/frame` and shows the trained-model emotion **beside** the per-frame MediaPipe
+heuristic — so e.g. *fear* (which the heuristic confuses with *surprise*) is actually detected.
+It requires the optional `backend/requirements-emotion.txt` install and `EMOTION_ANALYSIS=1`, and
+degrades to a clear "off" message otherwise. The post-interview batch track (`POST /api/emotion`)
+and the report's emotion chart already existed. Identity verification and liveness (#2, #3)
+remain unbuilt.
+
+---
+
 ## 6. Bottom line
 
 | Question | Answer |
