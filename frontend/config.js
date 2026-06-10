@@ -9,6 +9,7 @@ export const CONFIG = {
   EMOTION_THROTTLE_MS: 3000,  // capture ~1 face crop per 3s for DeepFace emotion
   EMOTION_CROP_PX: 112,       // square crop size sent to the backend
   EMOTION_MAX_SHOTS: 200,     // hard cap on buffered crops per interview
+  DEEPFACE_LIVE_MS: 2000,     // live Facial screen: snapshot for DeepFace every ~2s
   // Blendshapes forwarded to the backend (smile, blink, brow, and 8 eyeLook* for gaze)
   BLENDSHAPES: ["mouthSmileLeft", "mouthSmileRight", "eyeBlinkLeft", "eyeBlinkRight", "browInnerUp",
     "eyeLookInLeft", "eyeLookInRight", "eyeLookOutLeft", "eyeLookOutRight",

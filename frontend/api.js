@@ -20,4 +20,13 @@ export const api = {
   putSettings:    (s)       => request('PUT',    '/api/settings', s),
   getRoles:       ()        => request('GET',    '/api/roles'),
   putRoles:       (r)       => request('PUT',    '/api/roles', r),
+  // POST a single face-crop blob to the live DeepFace endpoint. Never throws;
+  // resolves to {available:false} when the server can't score it.
+  scoreEmotionFrame: (blob) => {
+    const fd = new FormData();
+    fd.append('image', blob, 'crop.jpg');
+    return fetch('/api/emotion/frame', { method: 'POST', body: fd })
+      .then((r) => (r.ok ? r.json() : { available: false }))
+      .catch(() => ({ available: false }));
+  },
 };
