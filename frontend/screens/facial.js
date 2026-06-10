@@ -70,7 +70,11 @@ async function deepfaceTick(){
       paintPanel(lastFrame);    // reflect the new DeepFace reading immediately
     }
   }
-  if (dfRunning) dfTimer = setTimeout(deepfaceTick, CONFIG.DEEPFACE_LIVE_MS);
+  // Back off when there's nothing to score (camera not running) or the server has
+  // emotion off, so we don't upload a face crop every 2s for nothing. Still polls,
+  // so it auto-resumes once the camera starts or the server is enabled.
+  const idle = !vision.isRunning() || dfStatus === 'unavailable';
+  if (dfRunning) dfTimer = setTimeout(deepfaceTick, idle ? 15000 : CONFIG.DEEPFACE_LIVE_MS);
 }
 
 function startDeepface(){
