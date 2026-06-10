@@ -1,9 +1,20 @@
 import { mountShell, renderSidebar } from './shell.js';
 import * as router from './router.js';
 import { screens } from './screens/registry.js';
+import { initTheme, toggleTheme } from './theme.js';
+
+initTheme();
 
 const root = document.getElementById('app');
 const { sidebar, content } = mountShell(root);
+
+sidebar.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-theme-toggle]');
+  if (!btn) return;
+  e.preventDefault();
+  toggleTheme();
+  renderSidebar(sidebar, router.currentPath());
+});
 
 function show(html){
   content.innerHTML = html;

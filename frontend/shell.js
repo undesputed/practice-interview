@@ -1,4 +1,5 @@
 // Renders the persistent shell (sidebar + content slot) and the sidebar nav.
+import { currentTheme } from './theme.js';
 const NAV = [
   { group: null, items: [
     { path: '/',         icon: '◷', label: 'Dashboard' },
@@ -45,5 +46,14 @@ export function renderSidebar(sidebar, activePath){
       );
     }
   }
+  const dark = currentTheme() === 'dark';
+  html.push(
+    '<div class="side-foot">' +
+      '<button class="theme-toggle" data-theme-toggle type="button">' +
+        '<span class="tt-ic">' + (dark ? '☾' : '☀') + '</span>' +
+        '<span>' + (dark ? 'Dark' : 'Light') + ' mode</span>' +
+      '</button>' +
+    '</div>'
+  );
   sidebar.innerHTML = html.join('');
 }
