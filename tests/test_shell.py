@@ -12,9 +12,10 @@ def test_root_serves_new_shell():
 
 
 def test_clean_studio_css_served():
-    r = client.get("/styles/clean-studio.css")
-    assert r.status_code == 200
-    assert "--green:#157a4c" in r.text
+    css = client.get("/styles/clean-studio.css")
+    assert css.status_code == 200
+    assert "--brand:#0d9488" in css.text
+    assert '[data-theme="dark"]' in css.text
 
 
 def test_router_and_shell_modules_served():

@@ -1,10 +1,54 @@
-/* Clean Studio — design tokens + base + shell. See spec §4. */
+/* Clean Studio — Emerald design tokens + dark theme. See mockup for visual target. */
 :root{
-  --bg:#f7f8f7; --card:#ffffff; --ink:#11150f; --ink-2:#3a403c; --ink-3:#7c837d;
-  --line:#e6e8e6; --line-2:#eceeec; --green:#157a4c; --green-soft:#eef6f0; --green-deep:#0f5c39;
-  --amber:#b4791f; --red:#c0492f; --blue:#2f6fb4;
-  --radius:12px; --radius-sm:9px;
-  --shadow:0 14px 36px -28px rgba(17,21,15,.4);
+  /* neutrals (emerald-tinted) */
+  --bg:#f4f8f5; --surface:#ffffff; --surface-2:#f2f7f3; --surface-3:#e8f1ea;
+  --ink:#0f1714; --ink-2:#45514b; --ink-3:#7c8a82;
+  --line:#e1eae4; --line-2:#eef4f0;
+  /* brand + tool hues */
+  --brand:#0d9488; --brand-2:#16a34a;
+  --face:#059669; --pose:#0891b2; --hands:#ca8a04;
+  --good:#16a34a; --warn:#d97706; --risk:#e11d48; --info:#0891b2;
+  /* soft tints — mix with --surface so they auto-darken in dark mode */
+  --brand-soft:color-mix(in srgb,var(--brand) 14%,var(--surface));
+  --face-soft:color-mix(in srgb,var(--face) 14%,var(--surface));
+  --pose-soft:color-mix(in srgb,var(--pose) 14%,var(--surface));
+  --hands-soft:color-mix(in srgb,var(--hands) 14%,var(--surface));
+  --good-soft:color-mix(in srgb,var(--good) 14%,var(--surface));
+  --warn-soft:color-mix(in srgb,var(--warn) 14%,var(--surface));
+  --risk-soft:color-mix(in srgb,var(--risk) 14%,var(--surface));
+  --info-soft:color-mix(in srgb,var(--info) 14%,var(--surface));
+  /* back-compat aliases (existing screens reference these names) */
+  --card:var(--surface);
+  --green:var(--brand); --green-deep:#0f766e; --green-soft:var(--brand-soft);
+  --amber:var(--warn); --red:var(--risk); --blue:var(--info);
+  /* structural */
+  --radius:16px; --radius-sm:11px; --radius-xs:8px; --r-pill:999px;
+  --shadow:0 1px 2px rgba(16,30,24,.04), 0 12px 28px -20px rgba(16,30,24,.26);
+  --shadow-lg:0 24px 60px -32px rgba(16,30,24,.38);
+  --grad:linear-gradient(120deg,var(--brand),var(--brand-2));
+  --grad-mesh:
+     radial-gradient(900px 420px at 88% -10%, color-mix(in srgb,var(--brand-2) 14%,transparent), transparent 60%),
+     radial-gradient(760px 460px at -8% 6%, color-mix(in srgb,var(--brand) 12%,transparent), transparent 55%);
+  --stage:#0e1613; --stage-line:rgba(255,255,255,.08);
+  --t:.22s cubic-bezier(.4,0,.2,1);
+  --font-display:'Bricolage Grotesque',serif;
+  --font-body:'Hanken Grotesk',system-ui,-apple-system,sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,monospace;
+}
+[data-theme="dark"]{
+  --bg:#0a0f0c; --surface:#141b16; --surface-2:#19221c; --surface-3:#212d25;
+  --ink:#e7f0ea; --ink-2:#aabcb1; --ink-3:#6e8076;
+  --line:#1f2b24; --line-2:#18211b;
+  --brand:#2dd4bf; --brand-2:#4ade80;
+  --face:#34d399; --pose:#22d3ee; --hands:#facc15;
+  --good:#4ade80; --warn:#fbbf24; --risk:#fb7185; --info:#38bdf8;
+  --green-deep:#5eead4;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 18px 40px -26px rgba(0,0,0,.7);
+  --shadow-lg:0 30px 70px -30px rgba(0,0,0,.85);
+  --stage:#050806; --stage-line:rgba(255,255,255,.06);
+  --grad-mesh:
+     radial-gradient(1000px 520px at 90% -12%, color-mix(in srgb,var(--brand-2) 22%,transparent), transparent 60%),
+     radial-gradient(820px 520px at -10% 0%, color-mix(in srgb,var(--brand) 20%,transparent), transparent 55%);
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
