@@ -9,6 +9,8 @@ def test_root_serves_new_shell():
     assert r.status_code == 200
     assert 'id="app"' in r.text
     assert "/main.js" in r.text
+    assert "Bricolage+Grotesque" in r.text
+    assert "Hanken+Grotesk" in r.text
 
 
 def test_clean_studio_css_served():
