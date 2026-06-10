@@ -21,7 +21,7 @@ def test_clean_studio_css_served():
 
 
 def test_router_and_shell_modules_served():
-    for path in ("/router.js", "/shell.js", "/main.js",
+    for path in ("/router.js", "/shell.js", "/main.js", "/theme.js",
                  "/api.js", "/screens/registry.js", "/screens/placeholder.js", "/util.js",
                  "/format.js", "/charts.js", "/screens/dashboard.js",
                  "/screens/history.js", "/screens/report.js",
