@@ -6,11 +6,11 @@ export const CONFIG = {
   GESTURE_MODEL_URL: "https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task",
   OBJECT_MODEL_URL: "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite",
   POSE_THROTTLE_MS: 120,  // run pose + hands ~8x/sec
-  EMOTION_THROTTLE_MS: 3000,  // capture ~1 face crop per 3s for DeepFace emotion
-  EMOTION_CROP_PX: 112,       // square crop size sent to the backend
+  EMOTION_THROTTLE_MS: 3000,  // capture ~1 face crop per 3s for the interview emotion track
+  EMOTION_CROP_PX: 112,       // square crop size sent to the backend (interview batch path)
   EMOTION_MAX_SHOTS: 200,     // hard cap on buffered crops per interview
-  DEEPFACE_LIVE_MS: 2000,     // live Facial screen: snapshot for DeepFace every ~2s
-  DEEPFACE_CROP_PX: 256,      // larger crop for the live DeepFace path (detector needs detail)
+  EMOTION_LIVE_MS: 2000,      // live Facial screen: snapshot for the emotion model every ~2s
+  EMOTION_LIVE_CROP_PX: 256,  // square face-crop size sent to the live emotion model
   // Blendshapes forwarded to the backend (smile, blink, brow, and 8 eyeLook* for gaze)
   BLENDSHAPES: ["mouthSmileLeft", "mouthSmileRight", "eyeBlinkLeft", "eyeBlinkRight", "browInnerUp",
     "eyeLookInLeft", "eyeLookInRight", "eyeLookOutLeft", "eyeLookOutRight",

@@ -93,7 +93,7 @@ function view(s){
     '<div class="chart-card"><div class="ct">Emotion (MediaPipe)</div>' +
       '<div class="cs">Heuristic emotion track from face blendshapes.</div>' +
       emotionBars(s.emotion_mediapipe) + '</div>' +
-    (s.emotion && s.emotion.available ? ('<div class="chart-card"><div class="ct">Emotion (DeepFace)</div>' +
+    (s.emotion && s.emotion.available ? ('<div class="chart-card"><div class="ct">Emotion (HSEmotion)</div>' +
       emotionBars(s.emotion) + '</div>') : '');
 }
 

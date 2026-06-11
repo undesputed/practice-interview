@@ -86,10 +86,10 @@ async def interview_token(req: TokenRequest):
 
 @app.post("/api/emotion")
 async def emotion(meta: str = Form(...), images: list[UploadFile] = File(default=[])):
-    """Score buffered face crops with DeepFace and return the aggregated emotion summary.
+    """Score buffered face crops with HSEmotion and return the aggregated emotion summary.
 
     Optional + graceful: returns {"available": False} when EMOTION_ANALYSIS != "1",
-    no images were sent, or DeepFace is unavailable. Images are scored in memory and
+    no images were sent, or the emotion model is unavailable. Images are scored in memory and
     never written to disk.
     """
     if os.getenv("EMOTION_ANALYSIS") != "1" or not images:
@@ -101,7 +101,7 @@ async def emotion(meta: str = Form(...), images: list[UploadFile] = File(default
     bufs = [await im.read() for im in images]
     try:
         scored = score_emotions(bufs)
-    except Exception as exc:  # DeepFace import/runtime failure -> degrade
+    except Exception as exc:  # emotion model import/runtime failure -> degrade
         logging.warning("emotion scoring unavailable: %s", exc)
         return {"available": False}
     if len(metas) != len(scored):
@@ -127,7 +127,7 @@ async def emotion_frame(image: UploadFile = File(...)):
     buf = await image.read()
     try:
         scored = score_emotions([buf])
-    except Exception as exc:  # DeepFace import/runtime failure -> degrade
+    except Exception as exc:  # emotion model import/runtime failure -> degrade
         logging.warning("emotion frame scoring unavailable: %s", exc)
         return {"available": False}
     r = scored[0] if scored else None

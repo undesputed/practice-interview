@@ -17,7 +17,7 @@ const DISPLAY = [
 let engine = 'mediapipe';   // 'mediapipe' (live blendshapes) | 'deepface' (server emotion)
 let mode = 'face';          // 'face' | 'pose' | 'hands'
 
-// DeepFace live track (server, ~every DEEPFACE_LIVE_MS). Runs only while engine==='deepface'.
+// Live server emotion track (~every EMOTION_LIVE_MS). Runs only while engine==='deepface'.
 let dfRunning = false, dfTimer = null;
 let dfStatus = 'off';   // 'off' | 'warming' | 'measuring' | 'live' | 'unavailable'
 let dfDom = null, dfScores = null;
@@ -50,7 +50,7 @@ function dfPanel(){
     body = '<div class="fa-note">Measuring…</div>';
   }
   const dom = (dfStatus === 'live' && dfDom) ? dfDom : '—';
-  const every = Math.round(CONFIG.DEEPFACE_LIVE_MS / 1000);
+  const every = Math.round(CONFIG.EMOTION_LIVE_MS / 1000);
   return '<div class="phead"><div><h3>Expression Analysis</h3>' +
       '<div class="desc">HSEmotion · AffectNet model — refreshed every ' + every + 's on the server.</div></div>' +
       '<div class="fa-dom"><div class="e">' + esc(dom) + '</div></div></div>' + body;
@@ -61,7 +61,7 @@ let lastFrame = null;
 async function deepfaceTick(){
   if (!dfRunning){ return; }
   if (vision.isRunning()){
-    const blob = await vision.captureFaceCrop(CONFIG.DEEPFACE_CROP_PX);
+    const blob = await vision.captureFaceCrop(CONFIG.EMOTION_LIVE_CROP_PX);
     if (blob){
       if (dfStatus === 'warming' || dfStatus === 'off') dfStatus = 'measuring';
       const res = await api.scoreEmotionFrame(blob);
@@ -75,7 +75,7 @@ async function deepfaceTick(){
   // emotion off, so we don't upload a face crop every 2s for nothing. Still polls,
   // so it auto-resumes once the camera starts or the server is enabled.
   const idle = !vision.isRunning() || dfStatus === 'unavailable';
-  if (dfRunning) dfTimer = setTimeout(deepfaceTick, idle ? 15000 : CONFIG.DEEPFACE_LIVE_MS);
+  if (dfRunning) dfTimer = setTimeout(deepfaceTick, idle ? 15000 : CONFIG.EMOTION_LIVE_MS);
 }
 
 function startDeepface(){
