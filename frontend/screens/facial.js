@@ -31,14 +31,14 @@ function bsBars(bs){
   }).join('');
 }
 
-// The full Expression Analysis panel when the DeepFace engine is selected
-// (DeepFace-only — no MediaPipe blendshapes).
+// The full Expression Analysis panel when the HSEmotion engine is selected
+// (server emotion only — no MediaPipe blendshapes).
 function dfPanel(){
   let body;
   if (dfStatus === 'warming'){
-    body = '<div class="fa-note">Warming up DeepFace… the first read takes a few seconds.</div>';
+    body = '<div class="fa-note">Warming up the emotion model… the first read takes a few seconds.</div>';
   } else if (dfStatus === 'unavailable'){
-    body = '<div class="fa-note">DeepFace is off on the server. Start it with <b>EMOTION_ANALYSIS=1</b>.</div>';
+    body = '<div class="fa-note">Emotion analysis is off on the server. Start it with <b>EMOTION_ANALYSIS=1</b>.</div>';
   } else if (dfStatus === 'live' && dfScores){
     body = '<div class="bs-bars">' + EMOTION_CLASSES.map((c) => {
       const v = Math.round(dfScores[c] || 0);
@@ -52,7 +52,7 @@ function dfPanel(){
   const dom = (dfStatus === 'live' && dfDom) ? dfDom : '—';
   const every = Math.round(CONFIG.DEEPFACE_LIVE_MS / 1000);
   return '<div class="phead"><div><h3>Expression Analysis</h3>' +
-      '<div class="desc">DeepFace · trained model — refreshed every ' + every + 's on the server.</div></div>' +
+      '<div class="desc">HSEmotion · AffectNet model — refreshed every ' + every + 's on the server.</div></div>' +
       '<div class="fa-dom"><div class="e">' + esc(dom) + '</div></div></div>' + body;
 }
 
@@ -166,7 +166,7 @@ export function facial(){
       root.querySelectorAll('[data-engine]').forEach((x) => x.classList.toggle('on', x === b));
       const note = document.getElementById('fa-engine-note');
       if (note) note.textContent = engine === 'deepface'
-        ? 'DeepFace scores a face snapshot on the server every ~2s (replaces the live MediaPipe reading).'
+        ? 'HSEmotion scores a face snapshot on the server every ~2s (replaces the live MediaPipe reading).'
         : 'MediaPipe runs live in your browser, every frame.';
       if (engine === 'deepface') startDeepface(); else stopDeepface();
       paintPanel({ mode: mode, blendshapes: null });
@@ -188,7 +188,7 @@ export function facial(){
       '<div class="fa-rail">' +
         '<div class="lab">Emotion engine</div>' +
         '<div class="seg"><button data-engine="mediapipe" class="on">MediaPipe</button>' +
-          '<button data-engine="deepface">DeepFace</button></div>' +
+          '<button data-engine="deepface">HSEmotion</button></div>' +
         '<div class="seg-note" id="fa-engine-note">MediaPipe runs live in your browser, every frame.</div>' +
         '<div class="lab" style="margin-top:16px">Detection mode</div>' +
         '<button class="mode on" data-mode="face"><span class="r"></span> Face landmarks</button>' +

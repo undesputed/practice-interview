@@ -1,10 +1,7 @@
 # backend/requirements-emotion.txt
-# OPTIONAL — only needed to enable DeepFace emotion analysis (EMOTION_ANALYSIS=1).
-# Heavy (TensorFlow). Install AFTER backend/requirements.txt (not combined in one
-# resolve): TensorFlow 2.17 requires numpy<2.0, so this downgrades the base pin
-# numpy==2.0.2 to numpy 1.26.x. The app is compatible with both (full test suite
-# passes on numpy 1.26.4). The Dockerfile already installs base then emotion in
-# this order, so the downgrade is handled there too.
-deepface==0.0.93
-tf-keras==2.17.0
+# OPTIONAL — only needed to enable emotion analysis (EMOTION_ANALYSIS=1).
+# Emotion uses HSEmotion (AffectNet EfficientNet) via ONNX Runtime — lighter than the
+# old DeepFace/TensorFlow stack and more accurate on real webcam faces. The model
+# (~30 MB) downloads on first use. Install separately from backend/requirements.txt.
+hsemotion-onnx==0.3.1
 opencv-python==4.10.0.84

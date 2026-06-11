@@ -41,14 +41,15 @@ def test_aggregate_ignores_unknown_dominant_class():
 
 from backend import emotion as emotion_mod
 
-def test_score_emotions_raises_when_deepface_missing(monkeypatch):
-    # Simulate DeepFace not installed: the lazy import inside score_emotions fails.
+def test_score_emotions_raises_when_hsemotion_missing(monkeypatch):
+    # Simulate hsemotion-onnx not installed: building the recognizer fails.
+    emotion_mod._recognizer = None
     import builtins
     real_import = builtins.__import__
 
     def fake_import(name, *a, **k):
-        if name == "deepface" or name.startswith("deepface."):
-            raise ImportError("No module named 'deepface'")
+        if name == "hsemotion_onnx" or name.startswith("hsemotion_onnx."):
+            raise ImportError("No module named 'hsemotion_onnx'")
         return real_import(name, *a, **k)
 
     monkeypatch.setattr(builtins, "__import__", fake_import)

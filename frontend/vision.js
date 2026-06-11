@@ -54,16 +54,18 @@ export function captureFaceCrop(sizePx){
     if (p.y > maxY) maxY = p.y;
   }
   const vw = video.videoWidth, vh = video.videoHeight;
-  // Generous padding so a server-side detector has margin to find + align the face.
-  const padX = (maxX - minX) * 0.4, padY = (maxY - minY) * 0.4;
-  const sx = Math.max(0, (minX - padX) * vw);
-  const sy = Math.max(0, (minY - padY) * vh);
-  const sw = Math.min(vw - sx, (maxX - minX + 2 * padX) * vw);
-  const sh = Math.min(vh - sy, (maxY - minY + 2 * padY) * vh);
-  if (sw < 8 || sh < 8) return Promise.resolve(null);
+  // SQUARE crop centered on the face (side = larger face dimension + ~25% margin each
+  // side), so resizing into a square canvas does NOT stretch the face. A distorted
+  // (non-square) crop skews the emotion model — this is the key accuracy fix.
+  const bw = (maxX - minX) * vw, bh = (maxY - minY) * vh;
+  const cx = ((minX + maxX) / 2) * vw, cy = ((minY + maxY) / 2) * vh;
+  const side = Math.min(Math.max(bw, bh) * 1.5, vw, vh);
+  if (side < 8) return Promise.resolve(null);
+  const sx = Math.max(0, Math.min(cx - side / 2, vw - side));
+  const sy = Math.max(0, Math.min(cy - side / 2, vh - side));
   const c = document.createElement('canvas');
   c.width = sizePx; c.height = sizePx;
-  c.getContext('2d').drawImage(video, sx, sy, sw, sh, 0, 0, sizePx, sizePx);
+  c.getContext('2d').drawImage(video, sx, sy, side, side, 0, 0, sizePx, sizePx);
   return new Promise((resolve) => c.toBlob((b) => resolve(b), 'image/jpeg', 0.8));
 }
 
