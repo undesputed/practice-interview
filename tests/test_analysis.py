@@ -424,3 +424,12 @@ def test_emotion_blendshapes_one_sided_value_not_halved():
                                         noseSneerLeft=0.4, noseSneerRight=0.4,
                                         mouthUpperUpLeft=0.4, mouthUpperUpRight=0.4)])
     assert out["dominant"] == "happy"
+
+def test_emotion_blendshapes_browdown_without_stretch_is_not_fear():
+    # Fear is product-gated on BOTH browDown (AU4) AND mouthStretch (AU20). With a
+    # lowered brow + wide eyes but NO lip-stretch, fear must be gated off (so an
+    # angry/surprised brow can't masquerade as fear).
+    out = emotion_from_blendshapes([_ef(browInnerUp=0.7, browOuterUpLeft=0.6, browOuterUpRight=0.6,
+                                        browDownLeft=0.6, browDownRight=0.6,
+                                        eyeWideLeft=0.6, eyeWideRight=0.6, jawOpen=0.5)])
+    assert out["dominant"] != "fear"

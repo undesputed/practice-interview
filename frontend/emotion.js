@@ -1,20 +1,30 @@
-// Live blendshape -> emotion scorer. Ported VERBATIM from backend/analysis.py
-// (EMOTION_WEIGHTS / _bs_avg / NEUTRAL_BASE / _frame_emotion_scores) so this
-// screen's live "dominant emotion" matches the report's MediaPipe track.
-// KEEP IN SYNC with backend/analysis.py if the weights change.
+// Live blendshape -> emotion scorer. Mirrors backend/analysis.py (the FACS Action-Unit
+// prototype model) so the live "dominant emotion" matches the report's MediaPipe track.
+// KEEP IN SYNC with backend/analysis.py if the AU prototypes / gates / weights change.
 
 export const EMOTION_CLASSES = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral'];
 
-const EMOTION_WEIGHTS = {
-  happy:    { mouthSmile: 1.0, cheekSquint: 0.6 },
-  sad:      { mouthFrown: 1.0, browInnerUp: 0.6, browDown: 0.3 },
-  angry:    { browDown: 1.0, mouthPress: 0.6, eyeSquint: 0.5 },
-  surprise: { browInnerUp: 0.7, browOuterUp: 0.7, eyeWide: 0.8, jawOpen: 0.6 },
-  fear:     { browInnerUp: 0.6, browOuterUp: 0.6, browDown: 0.5,
-              eyeWide: 0.7, mouthStretch: 0.7, jawOpen: 0.4 },
-  disgust:  { noseSneer: 1.0, mouthUpperUp: 0.8 },
+// FACS Action Unit -> blendshape base name (Left/Right averaged by bsAvg).
+const AU = {
+  AU1: 'browInnerUp', AU2: 'browOuterUp', AU4: 'browDown', AU5: 'eyeWide',
+  AU6: 'cheekSquint', AU7: 'eyeSquint', AU9: 'noseSneer', AU10: 'mouthUpperUp',
+  AU12: 'mouthSmile', AU15: 'mouthFrown', AU20: 'mouthStretch', AU23: 'mouthPress', AU26: 'jawOpen',
 };
-const NEUTRAL_BASE = 0.15;
+// EMFACS emotion prototypes: match = MEAN activation of these AUs.
+const PROTOTYPES = {
+  happy:    ['AU6', 'AU12'],
+  sad:      ['AU1', 'AU4', 'AU15'],
+  surprise: ['AU1', 'AU2', 'AU5', 'AU26'],
+  fear:     ['AU1', 'AU2', 'AU4', 'AU5', 'AU7', 'AU20', 'AU26'],
+  angry:    ['AU4', 'AU5', 'AU7', 'AU23'],
+  disgust:  ['AU9', 'AU10', 'AU15'],
+};
+// Distinguishing AU(s) each emotion REQUIRES (soft product-gate): fear needs brow-lower
+// + lip-stretch (or surprise wins); disgust needs the nose-wrinkle (or anger wins).
+const GATES = { fear: ['AU4', 'AU20'], disgust: ['AU9'] };
+// AUs that CONTRADICT an emotion (subtracted, weighted).
+const CONFLICTS = { surprise: ['AU4'], happy: ['AU4', 'AU15'] };
+const GATE_T = 0.35, CONFLICT_W = 0.5, NEUTRAL_BASE = 0.12;
 
 // Average the Left/Right variants that are present; a one-sided value counts at
 // full strength. Falls back to the bare key, then 0.
@@ -27,17 +37,20 @@ function bsAvg(bs, name){
   return bs[name] != null ? bs[name] : 0;
 }
 
-// 7-class 0-100 distribution for one frame's blendshapes.
+// 7-class 0-100 distribution for one frame's blendshapes, via FACS-AU prototypes.
 export function emotionScores(bs){
   bs = bs || {};
+  const au = {};
+  for (const k in AU) au[k] = bsAvg(bs, AU[k]);
   const raw = {};
   let maxExpressive = 0;
-  for (const emo in EMOTION_WEIGHTS){
-    let s = 0;
-    const w = EMOTION_WEIGHTS[emo];
-    for (const name in w) s += w[name] * bsAvg(bs, name);
-    raw[emo] = s;
-    if (s > maxExpressive) maxExpressive = s;
+  for (const emo in PROTOTYPES){
+    const proto = PROTOTYPES[emo];
+    let match = proto.reduce((s, a) => s + au[a], 0) / proto.length;          // mean prototype activation
+    for (const a of (CONFLICTS[emo] || [])) match -= CONFLICT_W * au[a];       // subtract conflicting AUs
+    for (const a of (GATES[emo] || [])) match *= Math.min(1, au[a] / GATE_T);  // require distinguishing AU(s)
+    raw[emo] = Math.max(0, match);
+    if (raw[emo] > maxExpressive) maxExpressive = raw[emo];
   }
   raw.neutral = Math.max(0, NEUTRAL_BASE - maxExpressive);
   const total = EMOTION_CLASSES.reduce((a, c) => a + (raw[c] || 0), 0);

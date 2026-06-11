@@ -313,22 +313,39 @@ def composite_scores(m: dict) -> dict:
     }
 
 
-# --- Blendshape-derived emotion (heuristic EMFACS mapping) ---
-# MediaPipe blendshapes are ARKit-style Action Unit proxies. Each emotion is the
-# weighted sum of its diagnostic AUs (Ekman/EMFACS). Weights are tunable, like the
-# threshold block at the top of this file. Neutral is derived from low overall
-# activation, not weighted. This is an INFERENCE shown beside DeepFace, never
-# ground truth — see docs/features/mediapipe-limitations.md.
-EMOTION_WEIGHTS = {
-    "happy":    {"mouthSmile": 1.0, "cheekSquint": 0.6},
-    "sad":      {"mouthFrown": 1.0, "browInnerUp": 0.6, "browDown": 0.3},
-    "angry":    {"browDown": 1.0, "mouthPress": 0.6, "eyeSquint": 0.5},
-    "surprise": {"browInnerUp": 0.7, "browOuterUp": 0.7, "eyeWide": 0.8, "jawOpen": 0.6},
-    "fear":     {"browInnerUp": 0.6, "browOuterUp": 0.6, "browDown": 0.5,
-                 "eyeWide": 0.7, "mouthStretch": 0.7, "jawOpen": 0.4},
-    "disgust":  {"noseSneer": 1.0, "mouthUpperUp": 0.8},
+# --- Blendshape-derived emotion (FACS / EMFACS Action-Unit prototypes) ---
+# MediaPipe blendshapes are ARKit-style proxies for FACS Action Units. We map them to
+# AUs, then score each emotion as the MEAN activation of its EMFACS prototype AUs, GATE
+# the emotion on its distinguishing AU(s), and PENALIZE conflicting AUs. This separates
+# the commonly-confused pairs (fear/surprise, anger/disgust) far better than a flat sum.
+# Still an INFERENCE, never ground truth — see docs/features/mediapipe-limitations.md.
+
+# FACS Action Unit -> blendshape base name (Left/Right averaged by _bs_avg).
+_AU = {
+    "AU1": "browInnerUp", "AU2": "browOuterUp", "AU4": "browDown", "AU5": "eyeWide",
+    "AU6": "cheekSquint", "AU7": "eyeSquint", "AU9": "noseSneer", "AU10": "mouthUpperUp",
+    "AU12": "mouthSmile", "AU15": "mouthFrown", "AU20": "mouthStretch", "AU23": "mouthPress",
+    "AU26": "jawOpen",
 }
-NEUTRAL_BASE = 0.15  # neutral floor; expressive activation eats into it
+# EMFACS emotion prototypes: an emotion's match = the MEAN activation of these AUs.
+_PROTOTYPES = {
+    "happy":    ["AU6", "AU12"],
+    "sad":      ["AU1", "AU4", "AU15"],
+    "surprise": ["AU1", "AU2", "AU5", "AU26"],
+    "fear":     ["AU1", "AU2", "AU4", "AU5", "AU7", "AU20", "AU26"],
+    "angry":    ["AU4", "AU5", "AU7", "AU23"],
+    "disgust":  ["AU9", "AU10", "AU15"],
+}
+# Distinguishing AU(s) an emotion REQUIRES (soft product-gate). Fear needs BOTH the
+# brow-lower (AU4) and the lip-stretch (AU20) or surprise wins; disgust needs the
+# nose-wrinkle (AU9) or anger wins. Anger separates from disgust via disgust's gate.
+_GATES = {"fear": ["AU4", "AU20"], "disgust": ["AU9"]}
+# AUs that CONTRADICT an emotion (subtracted, weighted): brow-down opposes surprise; a
+# real smile should not carry a lowered brow or a frown.
+_CONFLICTS = {"surprise": ["AU4"], "happy": ["AU4", "AU15"]}
+_GATE_T = 0.35       # soft-gate threshold on each distinguishing AU
+_CONFLICT_W = 0.5    # weight of the conflicting-AU penalty
+NEUTRAL_BASE = 0.12  # neutral floor; an emotion must beat this to be "expressed"
 
 
 def _bs_avg(bs: dict, name: str) -> float:
@@ -345,9 +362,16 @@ def _bs_avg(bs: dict, name: str) -> float:
 
 
 def _frame_emotion_scores(bs: dict) -> dict:
-    """7-class 0-100 distribution for one frame's blendshapes."""
-    raw = {emo: sum(w * _bs_avg(bs, name) for name, w in weights.items())
-           for emo, weights in EMOTION_WEIGHTS.items()}
+    """7-class 0-100 distribution for one frame's blendshapes, via FACS-AU prototypes."""
+    au = {name: _bs_avg(bs, blend) for name, blend in _AU.items()}
+    raw = {}
+    for emo, proto in _PROTOTYPES.items():
+        match = sum(au[a] for a in proto) / len(proto)        # mean prototype activation
+        for a in _CONFLICTS.get(emo, []):                      # subtract conflicting AUs
+            match -= _CONFLICT_W * au[a]
+        for a in _GATES.get(emo, []):                          # require distinguishing AU(s)
+            match *= min(1.0, au[a] / _GATE_T)
+        raw[emo] = max(0.0, match)
     raw["neutral"] = max(0.0, NEUTRAL_BASE - max(raw.values(), default=0.0))
     total = sum(raw.values())
     if total <= 0:
