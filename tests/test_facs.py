@@ -26,3 +26,28 @@ def test_disgust_uses_lower_lip_au16():
           "mouthFrownLeft": 0.4, "mouthFrownRight": 0.4}
     scores = analysis._frame_emotion_scores(bs)
     assert max(scores, key=scores.get) == "disgust"
+
+
+def test_contempt_on_asymmetric_smile_with_dimple():
+    bs = {"mouthSmileLeft": 0.7, "mouthSmileRight": 0.05,
+          "mouthDimpleLeft": 0.5, "mouthDimpleRight": 0.0}
+    scores = analysis._frame_emotion_scores(bs)
+    assert "contempt" in scores
+    assert max(scores, key=scores.get) == "contempt"
+
+
+def test_symmetric_smile_is_not_contempt():
+    bs = {"mouthSmileLeft": 0.7, "mouthSmileRight": 0.7,
+          "cheekSquintLeft": 0.4, "cheekSquintRight": 0.4}
+    scores = analysis._frame_emotion_scores(bs)
+    assert scores["contempt"] == 0.0
+    assert max(scores, key=scores.get) == "happy"
+
+
+def test_mediapipe_track_distribution_includes_contempt():
+    frame = {"face": True, "t": 0.0, "turn": 0,
+             "bs": {"mouthSmileLeft": 0.7, "mouthSmileRight": 0.05,
+                    "mouthDimpleLeft": 0.5, "mouthDimpleRight": 0.0}}
+    out = analysis.emotion_from_blendshapes([frame])
+    assert out["available"] is True
+    assert "contempt" in out["overall_distribution"]

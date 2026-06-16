@@ -2,7 +2,7 @@
 from __future__ import annotations  # PEP 604 (X | Y) on Python 3.9
 import math
 from typing import Sequence
-from backend.emotion import aggregate_emotions, EMOTION_CLASSES
+from backend.emotion import aggregate_emotions, EMOTION_CLASSES, EMOTION_CLASSES as _BASIC_CLASSES
 
 # A "frame" dict has the shape:
 #   {"t": float_ms, "turn": int, "face": bool,
@@ -358,6 +358,23 @@ _PROTOTYPES = {
     "angry":    ["AU4", "AU5", "AU7", "AU23"],
     "disgust":  ["AU9", "AU10", "AU15", "AU16"],
 }
+# MediaPipe track adds Contempt (8th); the HSEmotion track keeps the basic 7.
+_MP_CLASSES = list(_BASIC_CLASSES[:-1]) + ["contempt", "neutral"]  # keep neutral last
+_CONTEMPT_SMILE_DELTA = 0.2   # min left/right smile asymmetry to consider contempt
+
+
+def _contempt_score(bs: dict) -> float:
+    """Contempt = a one-sided (asymmetric) smile plus a dimpler (AU14). A symmetric
+    smile scores 0. Gated on the dimpler so an ordinary lopsided smile won't trigger."""
+    sl = bs.get("mouthSmileLeft", 0.0) or 0.0
+    sr = bs.get("mouthSmileRight", 0.0) or 0.0
+    asym = abs(sl - sr)
+    if asym < _CONTEMPT_SMILE_DELTA:
+        return 0.0
+    dimple = max(bs.get("mouthDimpleLeft", 0.0) or 0.0, bs.get("mouthDimpleRight", 0.0) or 0.0)
+    return max(0.0, asym) * min(1.0, dimple / _GATE_T)
+
+
 # Distinguishing AU(s) an emotion REQUIRES (soft product-gate). Fear needs BOTH the
 # brow-lower (AU4) and the lip-stretch (AU20) or surprise wins; disgust needs the
 # nose-wrinkle (AU9) or anger wins. Anger separates from disgust via disgust's gate.
@@ -401,11 +418,12 @@ def _frame_emotion_scores(bs: dict) -> dict:
         for a in _GATES.get(emo, []):                          # require distinguishing AU(s)
             match *= min(1.0, au[a] / _GATE_T)
         raw[emo] = max(0.0, match)
+    raw["contempt"] = _contempt_score(bs)
     raw["neutral"] = max(0.0, NEUTRAL_BASE - max(raw.values(), default=0.0))
     total = sum(raw.values())
     if total <= 0:
-        return {c: (100.0 if c == "neutral" else 0.0) for c in EMOTION_CLASSES}
-    return {c: round(100.0 * raw.get(c, 0.0) / total, 1) for c in EMOTION_CLASSES}
+        return {c: (100.0 if c == "neutral" else 0.0) for c in _MP_CLASSES}
+    return {c: round(100.0 * raw.get(c, 0.0) / total, 1) for c in _MP_CLASSES}
 
 
 def emotion_from_blendshapes(frames: list[dict]) -> dict:
@@ -421,7 +439,7 @@ def emotion_from_blendshapes(frames: list[dict]) -> dict:
         scores = _frame_emotion_scores(f["bs"])
         shots.append({"t": f.get("t", 0.0), "turn": f.get("turn", -1),
                       "dominant": max(scores, key=scores.get), "scores": scores})
-    return aggregate_emotions(shots)
+    return aggregate_emotions(shots, classes=_MP_CLASSES)
 
 
 CONCERN_OBJECTS = {"cell phone", "laptop", "tv", "book", "remote", "keyboard"}

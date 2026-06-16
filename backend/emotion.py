@@ -25,22 +25,23 @@ def _get_recognizer():
     return _recognizer
 
 
-def aggregate_emotions(shots: list[dict]) -> dict:
+def aggregate_emotions(shots: list[dict], classes: list | None = None) -> dict:
     """Aggregate per-shot emotion records into the report's emotion summary.
 
     Each shot: {"t": float_ms, "turn": int, "dominant": str, "scores": {class: 0-100}}.
     Distribution = percent of shots for which a class is the dominant emotion.
     Returns {"available": False} when there are no shots.
     """
+    classes = classes or EMOTION_CLASSES
     if not shots:
         return {"available": False}
 
     n = len(shots)
-    dom_counts = {c: 0 for c in EMOTION_CLASSES}
+    dom_counts = {c: 0 for c in classes}
     for s in shots:
         if s["dominant"] in dom_counts:
             dom_counts[s["dominant"]] += 1
-    overall = {c: round(100.0 * dom_counts[c] / n, 1) for c in EMOTION_CLASSES}
+    overall = {c: round(100.0 * dom_counts[c] / n, 1) for c in classes}
     dominant = max(dom_counts, key=dom_counts.get)
 
     by_turn: dict[int, list[dict]] = {}
@@ -49,7 +50,7 @@ def aggregate_emotions(shots: list[dict]) -> dict:
     per_question = []
     for turn in sorted(t for t in by_turn if t >= 0):
         group = by_turn[turn]
-        c = {cl: 0 for cl in EMOTION_CLASSES}
+        c = {cl: 0 for cl in classes}
         for s in group:
             if s["dominant"] in c:
                 c[s["dominant"]] += 1
@@ -57,7 +58,7 @@ def aggregate_emotions(shots: list[dict]) -> dict:
         per_question.append({
             "turn": turn,
             "dominant": max(c, key=c.get),
-            "distribution": {cl: round(100.0 * c[cl] / m, 1) for cl in EMOTION_CLASSES},
+            "distribution": {cl: round(100.0 * c[cl] / m, 1) for cl in classes},
         })
 
     timeline = [{"t": s["t"], "turn": s.get("turn", -1),

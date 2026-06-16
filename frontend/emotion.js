@@ -2,7 +2,7 @@
 // prototype model) so the live "dominant emotion" matches the report's MediaPipe track.
 // KEEP IN SYNC with backend/analysis.py if the AU prototypes / gates / weights change.
 
-export const EMOTION_CLASSES = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral'];
+export const EMOTION_CLASSES = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'contempt', 'neutral'];
 
 // FACS Action Unit -> MediaPipe blendshape key(s) (averaged). KEEP IN SYNC with analysis.py _AU.
 const AU = {
@@ -31,6 +31,14 @@ const GATES = { fear: ['AU4', 'AU20'], disgust: ['AU9'] };
 // AUs that CONTRADICT an emotion (subtracted, weighted).
 const CONFLICTS = { surprise: ['AU4'], happy: ['AU4', 'AU15'] };
 const GATE_T = 0.35, CONFLICT_W = 0.5, NEUTRAL_BASE = 0.12;
+const CONTEMPT_SMILE_DELTA = 0.2;   // KEEP IN SYNC with analysis.py
+function contemptScore(bs){
+  const sl = bs['mouthSmileLeft'] || 0, sr = bs['mouthSmileRight'] || 0;
+  const asym = Math.abs(sl - sr);
+  if (asym < CONTEMPT_SMILE_DELTA) return 0;
+  const dimple = Math.max(bs['mouthDimpleLeft'] || 0, bs['mouthDimpleRight'] || 0);
+  return Math.max(0, asym) * Math.min(1, dimple / GATE_T);
+}
 
 // Average the blendshape keys present for an AU (missing skipped). KEEP IN SYNC with analysis.py _au_value.
 function auValue(bs, keys){
@@ -54,6 +62,8 @@ export function emotionScores(bs){
     raw[emo] = Math.max(0, match);
     if (raw[emo] > maxExpressive) maxExpressive = raw[emo];
   }
+  raw.contempt = contemptScore(bs);
+  if (raw.contempt > maxExpressive) maxExpressive = raw.contempt;
   raw.neutral = Math.max(0, NEUTRAL_BASE - maxExpressive);
   const total = EMOTION_CLASSES.reduce((a, c) => a + (raw[c] || 0), 0);
   const out = {};
