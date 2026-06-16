@@ -1,11 +1,13 @@
 // frontend/interview-engine.js
-// DOM-free MediaPipe capture engine for the live interview. Runs face mesh +
-// hands/gestures every (unique) frame and feeds the action detector; pose +
-// objects run only when the overlay is shown. All models use the GPU delegate.
-// No audio, no frame collection, no network — those attach in later steps.
+// DOM-free MediaPipe capture engine for the live interview. Each unique frame it
+// runs the face mesh and feeds the action detector; pose, hands, and objects run
+// throttled. It buffers every frame (see getFrames) for posting to /api/session,
+// and draws the overlay only when asked. All models use the GPU delegate.
+// No audio capture and no network here — those attach in the live screen.
 // Modeled on the proven loop in app.js, decoupled from the DOM.
 import { CONFIG } from './config.js';
 import { createActionDetector } from './actions.js';
+import { pickPose, pickHands, pickObjects } from './landmarks.js';
 import { FaceLandmarker, PoseLandmarker, HandLandmarker, GestureRecognizer, ObjectDetector, FilesetResolver, DrawingUtils }
   from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35";
 
@@ -53,6 +55,10 @@ export function isRunning(){ return !!(session && session.running); }
 
 // The live camera+mic stream, so the screen can hand the mic to the voice agent. null when stopped.
 export function getStream(){ return session ? session.stream : null; }
+
+// The frames captured this run, for posting to /api/session. Call BEFORE stop()
+// (stop() releases the session). Returns [] when nothing is running.
+export function getFrames(){ return session ? session.frames : []; }
 
 // Tag subsequent action events with the current interview question index. The screen
 // advances this as the AI interviewer asks each question (was hard-pinned to -1).
@@ -125,7 +131,7 @@ function launch(canvas, video, stream, { onStats, onAction, showOverlay }){
   session = {
     stream, video, running: true, rafId: 0, showOverlay: !!showOverlay, turn: -1,
     startTs: performance.now(), fps: 0, _t: performance.now(), _n: 0,
-    lastBodyTs: 0, lastStatsTs: 0, lastVideoTime: -1,
+    lastBodyTs: 0, lastStatsTs: 0, lastVideoTime: -1, frames: [],
     lastPose: null, lastHand: null, lastObjects: null,
   };
 
@@ -166,23 +172,29 @@ function launch(canvas, video, stream, { onStats, onAction, showOverlay }){
         : [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1];
     } catch (e){ /* a single bad frame must not kill the loop */ }
 
-    // Hands/gestures feed the action detector, so they run in every mode (throttled).
-    // Pose + objects are only ever drawn on the overlay and aren't used by the
-    // detector, so skip them entirely when the overlay is hidden — that's the live
-    // interview, where every spare millisecond keeps the video and audio smooth.
+    // Build the frame record this loop iteration (mirrors the legacy app.js shape
+    // the backend /api/session expects). Heavy detectors attach on throttled frames.
+    const tRel = now - session.startTs;
+    const frame = { t: tRel, turn: session.turn, face: hasFace, face_count: faceCount, bs, m };
+
+    // Pose + hands + objects: detect on a throttle for the report data (posture,
+    // fidget, integrity). Cache the raw results so the overlay (when shown) draws
+    // smoothly; the candidate's live view runs overlay-off, so nothing is drawn.
     if (now - session.lastBodyTs >= CONFIG.POSE_THROTTLE_MS){
       session.lastBodyTs = now;
       try {
+        const pr = tasks.pose.detectForVideo(video, now);
+        session.lastPose = pr.landmarks || null;
+        frame.pose = pickPose(pr);
         const hr = tasks.gesture.recognizeForVideo(video, now);
         session.lastHand = (hr && hr.landmarks && hr.landmarks.length) ? hr : null;
-        if (session.showOverlay){
-          const pr = tasks.pose.detectForVideo(video, now);
-          session.lastPose = pr.landmarks || null;
-          const orr = tasks.objects.detectForVideo(video, now);
-          session.lastObjects = (orr && orr.detections && orr.detections.length) ? orr.detections : null;
-        }
+        frame.hands = pickHands(hr);
+        const orr = tasks.objects.detectForVideo(video, now);
+        session.lastObjects = (orr && orr.detections && orr.detections.length) ? orr.detections : null;
+        frame.objects = pickObjects(orr);
       } catch (e){ /* skip body detect on a bad frame */ }
     }
+    session.frames.push(frame);
 
     // Overlays are drawn only when asked. The live interview runs clean (showOverlay:false)
     // so the candidate sees a plain video — detection above still ran, it just isn't drawn.
@@ -210,7 +222,6 @@ function launch(canvas, video, stream, { onStats, onAction, showOverlay }){
     }
 
     // Action detection. `turn` starts at -1 and advances as the AI asks each question (setTurn).
-    const tRel = now - session.startTs;
     const gestureNames = (session.lastHand && session.lastHand.gestures)
       ? session.lastHand.gestures.map((g) => g && g[0] && g[0].categoryName) : [];
     for (const ev of detector.feed({ t: tRel, turn: session.turn, bs, gestures: gestureNames, m, face: hasFace })){
