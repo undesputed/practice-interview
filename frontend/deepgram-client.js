@@ -3,7 +3,7 @@
 //
 // Auth scheme matters: a raw Deepgram API key uses the "token" subprotocol;
 // an ephemeral token (from /v1/auth/grant) uses "bearer". The backend tells us which.
-export function startVoiceAgent({ url, token, scheme, config, micStream, onTranscript, onError, onClose }) {
+export function startVoiceAgent({ url, token, scheme, config, micStream, onTranscript, onError, onClose, onSpeaking }) {
   const sub = scheme || "token";
   console.log(`[dg] connecting: scheme=${sub} tokenLen=${(token || "").length} url=${url}`);
   const ws = new WebSocket(url, [sub, token]);
@@ -15,6 +15,9 @@ export function startVoiceAgent({ url, token, scheme, config, micStream, onTrans
   let processor = null;
   let source = null;
   let audioChunks = 0;
+  let muted = false;
+  let speaking = false;
+  let silenceTimer = null;
 
   ws.onopen = () => {
     console.log("[dg] ws OPEN — sending Settings; inCtx=%s outCtx=%s", inCtx.state, outCtx.state);
@@ -33,6 +36,7 @@ export function startVoiceAgent({ url, token, scheme, config, micStream, onTrans
     processor = inCtx.createScriptProcessor(4096, 1, 1);
     processor.onaudioprocess = (e) => {
       if (ws.readyState !== WebSocket.OPEN) return;
+      if (muted) return;
       const input = e.inputBuffer.getChannelData(0);
       const int16 = new Int16Array(input.length);
       for (let i = 0; i < input.length; i++) {
@@ -62,6 +66,7 @@ export function startVoiceAgent({ url, token, scheme, config, micStream, onTrans
       const start = Math.max(now, nextStart);
       src.start(start);
       nextStart = start + buf.duration;
+      markSpeaking();
     } else {
       const msg = JSON.parse(event.data);
       console.log("[dg] <-", msg.type);
@@ -86,14 +91,25 @@ export function startVoiceAgent({ url, token, scheme, config, micStream, onTrans
     if (onError) onError("voice connection error");
   };
 
+  // The AI is "speaking" while TTS audio is queued; flips off shortly after the
+  // last scheduled chunk finishes playing.
+  function markSpeaking(){
+    if (!speaking){ speaking = true; if (onSpeaking) onSpeaking(true); }
+    clearTimeout(silenceTimer);
+    const ms = Math.max(0, (nextStart - outCtx.currentTime) * 1000) + 150;
+    silenceTimer = setTimeout(() => { speaking = false; if (onSpeaking) onSpeaking(false); }, ms);
+  }
+
   return {
     stop() {
       console.log("[dg] stopping agent");
+      clearTimeout(silenceTimer);
       try { if (processor) processor.disconnect(); } catch (_) {}
       try { if (source) source.disconnect(); } catch (_) {}
       try { inCtx.close(); } catch (_) {}
       try { outCtx.close(); } catch (_) {}
       if (ws.readyState === WebSocket.OPEN) ws.close();
     },
+    setMuted(m) { muted = !!m; },
   };
 }
