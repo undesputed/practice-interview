@@ -54,3 +54,11 @@ def test_agent_config_defines_end_interview_function():
 def test_prompt_instructs_calling_end_interview():
     prompt = build_agent_config("Software Engineer")["agent"]["think"]["prompt"]
     assert "end_interview" in prompt
+
+
+def test_prompt_requires_plain_spoken_text_no_markdown():
+    # The interviewer's words are spoken by TTS; markdown/asterisks would be read aloud
+    # ("star star First Question..."). The prompt must forbid formatting.
+    prompt = build_agent_config("Software Engineer")["agent"]["think"]["prompt"].lower()
+    assert ("text-to-speech" in prompt) or ("read aloud" in prompt) or ("spoken" in prompt)
+    assert "markdown" in prompt
