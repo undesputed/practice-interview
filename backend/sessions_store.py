@@ -52,6 +52,7 @@ def list_sessions(sessions_dir):
         if summary is None:
             continue
         overall = summary.get("overall") or {}
+        verdict = summary.get("verdict") or {}
         rows.append({
             "id": name,
             "created_at": _created_at(name),
@@ -65,6 +66,8 @@ def list_sessions(sessions_dir):
                 "nervousness": overall.get("nervousness"),
                 "composure": overall.get("composure"),
             },
+            "readiness": {"score": verdict.get("readiness_score"),
+                          "band": verdict.get("band")},
         })
     rows.sort(key=lambda r: r["id"], reverse=True)
     return rows
