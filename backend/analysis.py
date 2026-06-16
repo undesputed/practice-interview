@@ -320,21 +320,43 @@ def composite_scores(m: dict) -> dict:
 # the commonly-confused pairs (fear/surprise, anger/disgust) far better than a flat sum.
 # Still an INFERENCE, never ground truth — see docs/features/mediapipe-limitations.md.
 
-# FACS Action Unit -> blendshape base name (Left/Right averaged by _bs_avg).
+# FACS Action Unit -> the MediaPipe blendshape key(s) that drive it (averaged).
 _AU = {
-    "AU1": "browInnerUp", "AU2": "browOuterUp", "AU4": "browDown", "AU5": "eyeWide",
-    "AU6": "cheekSquint", "AU7": "eyeSquint", "AU9": "noseSneer", "AU10": "mouthUpperUp",
-    "AU12": "mouthSmile", "AU15": "mouthFrown", "AU20": "mouthStretch", "AU23": "mouthPress",
-    "AU26": "jawOpen",
+    "AU1": ["browInnerUp"],
+    "AU2": ["browOuterUpLeft", "browOuterUpRight"],
+    "AU4": ["browDownLeft", "browDownRight"],
+    "AU5": ["eyeWideLeft", "eyeWideRight"],
+    "AU6": ["cheekSquintLeft", "cheekSquintRight"],
+    "AU7": ["eyeSquintLeft", "eyeSquintRight"],
+    "AU8": ["mouthClose"],
+    "AU9": ["noseSneerLeft", "noseSneerRight"],
+    "AU10": ["mouthUpperUpLeft", "mouthUpperUpRight"],
+    "AU12": ["mouthSmileLeft", "mouthSmileRight"],
+    "AU14": ["mouthDimpleLeft", "mouthDimpleRight"],
+    "AU15": ["mouthFrownLeft", "mouthFrownRight"],
+    "AU16": ["mouthLowerDownLeft", "mouthLowerDownRight"],
+    "AU17": ["mouthShrugUpper", "mouthShrugLower"],
+    "AU20": ["mouthStretchLeft", "mouthStretchRight"],
+    "AU23": ["mouthPressLeft", "mouthPressRight"],   # ARKit has no true AU23; mouthPress is the proxy
+    "AU26": ["jawOpen"],
+}
+# Human-readable AU names (for the per-AU breakdown on the report).
+_AU_NAMES = {
+    "AU1": "Inner brow raiser", "AU2": "Outer brow raiser", "AU4": "Brow lowerer",
+    "AU5": "Upper lid raiser", "AU6": "Cheek raiser", "AU7": "Lid tightener",
+    "AU8": "Lips toward each other", "AU9": "Nose wrinkler", "AU10": "Upper lip raiser",
+    "AU12": "Lip corner puller", "AU14": "Dimpler", "AU15": "Lip corner depressor",
+    "AU16": "Lower lip depressor", "AU17": "Chin raiser", "AU20": "Lip stretcher",
+    "AU23": "Lip presser", "AU26": "Jaw drop",
 }
 # EMFACS emotion prototypes: an emotion's match = the MEAN activation of these AUs.
 _PROTOTYPES = {
     "happy":    ["AU6", "AU12"],
-    "sad":      ["AU1", "AU4", "AU15"],
+    "sad":      ["AU1", "AU4", "AU15", "AU17"],
     "surprise": ["AU1", "AU2", "AU5", "AU26"],
     "fear":     ["AU1", "AU2", "AU4", "AU5", "AU7", "AU20", "AU26"],
     "angry":    ["AU4", "AU5", "AU7", "AU23"],
-    "disgust":  ["AU9", "AU10", "AU15"],
+    "disgust":  ["AU9", "AU10", "AU15", "AU16"],
 }
 # Distinguishing AU(s) an emotion REQUIRES (soft product-gate). Fear needs BOTH the
 # brow-lower (AU4) and the lip-stretch (AU20) or surprise wins; disgust needs the
@@ -361,9 +383,16 @@ def _bs_avg(bs: dict, name: str) -> float:
     return bs.get(name, 0.0)
 
 
+def _au_value(bs: dict, keys: list) -> float:
+    """Average the blendshape keys present for an AU (missing keys are skipped, so a
+    one-sided value counts at full strength). Returns 0.0 when none are present."""
+    vals = [bs[k] for k in keys if bs.get(k) is not None]
+    return sum(vals) / len(vals) if vals else 0.0
+
+
 def _frame_emotion_scores(bs: dict) -> dict:
     """7-class 0-100 distribution for one frame's blendshapes, via FACS-AU prototypes."""
-    au = {name: _bs_avg(bs, blend) for name, blend in _AU.items()}
+    au = {name: _au_value(bs, keys) for name, keys in _AU.items()}
     raw = {}
     for emo, proto in _PROTOTYPES.items():
         match = sum(au[a] for a in proto) / len(proto)        # mean prototype activation
