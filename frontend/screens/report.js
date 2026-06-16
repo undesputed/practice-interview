@@ -28,10 +28,24 @@ function emotionBars(emo){
       '<span class="val">' + Math.round(it[1]) + '%</span></div>').join('');
 }
 
+function voiceCard(v){
+  if (!v || !v.available) return '<p class="muted" style="font-size:12px">Voice delivery analysis not available for this session.</p>';
+  const m = v.metrics || {};
+  const rows = [
+    ['Delivery score', (v.delivery_score == null ? '—' : v.delivery_score) + '/100'],
+    ['Speaking pace', (m.wpm ?? '—') + ' wpm'],
+    ['Filler words', (m.filler_count ?? '—') + ' (' + (m.filler_rate_per100 ?? '—') + '/100 words)'],
+    ['Long pauses', (m.long_pause_count ?? '—')],
+    ['Pitch variation', (m.pitch_std_hz ?? '—') + ' Hz'],
+  ];
+  return rows.map((r) => '<div class="r"><span>' + esc(r[0]) + '</span><b>' + esc(String(r[1])) + '</b></div>').join('');
+}
+
 function view(s){
   const o = s.overall || {};
   const t = s.timing || {};
   const ig = s.integrity || {};
+  const v = s.voice || { available: false };
   const c = s.coaching || null;
   const title = esc(s.label || s.role || 'Interview');
   const perQ = s.per_question || [];
@@ -90,6 +104,9 @@ function view(s){
     (qrows ? ('<div class="chart-card"><div class="ct">Per-question</div>' +
       '<table class="data"><thead><tr><th>Question</th><th>Eye contact</th><th>Upright</th>' +
       '<th>Composure</th><th>Response</th></tr></thead><tbody>' + qrows + '</tbody></table></div>') : '') +
+    '<div class="chart-card"><div class="ct">Voice (Delivery)</div>' +
+      '<div class="cs">Pace, fillers, pauses, and pitch variation from your recorded audio.</div>' +
+      voiceCard(v) + '</div>' +
     '<div class="chart-card"><div class="ct">Emotion (MediaPipe)</div>' +
       '<div class="cs">Heuristic emotion track from face blendshapes.</div>' +
       emotionBars(s.emotion_mediapipe) + '</div>' +
