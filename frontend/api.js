@@ -25,6 +25,9 @@ export const api = {
   // POST a finished interview (frames + transcript + events) and get back the
   // session id + scored summary. Phase 1 is JSON; audio is added in a later plan.
   createSession: (payload) => request('POST', '/api/session', payload),
+  // Generate a tailored question set for the Practice Interview page. Never throws;
+  // resolves to {questions:[]} when the server can't generate.
+  generateQuestions: (s) => request('POST', '/api/questions', s).catch(() => ({ questions: [] })),
   // POST the recorded audio + browser acoustic features for Delivery scoring.
   // Never throws: resolves to {available:false} when the server can't score it.
   analyzeVoice: (blob, acoustic) => {
