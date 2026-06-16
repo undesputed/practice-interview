@@ -31,7 +31,14 @@ function setText(id, v){ const el = byId(id); if (el) el.textContent = v; }
 function setState(t){ setText('lv-state', t); }
 function setVoice(t){ setText('lv-voice', t); }
 function showControls(on){ const c = byId('lv-controls'); if (c) c.style.display = on ? 'flex' : 'none'; }
-function overlay(text){ const ph = byId('lv-ph'); if (ph){ ph.style.display = text ? 'grid' : 'none'; if (text) ph.textContent = text; } }
+function setOverlay(text, spin){
+  const ph = byId('lv-ph'); if (!ph) return;
+  ph.style.display = text ? 'flex' : 'none';
+  const t = byId('lv-ph-txt'); if (t) t.textContent = text || '';
+  const sp = byId('lv-spin'); if (sp) sp.style.display = (text && spin) ? '' : 'none';
+}
+function loading(text){ setOverlay(text, true); }    // spinner + text (busy states)
+function overlay(text){ setOverlay(text, false); }   // text only (errors), or null to hide
 function showStart(label){ const b = byId('lv-start'); if (b){ b.style.display = label ? '' : 'none'; if (label) b.textContent = label; } }
 
 function onStats(s){ setText('lv-time', fmtTime(s.elapsedMs)); }
@@ -121,7 +128,7 @@ function exitInterview(){
 // the user can retry (the start button becomes "Retry scoring") without data loss.
 async function submitScore(payload){
   setState('Processing…'); setVoice('Scoring…');
-  overlay('Scoring your interview…'); showControls(false); showStart(null);
+  loading('Scoring your interview…'); showControls(false); showStart(null);
   try {
     const resp = await api.createSession(payload);
     pendingScore = null;
@@ -139,12 +146,13 @@ async function submitScore(payload){
 async function finishInterview(){
   if (finishing) return;
   finishing = true;
+  // Show the loading state immediately, before tearing down / awaiting the recorder.
+  showControls(false); loading('Processing…'); setState('Processing…'); setVoice('—');
   const frames = engine.getFrames().slice();   // copy before stop() releases it
   const rec = recorder; recorder = null;
   stopAgent();
   const audio = rec ? await rec.stop() : null;   // finalize the recording before we drop the stream
   engine.stop();
-  showControls(false); overlay('Processing…'); setState('Processing…'); setVoice('—');
 
   if (!frames.length){
     overlay('Nothing to score.'); showStart('Start');
@@ -154,7 +162,7 @@ async function finishInterview(){
   // Voice (Delivery) analysis — non-fatal; a failure just omits the Delivery signal.
   let voice = null;
   if (audio && audio.blob){
-    overlay('Analyzing your voice…');
+    loading('Analyzing your voice…');
     const acoustic = await computeAcousticFeatures(audio.blob);
     voice = await api.analyzeVoice(audio.blob, acoustic || {});
   }
@@ -192,7 +200,7 @@ async function startEngine(){
   const mb = byId('lv-mute'); if (mb){ mb.classList.remove('off'); mb.disabled = false; }
   const cb = byId('lv-cam'); if (cb) cb.classList.remove('off');
   resetConvo();
-  overlay('Loading model…'); showControls(false); showStart(null);
+  loading('Loading model…'); showControls(false); showStart(null);
   setState('Starting…'); setVoice('—');
 
   // Try camera + mic; fall back to vision-only if the mic is blocked.
@@ -272,7 +280,7 @@ export function live(){
       '<button class="li-ctrl" id="lv-cam" type="button" title="Turn camera off" aria-label="Camera">' + CAM_SVG + '</button>' +
       '<button class="li-ctrl end" id="lv-end" type="button">End interview</button>' +
     '</div>' +
-    '<div class="li-ph" id="lv-ph">Loading model…</div>' +
+    '<div class="li-ph" id="lv-ph"><span class="li-spin" id="lv-spin"></span><span id="lv-ph-txt">Loading model…</span></div>' +
     '<button class="li-start" id="lv-start" type="button" style="display:none">Start</button>' +
     '<aside class="li-transcript" id="lv-transcript">' +
       '<div class="li-tx-head"><h3>Conversation</h3><button class="li-tx-close" id="lv-tx-close" type="button" aria-label="Close">✕</button></div>' +

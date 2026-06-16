@@ -337,17 +337,19 @@ body.live-immersive .content{padding:0}
 .li-ctrl.off::after{content:"";position:absolute;width:28px;height:2.5px;border-radius:2px;background:#fff;transform:rotate(-45deg)}
 .li-ctrl.end{width:auto;border-radius:var(--r-pill);padding:0 20px;height:46px;background:var(--risk);color:#fff;font-weight:700;font-size:13.5px}
 
-.li-ai{position:absolute;right:16px;bottom:92px;width:164px;height:108px;border-radius:14px;overflow:hidden;z-index:4;
+.li-ai{position:absolute;right:16px;bottom:92px;width:260px;height:180px;border-radius:16px;overflow:hidden;z-index:4;
   background:#19221c;border:1px solid rgba(255,255,255,.14);box-shadow:0 6px 20px rgba(0,0,0,.35);display:grid;place-items:center}
-.li-ai .ava{position:relative;width:56px;height:56px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:800;font-size:20px;background:linear-gradient(135deg,var(--brand-2),var(--brand))}
+.li-ai .ava{position:relative;width:80px;height:80px;border-radius:50%;display:grid;place-items:center;color:#fff;font-weight:800;font-size:28px;background:linear-gradient(135deg,var(--brand-2),var(--brand))}
 .li-ai .ava .ring{position:absolute;inset:-6px;border-radius:50%;border:2px solid var(--good);opacity:0}
 .li-ai.speaking .ava .ring{animation:liring 1.4s ease-out infinite}
 @keyframes liring{0%{transform:scale(.9);opacity:.9}100%{transform:scale(1.4);opacity:0}}
 .li-ai .ainame{position:absolute;left:8px;bottom:7px;display:flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:#fff;background:rgba(0,0,0,.45);padding:2px 8px;border-radius:var(--r-pill)}
 .li-ai .ainame .dot{width:6px;height:6px;border-radius:50%;background:var(--good)}
 
-.li-ph{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:0 24px;
-  color:rgba(255,255,255,.88);font-size:14px;background:rgba(8,12,10,.55);z-index:6}
+.li-ph{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:0 24px;
+  color:rgba(255,255,255,.9);font-size:14px;background:rgba(8,12,10,.62);z-index:6}
+.li-spin{width:30px;height:30px;border:3px solid rgba(255,255,255,.25);border-top-color:#fff;border-radius:50%;animation:lispin .8s linear infinite}
+@keyframes lispin{to{transform:rotate(360deg)}}
 .li-start{position:absolute;left:50%;top:58%;transform:translateX(-50%);z-index:7;display:none;
   background:var(--brand);color:#fff;border:none;border-radius:var(--r-pill);padding:11px 22px;font-weight:700;font-size:13.5px;font-family:inherit;cursor:pointer}
 
@@ -368,7 +370,7 @@ body.live-immersive .content{padding:0}
 .li-transcript .convo{max-height:none;height:auto;flex:1;overflow:auto}
 
 @media(max-width:640px){
-  .li-ai{width:120px;height:80px;bottom:84px}
+  .li-ai{width:180px;height:124px;bottom:84px}
   .li-cap{max-width:86%;bottom:86px}
   .li-transcript{width:calc(100% - 32px);max-height:50vh}
 }
