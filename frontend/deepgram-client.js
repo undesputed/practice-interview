@@ -103,6 +103,8 @@ export function startVoiceAgent({ url, token, scheme, config, micStream, onTrans
   return {
     stop() {
       console.log("[dg] stopping agent");
+      if (speaking && onSpeaking) onSpeaking(false);
+      speaking = false;
       clearTimeout(silenceTimer);
       try { if (processor) processor.disconnect(); } catch (_) {}
       try { if (source) source.disconnect(); } catch (_) {}
