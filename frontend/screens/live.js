@@ -3,6 +3,8 @@ import { startVoiceAgent } from '../deepgram-client.js';
 import { getInterviewConfig } from '../interview-config.js';
 import { api } from '../api.js';
 import { esc } from '../util.js';
+import { startRecording } from '../audio-recorder.js';
+import { computeAcousticFeatures } from '../acoustic-features.js';
 
 let agent = null;     // active Deepgram voice agent, or null
 let feedCount = 0;    // actions seen this run (0 until the first one, to clear the note)
@@ -13,6 +15,7 @@ let events = [];      // action events (nods, smiles, gestures) from the engine
 let startTs = 0;      // performance.now() at interview start, for segment timestamps
 let finishing = false; // guard so Stop + agent-close don't double-submit
 let pendingScore = null;  // payload from a failed score POST, kept so the user can retry without losing the interview
+let recorder = null;   // active audio recorder handle, or null
 let role = '';            // interview role captured at start, reused when scoring
 
 // mm:ss from milliseconds since the interview started.
@@ -113,24 +116,34 @@ async function finishInterview(){
   if (finishing) return;
   finishing = true;
   const frames = engine.getFrames().slice();   // copy before stop() releases it
+  const rec = recorder; recorder = null;
   stopAgent();
+  const audio = rec ? await rec.stop() : null;   // finalize the recording before we drop the stream
   engine.stop();
   setState('Processing…'); setVoice('Scoring your interview…');
   const live = document.getElementById('lv-live'); if (live) live.classList.remove('on');
   const stopBtn = document.getElementById('lv-stop'); if (stopBtn) stopBtn.style.display = 'none';
 
   if (!frames.length){
-    // Nothing was captured (e.g. camera never started) — go back to a startable state.
     setState('Stopped'); setVoice('Nothing to score');
     const startBtn = document.getElementById('lv-start');
     if (startBtn){ startBtn.style.display = ''; startBtn.textContent = 'Start'; }
     return;
   }
 
+  // Voice (Delivery) analysis: compute pitch/energy locally, send audio + features
+  // to the backend. Non-fatal — a failure just omits the Delivery signal.
+  let voice = null;
+  if (audio && audio.blob){
+    setVoice('Analyzing your voice…');
+    const acoustic = await computeAcousticFeatures(audio.blob);
+    voice = await api.analyzeVoice(audio.blob, acoustic || {});
+  }
+
   const full_text = segments
     .map((s) => (s.speaker === 'interviewer' ? 'INTERVIEWER: ' : 'CANDIDATE: ') + s.text)
     .join('\n');
-  await submitScore({ role, frames, transcript: { full_text, segments }, events, emotion: null });
+  await submitScore({ role, frames, transcript: { full_text, segments }, events, emotion: null, voice });
 }
 
 function resetPanels(){
@@ -160,7 +173,7 @@ async function startEngine(){
 
   feedCount = 0; convoCount = 0; turn = -1;
   segments = []; events = []; startTs = performance.now(); finishing = false;
-  pendingScore = null; role = getInterviewConfig().role;
+  pendingScore = null; role = getInterviewConfig().role; recorder = null;
   resetPanels();
   if (ph){ ph.style.display = ''; ph.textContent = 'Loading model…'; }
   setState('Starting…'); setVoice('—');
@@ -184,8 +197,12 @@ async function startEngine(){
   if (ph) ph.style.display = 'none';
   if (live) live.classList.add('on');
   setState('Detecting');
-  if (micOk) startAgent();
-  else setVoice('Mic unavailable — analysis only');
+  if (micOk){
+    startAgent();
+    recorder = startRecording(engine.getStream());   // capture audio for Delivery analysis
+  } else {
+    setVoice('Mic unavailable — analysis only');
+  }
 }
 
 

@@ -25,6 +25,16 @@ export const api = {
   // POST a finished interview (frames + transcript + events) and get back the
   // session id + scored summary. Phase 1 is JSON; audio is added in a later plan.
   createSession: (payload) => request('POST', '/api/session', payload),
+  // POST the recorded audio + browser acoustic features for Delivery scoring.
+  // Never throws: resolves to {available:false} when the server can't score it.
+  analyzeVoice: (blob, acoustic) => {
+    const fd = new FormData();
+    fd.append('meta', JSON.stringify({ acoustic }));
+    fd.append('audio', blob, 'interview' + (blob.type.includes('mp4') ? '.mp4' : '.webm'));
+    return fetch('/api/voice', { method: 'POST', body: fd })
+      .then((r) => (r.ok ? r.json() : { available: false }))
+      .catch(() => ({ available: false }));
+  },
   // POST a single face-crop blob to the live DeepFace endpoint. Never throws;
   // resolves to {available:false} when the server can't score it.
   scoreEmotionFrame: (blob) => {
