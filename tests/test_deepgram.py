@@ -62,3 +62,12 @@ def test_prompt_requires_plain_spoken_text_no_markdown():
     prompt = build_agent_config("Software Engineer")["agent"]["think"]["prompt"].lower()
     assert ("text-to-speech" in prompt) or ("read aloud" in prompt) or ("spoken" in prompt)
     assert "markdown" in prompt
+
+
+def test_prompt_prevents_restarting_the_interview():
+    # The Deepgram greeting isn't in the LLM's history, so the model must be told the
+    # interview already started (intro = question 1) or it loops ("let's start the real
+    # interview") and restarts from the beginning.
+    prompt = build_agent_config("Software Engineer")["agent"]["think"]["prompt"].lower()
+    assert "already in progress" in prompt
+    assert "question 1 of" in prompt
