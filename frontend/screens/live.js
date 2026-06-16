@@ -132,7 +132,7 @@ async function submitScore(payload){
   try {
     const resp = await api.createSession(payload);
     pendingScore = null;
-    location.hash = '#/session/' + resp.session_id;   // open the existing report screen
+    location.hash = '#/thanks/' + resp.session_id;   // thank-you page; results via its button or Progress
   } catch (e){
     pendingScore = payload;
     setState('Error'); setVoice('—');

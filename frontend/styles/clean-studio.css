@@ -369,6 +369,12 @@ body.live-immersive .content{padding:0}
 .li-tx-close{background:none;border:none;font-size:16px;cursor:pointer;color:var(--ink-2);font-family:inherit}
 .li-transcript .convo{max-height:none;height:auto;flex:1;overflow:auto}
 
+/* Post-interview thank-you screen (results are reached from here or Progress) */
+.thanks-wrap{max-width:520px;margin:8vh auto 0;text-align:center;display:flex;flex-direction:column;align-items:center;gap:14px}
+.thanks-check{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;font-size:30px;font-weight:800;color:#fff;background:var(--grad);box-shadow:0 10px 24px -14px var(--brand)}
+.thanks-wrap h1{font-size:30px;font-weight:700;font-family:var(--font-display)}
+.thanks-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:8px}
+
 @media(max-width:640px){
   .li-ai{width:180px;height:124px;bottom:84px}
   .li-cap{max-width:86%;bottom:86px}
