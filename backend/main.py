@@ -16,7 +16,7 @@ from backend.report import save_session
 from backend.deepgram import build_agent_config, grant_ephemeral_token, DEEPGRAM_AGENT_URL
 from backend.anthropic_coach import generate_coaching
 from backend.emotion import score_emotions, aggregate_emotions
-from backend import sessions_store
+from backend import sessions_store, voice
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)  # ensure our INFO/WARNING logs reach the console
@@ -26,11 +26,14 @@ SESSIONS_DIR = os.path.join(ROOT, "sessions")
 FRONTEND_DIR = os.path.join(ROOT, "frontend")
 os.makedirs(SESSIONS_DIR, exist_ok=True)
 
-app = FastAPI()
+app = FastAPI(title="molave.ai")
 
 
 class TokenRequest(BaseModel):
     role: str = "Software Engineer"
+    focus: str = "Mixed"
+    difficulty: str = "Realistic"
+    question_count: int = 5
 
 
 class SessionRequest(BaseModel):
@@ -39,6 +42,7 @@ class SessionRequest(BaseModel):
     transcript: dict
     events: list = []
     emotion: Optional[dict] = None
+    voice: Optional[dict] = None
 
 
 class LabelRequest(BaseModel):
@@ -81,7 +85,7 @@ async def interview_token(req: TokenRequest):
         else:
             raise HTTPException(502, f"Deepgram token grant failed: {exc.response.status_code}")
     return {"url": DEEPGRAM_AGENT_URL, "token": token, "scheme": scheme,
-            "config": build_agent_config(req.role)}
+            "config": build_agent_config(req.role, req.focus, req.difficulty, req.question_count)}
 
 
 @app.post("/api/emotion")
@@ -136,6 +140,33 @@ async def emotion_frame(image: UploadFile = File(...)):
     return {"available": True, "dominant": r["dominant"], "scores": r["scores"]}
 
 
+@app.post("/api/voice")
+async def voice_analyze(meta: str = Form(...), audio: UploadFile = File(...)):
+    """Score the candidate's voice delivery from a recorded interview.
+
+    Multipart: `meta` JSON `{acoustic: {...}}` (browser pitch/energy features) +
+    `audio` file. Runs a Deepgram pre-recorded pass for word timings + fillers,
+    combines with the acoustic features into a Delivery score, and returns it.
+    The audio is scored in memory and never written to disk.
+    Graceful: returns {"available": False} when the key is missing or Deepgram fails.
+    """
+    api_key = os.getenv("DEEPGRAM_API_KEY")
+    if not api_key:
+        return {"available": False}
+    try:
+        acoustic = json.loads(meta).get("acoustic", {})
+    except (ValueError, TypeError):
+        raise HTTPException(400, "invalid meta JSON")
+    buf = await audio.read()
+    try:
+        payload = await voice.transcribe_prerecorded(buf, audio.content_type, api_key)
+        words = voice.parse_words(payload)
+        return voice.compute_delivery(voice.measure_prosody(words), acoustic)
+    except Exception as exc:  # network / Deepgram / parsing failure -> degrade
+        logging.warning("voice analysis unavailable: %s", exc)
+        return {"available": False}
+
+
 @app.post("/api/session")
 def session(req: SessionRequest):
     if not req.frames:
@@ -147,6 +178,7 @@ def session(req: SessionRequest):
     summary["actions"] = summarize_actions(req.events)
     summary["emotion"] = req.emotion if (req.emotion and req.emotion.get("available")) else {"available": False}
     summary["emotion_mediapipe"] = emotion_from_blendshapes(req.frames)
+    summary["voice"] = req.voice if (req.voice and req.voice.get("available")) else {"available": False}
 
     coaching = None
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
