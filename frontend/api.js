@@ -20,6 +20,11 @@ export const api = {
   putSettings:    (s)       => request('PUT',    '/api/settings', s),
   getRoles:       ()        => request('GET',    '/api/roles'),
   putRoles:       (r)       => request('PUT',    '/api/roles', r),
+  // Mint a Deepgram voice-agent token + config for the interview settings.
+  interviewToken: (s)       => request('POST',   '/api/interview/token', s),
+  // POST a finished interview (frames + transcript + events) and get back the
+  // session id + scored summary. Phase 1 is JSON; audio is added in a later plan.
+  createSession: (payload) => request('POST', '/api/session', payload),
   // POST a single face-crop blob to the live DeepFace endpoint. Never throws;
   // resolves to {available:false} when the server can't score it.
   scoreEmotionFrame: (blob) => {
