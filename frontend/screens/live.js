@@ -12,6 +12,8 @@ let segments = [];    // { speaker, text, t } transcript lines, in order
 let events = [];      // action events (nods, smiles, gestures) from the engine
 let startTs = 0;      // performance.now() at interview start, for segment timestamps
 let finishing = false; // guard so Stop + agent-close don't double-submit
+let pendingScore = null;  // payload from a failed score POST, kept so the user can retry without losing the interview
+let role = '';            // interview role captured at start, reused when scoring
 
 // mm:ss from milliseconds since the interview started.
 function fmtTime(ms){
@@ -89,6 +91,22 @@ function stopAgent(){
   if (agent){ try { agent.stop(); } catch (_){} agent = null; }
 }
 
+// POST a captured interview to the backend and open its report. On failure, keep
+// the payload in pendingScore so the user can retry WITHOUT losing the interview.
+async function submitScore(payload){
+  setState('Processing…'); setVoice('Scoring your interview…');
+  try {
+    const resp = await api.createSession(payload);
+    pendingScore = null;
+    location.hash = '#/session/' + resp.session_id;   // open the existing report screen
+  } catch (e){
+    pendingScore = payload;
+    setState('Error'); setVoice('Could not score: ' + (e && e.message ? e.message : e));
+    const startBtn = document.getElementById('lv-start');
+    if (startBtn){ startBtn.style.display = ''; startBtn.textContent = 'Retry scoring'; }
+  }
+}
+
 // End the interview, score it, and open its report. Grabs frames before teardown
 // because engine.stop() releases the session. Idempotent via the `finishing` guard.
 async function finishInterview(){
@@ -112,20 +130,7 @@ async function finishInterview(){
   const full_text = segments
     .map((s) => (s.speaker === 'interviewer' ? 'INTERVIEWER: ' : 'CANDIDATE: ') + s.text)
     .join('\n');
-  try {
-    const resp = await api.createSession({
-      role: getInterviewConfig().role,
-      frames,
-      transcript: { full_text, segments },
-      events,
-      emotion: null,
-    });
-    location.hash = '#/session/' + resp.session_id;   // open the existing report screen
-  } catch (e){
-    setState('Error'); setVoice('Could not score: ' + (e && e.message ? e.message : e));
-    const startBtn = document.getElementById('lv-start');
-    if (startBtn){ startBtn.style.display = ''; startBtn.textContent = 'Retry'; }
-  }
+  await submitScore({ role, frames, transcript: { full_text, segments }, events, emotion: null });
 }
 
 function resetPanels(){
@@ -155,6 +160,7 @@ async function startEngine(){
 
   feedCount = 0; convoCount = 0; turn = -1;
   segments = []; events = []; startTs = performance.now(); finishing = false;
+  pendingScore = null; role = getInterviewConfig().role;
   resetPanels();
   if (ph){ ph.style.display = ''; ph.textContent = 'Loading model…'; }
   setState('Starting…'); setVoice('—');
@@ -183,6 +189,9 @@ async function startEngine(){
 }
 
 
+// The Start/Retry button: re-submit a failed score if one is pending, else start fresh.
+function onStartClick(){ return pendingScore ? submitScore(pendingScore) : startEngine(); }
+
 export function live(){
   // Tear down anything left running, then arm a one-shot teardown for navigate-away.
   stopAgent(); engine.stop();
@@ -196,7 +205,7 @@ export function live(){
   queueMicrotask(() => {
     const startBtn = document.getElementById('lv-start');
     const stopBtn = document.getElementById('lv-stop');
-    if (startBtn) startBtn.addEventListener('click', startEngine);
+    if (startBtn) startBtn.addEventListener('click', onStartClick);
     if (stopBtn) stopBtn.addEventListener('click', finishInterview);
     startEngine();   // auto-start: the user already pressed "Start interview" on /new
   });
