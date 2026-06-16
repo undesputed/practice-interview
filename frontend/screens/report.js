@@ -38,7 +38,8 @@ function voiceCard(v){
     ['Long pauses', (m.long_pause_count ?? '—')],
     ['Pitch variation', (m.pitch_std_hz ?? '—') + ' Hz'],
   ];
-  return rows.map((r) => '<div class="r"><span>' + esc(r[0]) + '</span><b>' + esc(String(r[1])) + '</b></div>').join('');
+  return rows.map((r) => '<div class="r"><span>' + esc(r[0]) + '</span><b>' + esc(String(r[1])) + '</b></div>').join('') +
+    '<p class="muted" style="font-size:11px;margin-top:8px">Audio was analyzed to score delivery and was not stored.</p>';
 }
 
 const BAND_LABEL = { ready: 'Ready', almost: 'Almost ready', needs_work: 'Needs work' };
@@ -63,6 +64,8 @@ function verdictHeader(vd){
     (str ? '<h5>Strengths</h5><ul>' + str + '</ul>' : '') +
     (imp ? '<h5>To improve</h5><ul>' + imp + '</ul>' : '') +
     (vd.next_action ? '<p class="vnext"><b>Next:</b> ' + esc(vd.next_action) + '</p>' : '') +
+    '<p class="muted" style="font-size:11px;margin-top:10px">This is practice feedback, not a hiring decision. ' +
+      'Facial-expression signals are approximate — read them as communication cues, not a clinical measure.</p>' +
     '</div>';
 }
 
