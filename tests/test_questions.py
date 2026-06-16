@@ -18,6 +18,8 @@ def test_parse_questions_bad_input():
     assert questions.parse_questions("not json") == []
     assert questions.parse_questions('{"a":1}') == []
     assert questions.parse_questions('["", "  ", "ok"]') == ["ok"]
+    assert questions.parse_questions(None) == []          # None must not crash
+    assert questions.parse_questions('[1, null, "ok"]') == ["ok"]   # non-strings dropped
 
 
 def test_prompt_with_questions_lists_them_in_order():

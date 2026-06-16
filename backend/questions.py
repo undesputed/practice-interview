@@ -17,7 +17,7 @@ SYSTEM_PROMPT = (
 
 def parse_questions(raw: str) -> list:
     """Extract a JSON array of question strings from the model response, tolerating fences."""
-    text = raw.strip()
+    text = (raw or "").strip()
     fenced = re.search(r"```(?:json)?\s*(\[.*\])\s*```", text, re.DOTALL)
     if fenced:
         text = fenced.group(1)
@@ -31,7 +31,7 @@ def parse_questions(raw: str) -> list:
         return []
     if not isinstance(data, list):
         return []
-    return [str(q).strip() for q in data if str(q).strip()]
+    return [q.strip() for q in data if isinstance(q, str) and q.strip()]
 
 
 def generate_questions(api_key: str, role: str, focus: str, difficulty: str, n: int) -> list:
