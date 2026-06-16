@@ -291,3 +291,14 @@ table.data .role{font-weight:600;color:var(--ink)}
 .verdict .vnotes{margin:8px 0;padding-left:18px;font-size:13px}
 .verdict h5{margin:10px 0 4px;font-size:12px;text-transform:uppercase;opacity:.6}
 .verdict .vnext{font-size:13px;margin-top:8px}
+.sess-list{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.sess-row{display:flex;align-items:center;gap:12px;padding:9px 12px;border:1px solid var(--rule,#e5e7eb);
+  border-radius:10px;text-decoration:none;color:inherit;transition:background .12s}
+.sess-row:hover{background:#15794c0d}
+.sess-row .sr-when{font-size:12px;opacity:.7;min-width:120px}
+.sess-row .sr-role{font-size:13px;font-weight:600;flex:1}
+.rbadge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;white-space:nowrap}
+.rbadge-ready{background:#15794c1a;color:#15794c}
+.rbadge-almost{background:#b7791f1a;color:#b7791f}
+.rbadge-needs_work{background:#b91c1c1a;color:#b91c1c}
+.rbadge-none{background:#9ca3af1a;color:#6b7280}
