@@ -4,20 +4,26 @@
 
 export const EMOTION_CLASSES = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'neutral'];
 
-// FACS Action Unit -> blendshape base name (Left/Right averaged by bsAvg).
+// FACS Action Unit -> MediaPipe blendshape key(s) (averaged). KEEP IN SYNC with analysis.py _AU.
 const AU = {
-  AU1: 'browInnerUp', AU2: 'browOuterUp', AU4: 'browDown', AU5: 'eyeWide',
-  AU6: 'cheekSquint', AU7: 'eyeSquint', AU9: 'noseSneer', AU10: 'mouthUpperUp',
-  AU12: 'mouthSmile', AU15: 'mouthFrown', AU20: 'mouthStretch', AU23: 'mouthPress', AU26: 'jawOpen',
+  AU1: ['browInnerUp'], AU2: ['browOuterUpLeft', 'browOuterUpRight'],
+  AU4: ['browDownLeft', 'browDownRight'], AU5: ['eyeWideLeft', 'eyeWideRight'],
+  AU6: ['cheekSquintLeft', 'cheekSquintRight'], AU7: ['eyeSquintLeft', 'eyeSquintRight'],
+  AU8: ['mouthClose'], AU9: ['noseSneerLeft', 'noseSneerRight'],
+  AU10: ['mouthUpperUpLeft', 'mouthUpperUpRight'], AU12: ['mouthSmileLeft', 'mouthSmileRight'],
+  AU14: ['mouthDimpleLeft', 'mouthDimpleRight'], AU15: ['mouthFrownLeft', 'mouthFrownRight'],
+  AU16: ['mouthLowerDownLeft', 'mouthLowerDownRight'], AU17: ['mouthShrugUpper', 'mouthShrugLower'],
+  AU20: ['mouthStretchLeft', 'mouthStretchRight'], AU23: ['mouthPressLeft', 'mouthPressRight'],
+  AU26: ['jawOpen'],
 };
 // EMFACS emotion prototypes: match = MEAN activation of these AUs.
 const PROTOTYPES = {
   happy:    ['AU6', 'AU12'],
-  sad:      ['AU1', 'AU4', 'AU15'],
+  sad:      ['AU1', 'AU4', 'AU15', 'AU17'],
   surprise: ['AU1', 'AU2', 'AU5', 'AU26'],
   fear:     ['AU1', 'AU2', 'AU4', 'AU5', 'AU7', 'AU20', 'AU26'],
   angry:    ['AU4', 'AU5', 'AU7', 'AU23'],
-  disgust:  ['AU9', 'AU10', 'AU15'],
+  disgust:  ['AU9', 'AU10', 'AU15', 'AU16'],
 };
 // Distinguishing AU(s) each emotion REQUIRES (soft product-gate): fear needs brow-lower
 // + lip-stretch (or surprise wins); disgust needs the nose-wrinkle (or anger wins).
@@ -26,22 +32,18 @@ const GATES = { fear: ['AU4', 'AU20'], disgust: ['AU9'] };
 const CONFLICTS = { surprise: ['AU4'], happy: ['AU4', 'AU15'] };
 const GATE_T = 0.35, CONFLICT_W = 0.5, NEUTRAL_BASE = 0.12;
 
-// Average the Left/Right variants that are present; a one-sided value counts at
-// full strength. Falls back to the bare key, then 0.
-function bsAvg(bs, name){
-  const sides = [];
-  const l = bs[name + 'Left'], r = bs[name + 'Right'];
-  if (l != null) sides.push(l);
-  if (r != null) sides.push(r);
-  if (sides.length) return sides.reduce((a, b) => a + b, 0) / sides.length;
-  return bs[name] != null ? bs[name] : 0;
+// Average the blendshape keys present for an AU (missing skipped). KEEP IN SYNC with analysis.py _au_value.
+function auValue(bs, keys){
+  const vals = [];
+  for (const k of keys){ if (bs[k] != null) vals.push(bs[k]); }
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
 }
 
 // 7-class 0-100 distribution for one frame's blendshapes, via FACS-AU prototypes.
 export function emotionScores(bs){
   bs = bs || {};
   const au = {};
-  for (const k in AU) au[k] = bsAvg(bs, AU[k]);
+  for (const k in AU) au[k] = auValue(bs, AU[k]);
   const raw = {};
   let maxExpressive = 0;
   for (const emo in PROTOTYPES){
