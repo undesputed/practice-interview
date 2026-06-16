@@ -41,5 +41,9 @@ export function startRecording(stream){
         try { recorder.stop(); } catch (_){ resolve(null); }
       });
     },
+    // Pause/resume capture for the live "mute" control, so muted silence isn't
+    // recorded and doesn't drag down the Delivery score.
+    pause(){ try { if (recorder.state === 'recording') recorder.pause(); } catch (_){} },
+    resume(){ try { if (recorder.state === 'paused') recorder.resume(); } catch (_){} },
   };
 }
