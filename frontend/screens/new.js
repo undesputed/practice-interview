@@ -17,7 +17,10 @@ const BARS = 18;   // mic level-meter bars
 let media = { stream: null, ctx: null, raf: 0 };
 let generatedQuestions = [];   // current AI-generated set for the live interview
 
-// Read the current role/focus/difficulty/count without storing (for generation).
+// Read the current role/focus/difficulty/count without storing (for question generation).
+// NOTE: this returns `question_count` (snake_case) because it feeds the POST /api/questions
+// body directly. saveSettings() stores `questionCount` (camelCase) for interview-config.js —
+// the two key names are intentionally different; don't "unify" them.
 function currentSettings(root){
   const onText = (sel, fb) => { const el = root.querySelector(sel); return el ? el.textContent.trim() : fb; };
   const rc = root.querySelector('.role-card.on');
