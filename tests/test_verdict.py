@@ -50,3 +50,23 @@ def test_compute_readiness_all_missing():
     assert r["readiness_score"] is None
     assert r["band"] is None
     assert r["weights_used"] == {}
+
+
+def test_parse_verdict_extracts_fields():
+    from backend import anthropic_coach
+    raw = ('```json\n{"content_score": 72, "headline": "Almost there",'
+           ' "delivery_note": "Good pace", "presence_note": "Steady",'
+           ' "content_note": "Add specifics", "strengths": ["clear"],'
+           ' "improvements": ["more detail"], "next_action": "Practice STAR"}\n```')
+    v = anthropic_coach.parse_verdict(raw)
+    assert v["content_score"] == 72
+    assert v["headline"] == "Almost there"
+    assert v["strengths"] == ["clear"]
+    assert v["next_action"] == "Practice STAR"
+
+
+def test_parse_verdict_bad_input_defaults():
+    from backend import anthropic_coach
+    v = anthropic_coach.parse_verdict("not json at all")
+    assert v["content_score"] is None
+    assert v["strengths"] == [] and v["improvements"] == []
