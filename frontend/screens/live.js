@@ -77,7 +77,7 @@ async function startAgent(){
       micStream: stream,
       onTranscript,
       onError: (m) => setVoice('Voice error: ' + m),
-      onClose: () => { if (engine.isRunning()) setVoice('Ended'); },
+      onClose: () => { if (engine.isRunning()) finishInterview(); },
     });
     setVoice('Live');
   } catch (e){
@@ -87,6 +87,45 @@ async function startAgent(){
 
 function stopAgent(){
   if (agent){ try { agent.stop(); } catch (_){} agent = null; }
+}
+
+// End the interview, score it, and open its report. Grabs frames before teardown
+// because engine.stop() releases the session. Idempotent via the `finishing` guard.
+async function finishInterview(){
+  if (finishing) return;
+  finishing = true;
+  const frames = engine.getFrames().slice();   // copy before stop() releases it
+  stopAgent();
+  engine.stop();
+  setState('Processing…'); setVoice('Scoring your interview…');
+  const live = document.getElementById('lv-live'); if (live) live.classList.remove('on');
+  const stopBtn = document.getElementById('lv-stop'); if (stopBtn) stopBtn.style.display = 'none';
+
+  if (!frames.length){
+    // Nothing was captured (e.g. camera never started) — go back to a startable state.
+    setState('Stopped'); setVoice('Nothing to score');
+    const startBtn = document.getElementById('lv-start');
+    if (startBtn){ startBtn.style.display = ''; startBtn.textContent = 'Start'; }
+    return;
+  }
+
+  const full_text = segments
+    .map((s) => (s.speaker === 'interviewer' ? 'INTERVIEWER: ' : 'CANDIDATE: ') + s.text)
+    .join('\n');
+  try {
+    const resp = await api.createSession({
+      role: getInterviewConfig().role,
+      frames,
+      transcript: { full_text, segments },
+      events,
+      emotion: null,
+    });
+    location.hash = '#/session/' + resp.session_id;   // open the existing report screen
+  } catch (e){
+    setState('Error'); setVoice('Could not score: ' + (e && e.message ? e.message : e));
+    const startBtn = document.getElementById('lv-start');
+    if (startBtn){ startBtn.style.display = ''; startBtn.textContent = 'Retry'; }
+  }
 }
 
 function resetPanels(){
@@ -143,17 +182,6 @@ async function startEngine(){
   else setVoice('Mic unavailable — analysis only');
 }
 
-function stopEngine(){
-  stopAgent();
-  engine.stop();
-  const ph = document.getElementById('lv-ph');
-  if (ph){ ph.style.display = ''; ph.textContent = 'Stopped — press Start to resume.'; }
-  const live = document.getElementById('lv-live'); if (live) live.classList.remove('on');
-  setState('Stopped'); setVoice('Ended');
-  const stopBtn = document.getElementById('lv-stop'); if (stopBtn) stopBtn.style.display = 'none';
-  const startBtn = document.getElementById('lv-start');
-  if (startBtn){ startBtn.style.display = ''; startBtn.textContent = 'Start'; }
-}
 
 export function live(){
   // Tear down anything left running, then arm a one-shot teardown for navigate-away.
@@ -169,7 +197,7 @@ export function live(){
     const startBtn = document.getElementById('lv-start');
     const stopBtn = document.getElementById('lv-stop');
     if (startBtn) startBtn.addEventListener('click', startEngine);
-    if (stopBtn) stopBtn.addEventListener('click', stopEngine);
+    if (stopBtn) stopBtn.addEventListener('click', finishInterview);
     startEngine();   // auto-start: the user already pressed "Start interview" on /new
   });
 
