@@ -77,7 +77,10 @@ async function startAgent(){
   const cfg = getInterviewConfig();
   setVoice('Connecting…');
   try {
-    const tok = await api.interviewToken({ role: cfg.role, focus: cfg.focus, difficulty: cfg.difficulty, question_count: cfg.questionCount });
+    const tok = await api.interviewToken({
+      role: cfg.role, focus: cfg.focus, difficulty: cfg.difficulty, question_count: cfg.questionCount,
+      questions: cfg.questions || [],
+    });
     const stream = engine.getStream();
     if (!stream || !engine.isRunning()) return;   // stopped / navigated away during the token fetch
     agent = startVoiceAgent({
