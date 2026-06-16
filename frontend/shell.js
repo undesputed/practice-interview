@@ -5,7 +5,7 @@ const NAV = [
     { path: '/',         icon: '◷', label: 'Dashboard' },
     { path: '/history',  icon: '▤', label: 'History' },
     { path: '/progress', icon: '◴', label: 'Progress' },
-    { path: '/new',      icon: '＋', label: 'New interview' },
+    { path: '/new',      icon: '＋', label: 'Practice Interview' },
   ]},
   { group: 'Live tools', items: [
     { path: '/facial', icon: '◉', label: 'Facial Analysis' },
@@ -35,7 +35,7 @@ export function renderSidebar(sidebar, activePath){
   const isActive = (p) => p === '/'
     ? activePath === '/'
     : (activePath === p || activePath.startsWith(p + '/'));
-  const html = ['<div class="brand">Rehearsal</div>'];
+  const html = ['<div class="brand">molave.ai</div>'];
   for (const sec of NAV){
     if (sec.group) html.push('<div class="nav-group">' + sec.group + '</div>');
     for (const it of sec.items){
