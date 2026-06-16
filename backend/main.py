@@ -15,6 +15,7 @@ from backend.analysis import compute_metrics, questions_from_transcript, transcr
 from backend.report import save_session
 from backend.deepgram import build_agent_config, grant_ephemeral_token, DEEPGRAM_AGENT_URL
 from backend.anthropic_coach import generate_coaching, generate_verdict
+from backend.questions import generate_questions
 from backend.emotion import score_emotions, aggregate_emotions
 from backend import sessions_store, voice, verdict as verdict_mod
 
@@ -30,6 +31,14 @@ app = FastAPI(title="molave.ai")
 
 
 class TokenRequest(BaseModel):
+    role: str = "Software Engineer"
+    focus: str = "Mixed"
+    difficulty: str = "Realistic"
+    question_count: int = 5
+    questions: list[str] = []
+
+
+class QuestionsRequest(BaseModel):
     role: str = "Software Engineer"
     focus: str = "Mixed"
     difficulty: str = "Realistic"
@@ -85,7 +94,22 @@ async def interview_token(req: TokenRequest):
         else:
             raise HTTPException(502, f"Deepgram token grant failed: {exc.response.status_code}")
     return {"url": DEEPGRAM_AGENT_URL, "token": token, "scheme": scheme,
-            "config": build_agent_config(req.role, req.focus, req.difficulty, req.question_count)}
+            "config": build_agent_config(req.role, req.focus, req.difficulty, req.question_count, req.questions)}
+
+
+@app.post("/api/questions")
+def questions_endpoint(req: QuestionsRequest):
+    """Generate a tailored interview question set for the Practice Interview page.
+    Graceful: returns {"questions": []} when no ANTHROPIC_API_KEY or generation fails."""
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        return {"questions": []}
+    try:
+        qs = generate_questions(api_key, req.role, req.focus, req.difficulty, req.question_count)
+    except Exception as exc:  # network / model failure -> degrade
+        logging.warning("question generation unavailable: %s", exc)
+        return {"questions": []}
+    return {"questions": qs}
 
 
 @app.post("/api/emotion")
