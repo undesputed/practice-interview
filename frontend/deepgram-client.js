@@ -18,6 +18,8 @@ export function startVoiceAgent({ url, token, scheme, config, micStream, onTrans
   let muted = false;
   let speaking = false;
   let silenceTimer = null;
+  let endRequested = false;   // the agent called end_interview — close once the goodbye plays
+  let closedForEnd = false;
 
   ws.onopen = () => {
     console.log("[dg] ws OPEN — sending Settings; inCtx=%s outCtx=%s", inCtx.state, outCtx.state);
@@ -75,6 +77,20 @@ export function startVoiceAgent({ url, token, scheme, config, micStream, onTrans
           speaker: msg.role === "assistant" ? "interviewer" : "candidate",
           text: msg.content,
         });
+      } else if (msg.type === "FunctionCallRequest") {
+        // The interviewer signals completion by calling the client-side end_interview
+        // function. ACK every function so the agent isn't left waiting, then close the
+        // socket once the goodbye audio has finished (onClose runs the score+report flow).
+        for (const f of (msg.functions || [])) {
+          try { ws.send(JSON.stringify({ type: "FunctionCallResponse", id: f.id, name: f.name, content: "ended" })); } catch (_) {}
+          if (f.name === "end_interview") endRequested = true;
+        }
+        if (endRequested) {
+          if (nextStart <= outCtx.currentTime + 0.05) setTimeout(closeForEnd, 600); // goodbye already done
+          setTimeout(closeForEnd, 8000);                                            // hard fallback
+        }
+      } else if (msg.type === "AgentAudioDone") {
+        if (endRequested) closeForEnd();   // goodbye finished — end the interview
       } else if (msg.type === "Error" || msg.type === "Warning") {
         console.error("[dg] agent message:", msg);
         if (onError) onError(msg.description || msg.message || msg.type);
@@ -98,6 +114,14 @@ export function startVoiceAgent({ url, token, scheme, config, micStream, onTrans
     clearTimeout(silenceTimer);
     const ms = Math.max(0, (nextStart - outCtx.currentTime) * 1000) + 150;
     silenceTimer = setTimeout(() => { speaking = false; if (onSpeaking) onSpeaking(false); }, ms);
+  }
+
+  // Close the socket so the screen ends + scores the interview (via onClose). Guarded
+  // so the AgentAudioDone path and the fallback timer can't double-close.
+  function closeForEnd(){
+    if (closedForEnd) return;
+    closedForEnd = true;
+    try { if (ws.readyState === WebSocket.OPEN) ws.close(); } catch (_) {}
   }
 
   return {
