@@ -51,3 +51,21 @@ def test_mediapipe_track_distribution_includes_contempt():
     out = analysis.emotion_from_blendshapes([frame])
     assert out["available"] is True
     assert "contempt" in out["overall_distribution"]
+
+
+def test_action_units_breakdown_levels_and_floor():
+    frames = [
+        {"face": True, "bs": {"mouthSmileLeft": 0.9, "mouthSmileRight": 0.9}},   # AU12 strong
+        {"face": True, "bs": {"mouthSmileLeft": 0.5, "mouthSmileRight": 0.5}},
+    ]
+    aus = analysis.action_units(frames)
+    by = {a["au"]: a for a in aus}
+    assert "AU12" in by
+    assert by["AU12"]["peak"] == 0.9
+    assert by["AU12"]["level"] == "E"           # 0.9 -> E
+    assert by["AU12"]["name"] == "Lip corner puller"
+    assert "AU4" not in by                        # never fired -> below floor, excluded
+
+
+def test_action_units_empty_when_no_faces():
+    assert analysis.action_units([{"face": False}]) == []

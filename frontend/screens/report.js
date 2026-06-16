@@ -28,6 +28,13 @@ function emotionBars(emo){
       '<span class="val">' + Math.round(it[1]) + '%</span></div>').join('');
 }
 
+function actionUnitsCard(aus){
+  if (!aus || !aus.length) return '<p class="muted" style="font-size:12px">No action units detected for this session.</p>';
+  return aus.map((a) => '<div class="emrow"><span>' + esc(a.au + ' · ' + a.name) + '</span>' +
+    '<span class="track"><span class="fill" style="width:' + Math.round(Math.max(0, Math.min(1, a.peak)) * 100) + '%"></span></span>' +
+    '<span class="val">' + esc(a.level) + '</span></div>').join('');
+}
+
 function voiceCard(v){
   if (!v || !v.available) return '<p class="muted" style="font-size:12px">Voice delivery analysis not available for this session.</p>';
   const m = v.metrics || {};
@@ -74,6 +81,7 @@ function view(s){
   const t = s.timing || {};
   const ig = s.integrity || {};
   const v = s.voice || { available: false };
+  const aus = s.action_units || [];
   const vd = s.verdict || null;
   const c = s.coaching || null;
   const title = esc(s.label || s.role || 'Interview');
@@ -140,6 +148,9 @@ function view(s){
     '<div class="chart-card"><div class="ct">Emotion (MediaPipe)</div>' +
       '<div class="cs">Heuristic emotion track from face blendshapes.</div>' +
       emotionBars(s.emotion_mediapipe) + '</div>' +
+    '<div class="chart-card"><div class="ct">Action Units (FACS)</div>' +
+      '<div class="cs">Which facial muscles fired and how strongly (FACS A–E). Approximate — derived from MediaPipe blendshapes, not clinical FACS coding.</div>' +
+      actionUnitsCard(aus) + '</div>' +
     (s.emotion && s.emotion.available ? ('<div class="chart-card"><div class="ct">Emotion (HSEmotion)</div>' +
       emotionBars(s.emotion) + '</div>') : '');
 }

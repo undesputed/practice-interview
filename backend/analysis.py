@@ -442,6 +442,45 @@ def emotion_from_blendshapes(frames: list[dict]) -> dict:
     return aggregate_emotions(shots, classes=_MP_CLASSES)
 
 
+_AU_FLOOR = 0.1   # below this peak, the AU never meaningfully fired
+
+
+def _au_level(v: float) -> str:
+    """FACS A-E intensity band for a 0-1 value."""
+    if v < 0.2:
+        return "A"
+    if v < 0.4:
+        return "B"
+    if v < 0.6:
+        return "C"
+    if v < 0.8:
+        return "D"
+    return "E"
+
+
+def action_units(frames: list[dict]) -> list:
+    """Per-AU intensity across the interview: peak + mean (0-1) + FACS A-E band for the
+    peak. AUs whose peak stays below the floor are omitted. Sorted by peak, descending."""
+    series = {name: [] for name in _AU}
+    for f in frames:
+        if not f.get("face", False) or "bs" not in f:
+            continue
+        bs = f["bs"]
+        for name, keys in _AU.items():
+            series[name].append(_au_value(bs, keys))
+    out = []
+    for name, vals in series.items():
+        if not vals:
+            continue
+        peak = max(vals)
+        if peak < _AU_FLOOR:
+            continue
+        out.append({"au": name, "name": _AU_NAMES[name], "peak": round(peak, 3),
+                    "mean": round(sum(vals) / len(vals), 3), "level": _au_level(peak)})
+    out.sort(key=lambda a: a["peak"], reverse=True)
+    return out
+
+
 CONCERN_OBJECTS = {"cell phone", "laptop", "tv", "book", "remote", "keyboard"}
 
 
