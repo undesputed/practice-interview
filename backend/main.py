@@ -14,9 +14,9 @@ from pydantic import BaseModel
 from backend.analysis import compute_metrics, questions_from_transcript, transcript_metrics, integrity_metrics, summarize_actions, emotion_from_blendshapes
 from backend.report import save_session
 from backend.deepgram import build_agent_config, grant_ephemeral_token, DEEPGRAM_AGENT_URL
-from backend.anthropic_coach import generate_coaching
+from backend.anthropic_coach import generate_coaching, generate_verdict
 from backend.emotion import score_emotions, aggregate_emotions
-from backend import sessions_store, voice
+from backend import sessions_store, voice, verdict as verdict_mod
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)  # ensure our INFO/WARNING logs reach the console
@@ -183,8 +183,39 @@ def session(req: SessionRequest):
     coaching = None
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
     full_text = req.transcript.get("full_text", "")
-    if anthropic_key and full_text.strip():
-        coaching = generate_coaching(anthropic_key, full_text, req.role)
+    run_claude = bool(anthropic_key and full_text.strip())
+    if run_claude:
+        try:
+            coaching = generate_coaching(anthropic_key, full_text, req.role)
+        except Exception as exc:
+            logging.warning("coaching unavailable: %s", exc)
+
+    # Fused readiness verdict: Delivery (voice) + Presence (composites) + Content (Claude).
+    presence = verdict_mod.presence_score(summary["overall"])
+    delivery = summary["voice"].get("delivery_score") if summary["voice"].get("available") else None
+    explanation = None
+    content = None
+    if run_claude:
+        try:
+            explanation = generate_verdict(anthropic_key, full_text, req.role, delivery, presence)
+            content = explanation.get("content_score")
+        except Exception as exc:
+            logging.warning("verdict unavailable: %s", exc)
+    readiness = verdict_mod.compute_readiness(delivery, presence, content)
+    summary["verdict"] = {
+        "readiness_score": readiness["readiness_score"],
+        "band": readiness["band"],
+        "components": readiness["components"],
+        "weights_used": readiness["weights_used"],
+        "content_score": content,
+        "headline": (explanation or {}).get("headline", ""),
+        "delivery_note": (explanation or {}).get("delivery_note", ""),
+        "presence_note": (explanation or {}).get("presence_note", ""),
+        "content_note": (explanation or {}).get("content_note", ""),
+        "strengths": (explanation or {}).get("strengths", []),
+        "improvements": (explanation or {}).get("improvements", []),
+        "next_action": (explanation or {}).get("next_action", ""),
+    }
 
     session_id = datetime.now().strftime("%Y-%m-%dT%H%M%S")
     summary["role"] = req.role
