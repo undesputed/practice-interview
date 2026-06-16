@@ -82,6 +82,7 @@ function view(s){
   const ig = s.integrity || {};
   const v = s.voice || { available: false };
   const aus = s.action_units || [];
+  const compound = (s.emotion_compound && s.emotion_compound.label) ? s.emotion_compound.label : null;
   const vd = s.verdict || null;
   const c = s.coaching || null;
   const title = esc(s.label || s.role || 'Interview');
@@ -146,7 +147,8 @@ function view(s){
       '<div class="cs">Pace, fillers, pauses, and pitch variation from your recorded audio.</div>' +
       voiceCard(v) + '</div>' +
     '<div class="chart-card"><div class="ct">Emotion (MediaPipe)</div>' +
-      '<div class="cs">Heuristic emotion track from face blendshapes.</div>' +
+      '<div class="cs">Heuristic emotion track from face blendshapes.' +
+        (compound ? ' Looks like: <b>' + esc(compound) + '</b>.' : '') + '</div>' +
       emotionBars(s.emotion_mediapipe) + '</div>' +
     '<div class="chart-card"><div class="ct">Action Units (FACS)</div>' +
       '<div class="cs">Which facial muscles fired and how strongly (FACS A–E). Approximate — derived from MediaPipe blendshapes, not clinical FACS coding.</div>' +

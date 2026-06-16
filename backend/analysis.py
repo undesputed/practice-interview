@@ -481,6 +481,40 @@ def action_units(frames: list[dict]) -> list:
     return out
 
 
+# Du, Tao & Martinez (PNAS 2014) compound emotions — unordered basic-emotion pairs.
+_COMPOUND = {
+    frozenset(["happy", "surprise"]):   "Happily surprised",
+    frozenset(["happy", "disgust"]):    "Happily disgusted",
+    frozenset(["sad", "fear"]):         "Sadly fearful",
+    frozenset(["sad", "angry"]):        "Sadly angry",
+    frozenset(["sad", "surprise"]):     "Sadly surprised",
+    frozenset(["sad", "disgust"]):      "Sadly disgusted",
+    frozenset(["fear", "angry"]):       "Fearfully angry",
+    frozenset(["fear", "surprise"]):    "Fearfully surprised",
+    frozenset(["fear", "disgust"]):     "Fearfully disgusted",
+    frozenset(["angry", "surprise"]):   "Angrily surprised",
+    frozenset(["angry", "disgust"]):    "Angrily disgusted",
+    frozenset(["disgust", "surprise"]): "Disgustedly surprised",
+}
+_COMPOUND_MIN = 20.0   # the second emotion must reach this % of the distribution
+
+
+def compound_emotion(distribution: dict) -> dict:
+    """Label a compound emotion from the top two NON-neutral emotions, when both are
+    clearly present and the pair has a defined compound. Else {"label": None}."""
+    ranked = sorted(((c, v) for c, v in (distribution or {}).items() if c != "neutral"),
+                    key=lambda kv: kv[1], reverse=True)
+    if len(ranked) < 2:
+        return {"label": None}
+    (c1, v1), (c2, v2) = ranked[0], ranked[1]
+    if v1 <= 0 or v2 < _COMPOUND_MIN:
+        return {"label": None}
+    label = _COMPOUND.get(frozenset([c1, c2]))
+    if not label:
+        return {"label": None}
+    return {"label": label, "components": [c1, c2], "confidence": round(v2, 1)}
+
+
 CONCERN_OBJECTS = {"cell phone", "laptop", "tv", "book", "remote", "keyboard"}
 
 

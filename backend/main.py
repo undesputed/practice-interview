@@ -11,7 +11,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from backend.analysis import compute_metrics, questions_from_transcript, transcript_metrics, integrity_metrics, summarize_actions, emotion_from_blendshapes, action_units
+from backend.analysis import compute_metrics, questions_from_transcript, transcript_metrics, integrity_metrics, summarize_actions, emotion_from_blendshapes, action_units, compound_emotion
 from backend.report import save_session
 from backend.deepgram import build_agent_config, grant_ephemeral_token, DEEPGRAM_AGENT_URL
 from backend.anthropic_coach import generate_coaching, generate_verdict
@@ -203,6 +203,8 @@ def session(req: SessionRequest):
     summary["emotion"] = req.emotion if (req.emotion and req.emotion.get("available")) else {"available": False}
     summary["emotion_mediapipe"] = emotion_from_blendshapes(req.frames)
     summary["action_units"] = action_units(req.frames)
+    summary["emotion_compound"] = compound_emotion(
+        summary["emotion_mediapipe"].get("overall_distribution", {}))
     summary["voice"] = req.voice if (req.voice and req.voice.get("available")) else {"available": False}
 
     coaching = None

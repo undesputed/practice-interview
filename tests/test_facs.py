@@ -69,3 +69,22 @@ def test_action_units_breakdown_levels_and_floor():
 
 def test_action_units_empty_when_no_faces():
     assert analysis.action_units([{"face": False}]) == []
+
+
+def test_compound_happy_surprise():
+    dist = {"happy": 45.0, "surprise": 30.0, "neutral": 25.0, "sad": 0.0,
+            "fear": 0.0, "angry": 0.0, "disgust": 0.0, "contempt": 0.0}
+    r = analysis.compound_emotion(dist)
+    assert r["label"] == "Happily surprised"
+    assert set(r["components"]) == {"happy", "surprise"}
+
+
+def test_compound_none_when_one_dominates():
+    dist = {"happy": 80.0, "surprise": 3.0, "neutral": 17.0}
+    assert analysis.compound_emotion(dist)["label"] is None
+
+
+def test_compound_none_for_unpaired():
+    # happy + angry has no defined compound -> None
+    dist = {"happy": 40.0, "angry": 35.0, "neutral": 25.0}
+    assert analysis.compound_emotion(dist)["label"] is None
