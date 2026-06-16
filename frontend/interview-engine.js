@@ -60,6 +60,15 @@ export function getStream(){ return session ? session.stream : null; }
 // (stop() releases the session). Returns [] when nothing is running.
 export function getFrames(){ return session ? session.frames : []; }
 
+// Camera on/off for the live "camera" control: disables the video track (turns
+// the camera light off) and pauses frame capture so we don't analyze black frames.
+export function setCameraOn(on){
+  if (!session) return;
+  session.paused = !on;
+  const track = session.stream && session.stream.getVideoTracks ? session.stream.getVideoTracks()[0] : null;
+  if (track) track.enabled = !!on;
+}
+
 // Tag subsequent action events with the current interview question index. The screen
 // advances this as the AI interviewer asks each question (was hard-pinned to -1).
 export function setTurn(n){ if (session) session.turn = n; }
@@ -131,7 +140,7 @@ function launch(canvas, video, stream, { onStats, onAction, showOverlay }){
   session = {
     stream, video, running: true, rafId: 0, showOverlay: !!showOverlay, turn: -1,
     startTs: performance.now(), fps: 0, _t: performance.now(), _n: 0,
-    lastBodyTs: 0, lastStatsTs: 0, lastVideoTime: -1, frames: [],
+    lastBodyTs: 0, lastStatsTs: 0, lastVideoTime: -1, frames: [], paused: false,
     lastPose: null, lastHand: null, lastObjects: null,
   };
 
@@ -139,6 +148,13 @@ function launch(canvas, video, stream, { onStats, onAction, showOverlay }){
     if (!session || !session.running) return;
     if (!document.body.contains(canvas)){ stop(); return; }   // left the screen
     const now = performance.now();
+
+    // Camera toggled off — blank the canvas, skip capture, keep the loop alive.
+    if (session.paused){
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      session.rafId = requestAnimationFrame(loop);
+      return;
+    }
 
     // The webcam delivers ~30fps but rAF fires ~60fps. Skip frames that haven't
     // advanced so MediaPipe never runs twice on the same image — this caps all
