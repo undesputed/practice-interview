@@ -365,7 +365,7 @@ def test_summarize_actions_counts():
 def test_summarize_actions_empty():
     assert summarize_actions([]) == {"counts": {}, "total": 0, "events": []}
 
-from backend.analysis import emotion_from_blendshapes, EMOTION_CLASSES
+from backend.analysis import emotion_from_blendshapes, _MP_CLASSES
 
 def _ef(t=0.0, turn=0, **bs):
     """A face frame carrying only the given blendshape values."""
@@ -414,7 +414,8 @@ def test_emotion_blendshapes_tolerates_missing_keys():
     assert out["available"] is True
     assert out["dominant"] == "neutral"
     dist = out["overall_distribution"]
-    assert set(dist) == set(EMOTION_CLASSES)
+    # The MediaPipe track now emits 8 classes (the basics + Contempt).
+    assert set(dist) == set(_MP_CLASSES)
 
 def test_emotion_blendshapes_one_sided_value_not_halved():
     # A blendshape present on only one side must count at full strength. Here a
