@@ -41,11 +41,37 @@ function voiceCard(v){
   return rows.map((r) => '<div class="r"><span>' + esc(r[0]) + '</span><b>' + esc(String(r[1])) + '</b></div>').join('');
 }
 
+const BAND_LABEL = { ready: 'Ready', almost: 'Almost ready', needs_work: 'Needs work' };
+
+function verdictHeader(vd){
+  if (!vd || vd.readiness_score == null) return '';
+  const band = vd.band || 'needs_work';
+  const comp = vd.components || {};
+  const sub = (label, val) => '<div class="vsub"><span>' + label + '</span><b>' +
+    (val == null ? '—' : Math.round(val)) + '</b></div>';
+  const notes = [vd.delivery_note, vd.presence_note, vd.content_note]
+    .filter(Boolean).map((n) => '<li>' + esc(n) + '</li>').join('');
+  const str = (vd.strengths || []).map((x) => '<li>' + esc(x) + '</li>').join('');
+  const imp = (vd.improvements || []).map((x) => '<li>' + esc(x) + '</li>').join('');
+  return '<div class="verdict verdict-' + band + '">' +
+    '<div class="vhead"><div class="vscore">' + Math.round(vd.readiness_score) + '<span>/100</span></div>' +
+      '<div class="vband"><div class="vlabel">' + esc(BAND_LABEL[band] || band) + '</div>' +
+      '<div class="vhl">' + esc(vd.headline || '') + '</div></div></div>' +
+    '<div class="vsubs">' + sub('Delivery', comp.delivery) + sub('Presence', comp.presence) +
+      sub('Content', comp.content) + '</div>' +
+    (notes ? '<ul class="vnotes">' + notes + '</ul>' : '') +
+    (str ? '<h5>Strengths</h5><ul>' + str + '</ul>' : '') +
+    (imp ? '<h5>To improve</h5><ul>' + imp + '</ul>' : '') +
+    (vd.next_action ? '<p class="vnext"><b>Next:</b> ' + esc(vd.next_action) + '</p>' : '') +
+    '</div>';
+}
+
 function view(s){
   const o = s.overall || {};
   const t = s.timing || {};
   const ig = s.integrity || {};
   const v = s.voice || { available: false };
+  const vd = s.verdict || null;
   const c = s.coaching || null;
   const title = esc(s.label || s.role || 'Interview');
   const perQ = s.per_question || [];
@@ -97,7 +123,8 @@ function view(s){
       scoreCard('Nervousness', 'nervousness', o.nervousness) +
       scoreCard('Composure', 'composure', o.composure) +
     '</div>' +
-    '<div class="two-col"><div class="cat-cards">' + cats + '</div>' + coachHtml + '</div>' +
+    verdictHeader(vd) +
+    '<div class="two-col"><div class="cat-cards">' + cats + '</div>' + ((vd && vd.readiness_score != null) ? '' : coachHtml) + '</div>' +
     '<div class="chart-card"><div class="ct">Composure across questions</div>' +
       '<div class="cs">Drawn in-browser from this session\'s data.</div>' +
       svgLineChart(composureSeries) + '</div>' +
