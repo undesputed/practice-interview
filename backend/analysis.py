@@ -2,7 +2,7 @@
 from __future__ import annotations  # PEP 604 (X | Y) on Python 3.9
 import math
 from typing import Sequence
-from backend.emotion import aggregate_emotions, EMOTION_CLASSES, EMOTION_CLASSES as _BASIC_CLASSES
+from backend.emotion import aggregate_emotions, EMOTION_CLASSES as _BASIC_CLASSES
 
 # A "frame" dict has the shape:
 #   {"t": float_ms, "turn": int, "face": bool,
