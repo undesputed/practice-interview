@@ -37,10 +37,10 @@ Legend: ✅ native · ⚠️ partial / indirect · ❌ not available
 ### Emotion & Expression
 | Data point | MediaPipe | DeepFace | Notes |
 |---|---|---|---|
-| Labeled basic emotions | ⚠️ heuristic EMFACS mapping from blendshapes (added — same 7 classes, shown beside DeepFace) | ✅ 7 classes: angry, disgust, fear, happy, sad, surprise, neutral | MediaPipe has no *native* classifier; our mapping is an inference (see `backend/analysis.py:emotion_from_blendshapes`). DeepFace has **no "contempt"** (FER-2013 has 7) |
+| Labeled basic emotions | ⚠️ heuristic EMFACS mapping from blendshapes (added — **8 classes**: the 7 basics + **Contempt**, shown beside DeepFace) | ✅ 7 classes: angry, disgust, fear, happy, sad, surprise, neutral | MediaPipe has no *native* classifier; our mapping is an inference (see `backend/analysis.py:emotion_from_blendshapes`). Our heuristic adds **Contempt** (asymmetric smile + dimpler); DeepFace has **no "contempt"** (FER-2013 has 7) |
 | Emotion confidence scores | ❌ | ✅ per-class probabilities | DeepFace's headline strength |
 | Micro-expressions | ❌ | ❌ | Neither; needs specialized high-FPS detection |
-| Facial Action Units (validated FACS) | ⚠️ ARKit-style blendshapes (FACS-*adjacent*, not validated) | ❌ | MediaPipe's 52 blendshapes are the closest either offers |
+| Facial Action Units (validated FACS) | ⚠️ ARKit-style blendshapes (FACS-*adjacent*, not validated) + an **approximate** per-AU breakdown with FACS A–E intensity on the report (`backend/analysis.py:action_units`) | ❌ | MediaPipe's 52 blendshapes are the closest either offers; our AU breakdown is derived heuristically, not clinical FACS |
 | Smile intensity | ✅ `mouthSmileLeft/Right` (continuous) | ⚠️ only via "happy" score | MediaPipe is finer-grained here |
 | Mouth openness (speaking) | ✅ `jawOpen` | ❌ | MediaPipe only |
 | Eyebrow raise / furrow | ✅ `browInnerUp`, `browDown*` | ❌ | MediaPipe only |
