@@ -263,6 +263,17 @@ def test_composite_scores_ranges_and_logic():
     for k in ("attention", "confidence", "nervousness", "composure"):
         assert 0.0 <= composite_scores(nervous)[k] <= 100.0
 
+def test_facial_tension_raises_nervousness():
+    # Identical inputs except facial_tension; the tense face must score MORE nervous.
+    base = {"gaze_eye_contact_pct": 80.0, "steadiness_score": 80.0, "face_presence_pct": 100.0,
+            "upright_pct": 80.0, "body_steadiness": 80.0, "blinks_per_min": 10.0,
+            "face_touch_count": 0, "hand_fidget": 0.0}
+    calm = composite_scores({**base, "facial_tension": 0.0})
+    tense = composite_scores({**base, "facial_tension": 80.0})
+    assert tense["nervousness"] > calm["nervousness"]
+    # 15% of 80 = 12 points of extra nervousness.
+    assert abs((tense["nervousness"] - calm["nervousness"]) - 12.0) < 1e-6
+
 def test_metric_block_detailed_keys():
     p = _pose(0.2)
     frames = [_frame_x(i*100.0, jaw=0.4, brow=0.3) for i in range(4)]

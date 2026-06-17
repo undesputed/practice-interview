@@ -304,11 +304,13 @@ def composite_scores(m: dict) -> dict:
     bpm = m.get("blinks_per_min", 0.0)
     touch = m.get("face_touch_count", 0)
     fidget = m.get("hand_fidget", 0.0)
+    tension = m.get("facial_tension", 0.0)   # 0-100, FACS-derived (AU4 + AU7 + AU23)
     return {
         "attention": clamp(0.5 * gaze + 0.3 * head + 0.2 * presence),
         "confidence": clamp(0.5 * upright + 0.5 * body),
-        "nervousness": clamp(0.3 * min(100.0, bpm * 5.0) + 0.3 * (100.0 - gaze)
-                             + 0.2 * min(100.0, touch * 20.0) + 0.2 * min(100.0, fidget * 2000.0)),
+        "nervousness": clamp(0.25 * min(100.0, bpm * 5.0) + 0.25 * (100.0 - gaze)
+                             + 0.2 * min(100.0, touch * 20.0) + 0.15 * min(100.0, fidget * 2000.0)
+                             + 0.15 * tension),
         "composure": clamp((head + body) / 2.0),
     }
 
