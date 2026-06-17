@@ -19,7 +19,7 @@ stack. They are intentionally **omitted** from the review page rather than faked
 | Labeled basic emotions (happy/sad/angry/surprised/fearful/disgusted/neutral/contempt) | MediaPipe ships **no native** emotion classifier — only blendshape *coefficients*. We add a **heuristic EMFACS mapping** (`backend/analysis.py:emotion_from_blendshapes`) that infers 8 classes (the 7 basics plus **Contempt**, detected via an asymmetric smile + dimpler) from those coefficients, shown **beside** the DeepFace track for comparison. It is an inference (accuracy/bias-prone, legally restricted in hiring), labeled as supplementary and **never used for scoring**. | Raw expression signals (smile intensity, eyebrow raise, mouth/eye openness) **plus** the labeled heuristic track, both transparent. |
 | Emotion confidence scores | No emotion classifier → no class probabilities. | — |
 | Micro-expressions | Require specialized high-FPS detection; not provided. | — |
-| Facial Action Units (validated FACS) | Blendshapes are ARKit-style coefficients — related to AUs but not validated FACS. | Surface the blendshape signals directly, **plus** an **approximate** per-AU breakdown with FACS A–E intensity (`backend/analysis.py:action_units`) shown on the report — labeled as derived-from-blendshapes, **not** clinical FACS coding. AUs with no blendshape (e.g. AU23) are out of reach. |
+| Facial Action Units (validated FACS) | Blendshapes are ARKit-style coefficients — related to AUs but not validated FACS. | Surface the blendshape signals directly, **plus** an **approximate** per-AU breakdown with FACS A–E intensity (`backend/analysis.py:action_units`) shown on the report — labeled as derived-from-blendshapes, **not** clinical FACS coding. AUs with no ARKit blendshape at all are out of reach. A three-signal facial-tension aggregate — AU4 (brow lower) + AU7 (lid tighten) + the AU23 lip-press **proxy** (mouthPress) — is the **only** AU signal that feeds scoring: 15% of the Nervousness indicator. All other AU/emotion output is display-only. |
 
 ## Eye Tracking & Gaze
 | Wanted | Why not | What we do instead |
@@ -48,7 +48,7 @@ stack. They are intentionally **omitted** from the review page rather than faked
 ## Derived / Speculative
 | Wanted | Why not | What we do instead |
 |--------|---------|--------------------|
-| Stress markers | No reliable physiological signal from an RGB webcam; speculative. | A heuristic "Nervousness" indicator from blink rate + looking-away + face-touch + fidget, clearly labeled supplementary. |
+| Stress markers | No reliable physiological signal from an RGB webcam; speculative. | A heuristic "Nervousness" indicator from blink rate + looking-away + face-touch + fidget + a low-weight (15%) facial-tension term (brow lower / lid tighten / lip press), clearly labeled supplementary. |
 | Lip biting / specific nervous habits | No dedicated detector. | Face-touch proximity (hand near face) as a proxy. |
 | Authenticity indicator | Not reliably measurable. | — |
 
