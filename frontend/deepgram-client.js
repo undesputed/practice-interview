@@ -20,6 +20,7 @@ export function startVoiceAgent({ url, token, scheme, config, micStream, onTrans
   let silenceTimer = null;
   let endRequested = false;   // the agent called end_interview — close once the goodbye plays
   let closedForEnd = false;
+  let fatalError = null;      // a Deepgram "Error" (e.g. FAILED_TO_THINK) — interview can't continue
 
   ws.onopen = () => {
     console.log("[dg] ws OPEN — sending Settings; inCtx=%s outCtx=%s", inCtx.state, outCtx.state);
@@ -91,16 +92,21 @@ export function startVoiceAgent({ url, token, scheme, config, micStream, onTrans
         }
       } else if (msg.type === "AgentAudioDone") {
         if (endRequested) closeForEnd();   // goodbye finished — end the interview
-      } else if (msg.type === "Error" || msg.type === "Warning") {
-        console.error("[dg] agent message:", msg);
-        if (onError) onError(msg.description || msg.message || msg.type);
+      } else if (msg.type === "Error") {
+        // Fatal: the agent cannot continue (e.g. FAILED_TO_THINK). Record it so onClose
+        // can tell the screen this was a failure, not a normal end-of-interview.
+        console.error("[dg] agent ERROR:", msg);
+        fatalError = msg.description || msg.message || msg.code || "voice agent error";
+        if (onError) onError(fatalError);
+      } else if (msg.type === "Warning") {
+        console.warn("[dg] agent WARNING (transient):", msg);   // e.g. provider retry — not surfaced
       }
     }
   };
 
   ws.onclose = (e) => {
     console.warn(`[dg] ws CLOSED code=${e.code} reason="${e.reason}" — audioChunks=${audioChunks}`);
-    if (onClose) onClose(e);
+    if (onClose) onClose(e, { ended: endRequested, fatal: !!fatalError, message: fatalError });
   };
   ws.onerror = (ev) => {
     console.error("[dg] ws ERROR", ev);

@@ -89,7 +89,10 @@ async function startAgent(){
       onTranscript,
       onSpeaking: onAiSpeaking,
       onError: (m) => setVoice('Voice error: ' + m),
-      onClose: () => { if (engine.isRunning()) finishInterview(); },
+      onClose: (e, info) => {
+        if (info && info.fatal){ voiceAgentFailed(info.message); return; }   // dead interview — don't score
+        if (engine.isRunning()) finishInterview();
+      },
     });
     setVoice(muted ? 'Muted' : 'Live');
   } catch (e){ setVoice('Voice unavailable: ' + (e && e.message ? e.message : e)); }
@@ -182,6 +185,23 @@ function resetConvo(){
   const convo = byId('lv-convo'); if (convo) convo.innerHTML = '<div class="fa-note">The interviewer will greet you when the connection is ready…</div>';
   const panel = byId('lv-transcript'); if (panel) panel.classList.remove('open');
   onAiSpeaking(false);
+}
+
+// The voice agent died with a fatal error (e.g. Deepgram couldn't reach the think/LLM
+// provider — FAILED_TO_THINK). Don't run the scoring pipeline on a dead interview (that's
+// the slow, confusing "hang"); tear down and show a clear, retryable message instead.
+function voiceAgentFailed(message){
+  if (finishing) return;          // a normal finish already ran
+  finishing = true;
+  if (recorder && recorder.stop){ try { recorder.stop(); } catch (_){} }
+  recorder = null;
+  stopAgent();
+  engine.stop();
+  console.warn("[live] voiceAgentFailed:", message);
+  overlay('The interviewer’s AI couldn’t respond, so the interview stopped. This is usually a ' +
+          'Deepgram Voice Agent LLM access/billing issue, not your answers. Please try again.');
+  setState('Error'); setVoice('—');
+  showControls(false); showStart('Retry');
 }
 
 function cameraError(e){

@@ -17,17 +17,22 @@ function pickMimeType(){
 export function startRecording(stream){
   const audioTracks = stream ? stream.getAudioTracks() : [];
   if (!audioTracks.length) return null;   // no mic -> caller skips voice analysis
+  // Record an AUDIO-ONLY stream. The engine's MediaStream also carries a video track,
+  // and an audio-only mimeType (webm/opus) cannot encode video — MediaRecorder.start()
+  // then throws NotSupportedError. Isolating the audio tracks avoids that.
+  const audioStream = new MediaStream(audioTracks);
   const mime = pickMimeType();
+  const chunks = [];
   let recorder;
   try {
-    recorder = mime ? new MediaRecorder(stream, { mimeType: mime }) : new MediaRecorder(stream);
+    recorder = mime ? new MediaRecorder(audioStream, { mimeType: mime }) : new MediaRecorder(audioStream);
+    recorder.ondataavailable = (ev) => { if (ev.data && ev.data.size) chunks.push(ev.data); };
+    recorder.start();   // single blob on stop (no timeslice needed); guarded so a start
+                        // failure degrades to "no Delivery analysis" instead of crashing.
   } catch (e){
-    console.warn('[voice] MediaRecorder unavailable:', e && e.message);
+    console.warn('[voice] MediaRecorder failed to start:', e && e.message);
     return null;
   }
-  const chunks = [];
-  recorder.ondataavailable = (ev) => { if (ev.data && ev.data.size) chunks.push(ev.data); };
-  recorder.start();   // single blob on stop (no timeslice needed)
 
   return {
     stop(){
