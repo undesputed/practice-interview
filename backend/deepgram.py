@@ -25,15 +25,37 @@ DIFFICULTY_GUIDANCE = {
             "follow-ups.",
 }
 
+# How the "Tone" choice shapes the interviewer's manner (not question hardness — that is
+# Difficulty's job). Spoken delivery is set separately via TONE_VOICE.
+TONE_GUIDANCE = {
+    "Friendly": "Adopt a warm, encouraging manner: put the candidate at ease, react "
+                "supportively, and acknowledge good answers.",
+    "Professional": "Adopt a calm, balanced, professional manner — warm but not effusive.",
+    "Stern": "Adopt a cool, no-nonsense manner: minimal warmth, brief acknowledgements, "
+             "and steady pressure.",
+    "Intimidating": "Adopt a tough, high-pressure manner: be curt and demanding and "
+                    "challenge answers directly — but never personal, rude, or demeaning.",
+}
+
+# Tone -> Deepgram Aura-2 voice (verified IDs). Falls back to TTS_MODEL.
+TONE_VOICE = {
+    "Friendly": "aura-2-helena-en",       # Caring, Natural, Friendly
+    "Professional": "aura-2-thalia-en",   # current default voice (unchanged)
+    "Stern": "aura-2-saturn-en",          # Knowledgeable, Confident, Baritone
+    "Intimidating": "aura-2-zeus-en",     # Deep, Trustworthy, Smooth
+}
+
 
 def build_interviewer_prompt(role: str, focus: str = "Mixed", difficulty: str = "Realistic",
-                             question_count: int = 5, questions=None) -> str:
+                             question_count: int = 5, questions=None,
+                             tone: str = "Professional") -> str:
     """System prompt for the Claude 'think' provider. In 'bound mode' (a question list is
     given) the interviewer asks those exact questions in order; otherwise it improvises."""
     focus_line = FOCUS_GUIDANCE.get(focus, FOCUS_GUIDANCE["Mixed"])
     difficulty_line = DIFFICULTY_GUIDANCE.get(difficulty, DIFFICULTY_GUIDANCE["Realistic"])
-    intro = (f"You are Judy, a warm but professional interviewer conducting a mock job "
-             f"interview for a {role} position. {focus_line} {difficulty_line} ")
+    tone_line = TONE_GUIDANCE.get(tone, TONE_GUIDANCE["Professional"])
+    intro = (f"You are an interviewer conducting a mock job interview for a {role} position. "
+             f"{focus_line} {difficulty_line} {tone_line} ")
     tts = ("Everything you say is read aloud by a text-to-speech voice, so reply in plain, "
            "natural spoken sentences only — no markdown, asterisks, bullet points, headings, "
            "numbered lists, emoji, or labels like 'First Question:'. Just ask the question "
@@ -68,14 +90,15 @@ def build_greeting(role: str, has_questions: bool = False) -> str:
     if has_questions:
         # Bound mode: the first listed question is asked by the model, so the greeting must
         # NOT also ask for a self-introduction (that would duplicate / conflict).
-        return (f"Hi, thanks for joining. I'm Judy, and I'll be interviewing you for the "
+        return (f"Hi, thanks for joining. I'll be interviewing you for the "
                 f"{role} role today. Let's get started.")
     return (f"Hi, thanks for joining. I'll be interviewing you for the {role} role today. "
             f"Whenever you're ready, tell me a little about yourself.")
 
 
 def build_agent_config(role: str, focus: str = "Mixed", difficulty: str = "Realistic",
-                       question_count: int = 5, questions=None) -> dict:
+                       question_count: int = 5, questions=None,
+                       tone: str = "Professional") -> dict:
     """Deepgram Voice Agent Settings payload (sent as first WS message)."""
     return {
         "type": "Settings",
@@ -89,7 +112,7 @@ def build_agent_config(role: str, focus: str = "Mixed", difficulty: str = "Reali
                                     "keyterms": ["STAR", "behavioral", "strengths", "weaknesses", role]}},
             "think": {
                 "provider": {"type": "anthropic", "model": THINK_MODEL},
-                "prompt": build_interviewer_prompt(role, focus, difficulty, question_count, questions),
+                "prompt": build_interviewer_prompt(role, focus, difficulty, question_count, questions, tone),
                 # Client-side function (no server endpoint) the interviewer calls when the
                 # interview is over. The browser ACKs it and closes the socket, which ends
                 # and scores the interview. Without this the agent never stops on its own.
@@ -101,7 +124,7 @@ def build_agent_config(role: str, focus: str = "Mixed", difficulty: str = "Reali
                     "parameters": {"type": "object", "properties": {}},
                 }],
             },
-            "speak": {"provider": {"type": "deepgram", "model": TTS_MODEL}},
+            "speak": {"provider": {"type": "deepgram", "model": TONE_VOICE.get(tone, TTS_MODEL)}},
             "greeting": build_greeting(role, bool(questions)),
         },
     }

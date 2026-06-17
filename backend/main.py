@@ -36,6 +36,7 @@ class TokenRequest(BaseModel):
     difficulty: str = "Realistic"
     question_count: int = 5
     questions: list[str] = []
+    tone: str = "Professional"
 
 
 class QuestionsRequest(BaseModel):
@@ -94,7 +95,8 @@ async def interview_token(req: TokenRequest):
         else:
             raise HTTPException(502, f"Deepgram token grant failed: {exc.response.status_code}")
     return {"url": DEEPGRAM_AGENT_URL, "token": token, "scheme": scheme,
-            "config": build_agent_config(req.role, req.focus, req.difficulty, req.question_count, req.questions)}
+            "config": build_agent_config(req.role, req.focus, req.difficulty,
+                                         req.question_count, req.questions, tone=req.tone)}
 
 
 @app.post("/api/questions")

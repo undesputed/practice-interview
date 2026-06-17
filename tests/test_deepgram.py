@@ -71,3 +71,41 @@ def test_prompt_prevents_restarting_the_interview():
     prompt = build_agent_config("Software Engineer")["agent"]["think"]["prompt"].lower()
     assert "already in progress" in prompt
     assert "question 1 of" in prompt
+
+
+def test_tone_injects_manner_line():
+    friendly = build_agent_config("Software Engineer", tone="Friendly")["agent"]["think"]["prompt"].lower()
+    assert "encouraging" in friendly
+    intimidating = build_agent_config("Software Engineer", tone="Intimidating")["agent"]["think"]["prompt"].lower()
+    assert "high-pressure" in intimidating
+
+
+def test_tone_selects_voice():
+    expected = {
+        "Friendly": "aura-2-helena-en",
+        "Professional": "aura-2-thalia-en",
+        "Stern": "aura-2-saturn-en",
+        "Intimidating": "aura-2-zeus-en",
+    }
+    for tone, voice in expected.items():
+        cfg = build_agent_config("Software Engineer", tone=tone)
+        assert cfg["agent"]["speak"]["provider"]["model"] == voice
+
+
+def test_unknown_tone_falls_back_to_professional_and_thalia():
+    cfg = build_agent_config("Software Engineer", tone="Wacky")
+    assert cfg["agent"]["speak"]["provider"]["model"] == "aura-2-thalia-en"
+    assert "professional" in cfg["agent"]["think"]["prompt"].lower()
+
+
+def test_default_tone_is_professional_thalia():
+    cfg = build_agent_config("Software Engineer")
+    assert cfg["agent"]["speak"]["provider"]["model"] == "aura-2-thalia-en"
+    assert "professional" in cfg["agent"]["think"]["prompt"].lower()
+
+
+def test_no_fixed_persona_name_in_prompt_or_greeting():
+    prompt = build_agent_config("Software Engineer")["agent"]["think"]["prompt"]
+    assert "Judy" not in prompt
+    assert "Judy" not in build_greeting("Software Engineer", has_questions=True)
+    assert "Judy" not in build_greeting("Software Engineer", has_questions=False)
