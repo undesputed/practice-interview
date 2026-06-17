@@ -79,7 +79,7 @@ async function startAgent(){
   try {
     const tok = await api.interviewToken({
       role: cfg.role, focus: cfg.focus, difficulty: cfg.difficulty, question_count: cfg.questionCount,
-      questions: cfg.questions || [],
+      questions: cfg.questions || [], tone: cfg.tone,
     });
     const stream = engine.getStream();
     if (!stream || !engine.isRunning()) return;   // stopped / navigated away during the token fetch

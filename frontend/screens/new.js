@@ -161,8 +161,9 @@ function saveSettings(root){
   const role = roleCard ? roleCard.querySelector('.rt').textContent.trim() : 'Software Engineer';
   const focus = onText('[data-group="focus"] button.on', 'Mixed');
   const difficulty = onText('[data-group="difficulty"] button.on', 'Realistic');
+  const tone = onText('[data-group="tone"] button.on', 'Professional');
   const questionCount = parseInt(root.querySelector('#ni-qval').textContent, 10) || 5;
-  setInterviewConfig({ role, focus, difficulty, questionCount, questions: generatedQuestions });
+  setInterviewConfig({ role, focus, difficulty, tone, questionCount, questions: generatedQuestions });
 }
 
 export function newInterview(){
@@ -226,6 +227,8 @@ export function newInterview(){
               '<button class="on">Behavioral</button><button>Technical</button><button>Mixed</button></div></div>' +
             '<div><span class="ql">Difficulty</span><div class="ni-seg" data-group="difficulty">' +
               '<button>Warm-up</button><button class="on">Realistic</button><button>Hard</button></div></div>' +
+            '<div><span class="ql">Tone</span><div class="ni-seg" data-group="tone">' +
+              '<button>Friendly</button><button class="on">Professional</button><button>Stern</button><button>Intimidating</button></div></div>' +
             '<div><span class="ql">Questions</span><div class="stepper">' +
               '<button data-step="-1">−</button><span class="val" id="ni-qval">6</span><button data-step="1">+</button></div></div>' +
           '</div></div>' +
