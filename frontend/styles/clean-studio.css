@@ -158,7 +158,33 @@ table.data .role{font-weight:600;color:var(--ink)}
 .emrow .track{height:7px;border-radius:100px;background:var(--line);overflow:hidden}
 .emrow .fill{height:100%;border-radius:100px;background:var(--green)}
 .emrow .val{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-3);font-size:11px}
-@media(max-width:820px){.two-col,.cat-cards{grid-template-columns:1fr}.score-cards{grid-template-columns:repeat(2,1fr)}}
+
+/* ---- "How you're scored" breakdown ---- */
+.sbk .cs b{color:var(--ink-2)}
+.sbk-pillar{padding:11px 0;border-top:1px solid var(--line)}
+.sbk-pillar:first-of-type{border-top:0;padding-top:2px}
+.sbk-head{display:grid;grid-template-columns:1fr auto auto auto;align-items:center;gap:12px;margin-bottom:7px}
+.sbk-pname{font-weight:700;font-size:13px;color:var(--ink)}
+.sbk-weight{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.sbk-score{font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--ink)}
+.sbk-score small{font-size:10px;font-weight:600;color:var(--ink-3)}
+.sbk-rate{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:2px 9px;border-radius:var(--r-pill)}
+.sbk-rate.good{background:var(--good-soft);color:var(--green-deep)}
+.sbk-rate.mid{background:var(--warn-soft);color:var(--amber)}
+.sbk-rate.low{background:var(--risk-soft);color:var(--red)}
+.sbk-rate.muted{background:var(--surface-2);color:var(--ink-3)}
+.sbk-row{display:grid;grid-template-columns:118px 1fr 38px 92px auto;align-items:center;gap:10px;font-size:12px;padding:3px 0}
+.sbk-name{color:var(--ink-2);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sbk-bar{height:7px;border-radius:100px;background:var(--line);overflow:hidden}
+.sbk-bar i{display:block;height:100%;border-radius:100px;background:var(--green)}
+.sbk-bar i.mid{background:var(--amber)} .sbk-bar i.low{background:var(--red)}
+.sbk-rrate{font-size:10.5px;font-weight:700;text-transform:uppercase}
+.sbk-rrate.good{color:var(--green-deep)} .sbk-rrate.mid{color:var(--amber)} .sbk-rrate.low{color:var(--red)}
+.sbk-val{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink-2);font-size:11px}
+.sbk-target{color:var(--ink-3);font-size:10.5px;white-space:nowrap}
+.sbk-note{grid-column:2 / -1;font-size:11px}
+@media(max-width:820px){.two-col,.cat-cards{grid-template-columns:1fr}.score-cards{grid-template-columns:repeat(2,1fr)}
+  .sbk-row{grid-template-columns:1fr auto auto;row-gap:2px}.sbk-bar{display:none}.sbk-target{display:none}}
 
 /* ---- Facial Analysis screen ---- */
 .fa-grid{display:grid;grid-template-columns:220px 1fr;gap:16px;align-items:start}

@@ -1,5 +1,5 @@
 // Persisted light/dark theme. Applies data-theme on <html>; remembers choice.
-const KEY = 'rehearsal-theme';
+const KEY = 'molave-theme';
 
 export function initTheme(){
   const saved = localStorage.getItem(KEY);

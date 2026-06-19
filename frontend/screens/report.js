@@ -76,6 +76,94 @@ function verdictHeader(vd){
     '</div>';
 }
 
+// --- "How you're scored" breakdown: shows how the candidate did against the readiness
+// criteria (Delivery 40% / Presence 35% / Content 25%) down to each sub-criterion. ---
+const RLABEL = { good: 'Good', mid: 'OK', low: 'Low' };
+// Cutoffs match the readiness bands in backend/verdict.py (70 = ready, 50 = almost)
+// so the rating chips never contradict the band copy shown on the same card.
+function rate01(s){ return s >= 0.70 ? 'good' : s >= 0.50 ? 'mid' : 'low'; }
+
+function sbkRow(label, score01, valueText, targetText){
+  const r = rate01(score01);
+  const pct = Math.round(Math.max(0, Math.min(1, score01)) * 100);
+  return '<div class="sbk-row"><span class="sbk-name">' + esc(label) + '</span>' +
+    '<span class="sbk-bar"><i class="' + (r === 'good' ? '' : r) + '" style="width:' + pct + '%"></i></span>' +
+    '<span class="sbk-rrate ' + r + '">' + RLABEL[r] + '</span>' +
+    '<span class="sbk-val">' + esc(valueText) + '</span>' +
+    '<span class="sbk-target">' + esc(targetText || '') + '</span></div>';
+}
+
+// breakdown key -> [label, value text (from voice metrics), target text]
+const DELIVERY_META = {
+  pace:    (m) => ['Pace', (m.wpm ?? '—') + ' wpm', 'aim 110–160 wpm'],
+  fillers: (m) => ['Filler words', (m.filler_rate_per100 ?? '—') + '/100 words', 'aim under 3'],
+  pauses:  (m) => ['Long pauses', String(m.long_pause_count ?? '—'), 'aim 2 or fewer'],
+  pitch:   (m) => ['Pitch variation', (m.pitch_std_hz ?? '—') + ' Hz', 'aim 25+ Hz (not monotone)'],
+  energy:  (m) => ['Energy', String(m.energy_mean ?? '—'), 'aim 0.02+'],
+};
+
+function deliveryRows(v){
+  if (!v || !v.available || !Array.isArray(v.breakdown)) return '';
+  const m = v.metrics || {};
+  return v.breakdown.map((b) => {
+    const meta = DELIVERY_META[b.key];
+    if (!meta) return '';
+    const [label, val, target] = meta(m);
+    return sbkRow(label, b.score, val, target);
+  }).join('');
+}
+
+function presenceRows(o){
+  const rows = [];
+  const add = (label, val, target) => {
+    if (typeof val === 'number') rows.push(sbkRow(label, val / 100, Math.round(val) + '/100', target));
+  };
+  add('Attention', o.attention, 'higher is better');
+  add('Confidence', o.confidence, 'higher is better');
+  add('Composure', o.composure, 'higher is better');
+  if (typeof o.nervousness === 'number') {
+    const calm = 100 - o.nervousness;
+    rows.push(sbkRow('Calm', calm / 100, Math.round(calm) + '/100', 'lower nervousness is better'));
+  }
+  return rows.join('');
+}
+
+function contentRows(vd){
+  if (vd.content_score == null) {
+    return '<div class="sbk-row"><span class="sbk-name">Answer quality</span>' +
+      '<span class="sbk-note muted">Not scored — needs the AI coach (ANTHROPIC_API_KEY).</span></div>';
+  }
+  return sbkRow('Answer quality', vd.content_score / 100, vd.content_score + '/100',
+    'clarity · structure · specificity · relevance');
+}
+
+function scoringBreakdown(vd, o, v){
+  if (!vd || vd.readiness_score == null) return '';
+  const w = vd.weights_used || {};
+  const comp = vd.components || {};
+  const weightPct = (k) => (typeof w[k] === 'number') ? Math.round(w[k] * 100) + '%' : '—';
+  const pillar = (name, key, rows) => {
+    const score = comp[key];
+    const has = typeof score === 'number';
+    const r = has ? rate01(score / 100) : null;
+    return '<div class="sbk-pillar"><div class="sbk-head">' +
+      '<span class="sbk-pname">' + esc(name) + '</span>' +
+      '<span class="sbk-weight">' + weightPct(key) + ' of score</span>' +
+      '<span class="sbk-score">' + (has ? Math.round(score) : '—') + '<small>/100</small></span>' +
+      (has ? '<span class="sbk-rate ' + r + '">' + RLABEL[r] + '</span>'
+           : '<span class="sbk-rate muted">not captured</span>') +
+      '</div>' + (rows || '') + '</div>';
+  };
+  return '<div class="chart-card sbk"><div class="ct">How you\'re scored</div>' +
+    '<div class="cs">Readiness blends <b>Delivery 40%</b> · <b>Presence 35%</b> · <b>Content 25%</b>. ' +
+      'If a signal isn\'t captured, its weight is shared across the rest. ' +
+      'Bands: 70+ Ready, 50–69 Almost, under 50 Needs work. Each row is rated against its target.</div>' +
+    pillar('Delivery · voice', 'delivery', deliveryRows(v)) +
+    pillar('Presence · face & body', 'presence', presenceRows(o)) +
+    pillar('Content · answers', 'content', contentRows(vd)) +
+    '</div>';
+}
+
 function view(s){
   const o = s.overall || {};
   const t = s.timing || {};
@@ -136,6 +224,7 @@ function view(s){
       scoreCard('Composure', 'composure', o.composure) +
     '</div>' +
     verdictHeader(vd) +
+    scoringBreakdown(vd, o, v) +
     '<div class="two-col"><div class="cat-cards">' + cats + '</div>' + ((vd && vd.readiness_score != null) ? '' : coachHtml) + '</div>' +
     '<div class="chart-card"><div class="ct">Composure across questions</div>' +
       '<div class="cs">Drawn in-browser from this session\'s data.</div>' +

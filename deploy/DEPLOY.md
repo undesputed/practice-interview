@@ -2,6 +2,9 @@
 
 > Local dev needs none of this — `localhost` is a secure context, so camera/mic work over plain HTTP.
 > This is only for remote testing on EC2, where browsers require HTTPS.
+>
+> Prefer containers / AWS ECS + ECR? See [ECS.md](ECS.md) — the ALB replaces nginx
+> for TLS there, and you don't need both paths.
 
 ## 1. Provision
 - Ubuntu 22.04 EC2 instance.

@@ -1,0 +1,57 @@
+For an AI interview project, here are the key facial data points to extract:
+
+**Emotion & Expression**
+- Basic emotions (happy, sad, angry, surprised, fearful, disgusted, neutral, contempt)
+- Emotion confidence scores
+- Micro-expressions (brief involuntary expressions)
+- Facial Action Units (FACS) — specific muscle movements
+
+**Eye Tracking & Gaze**
+- Gaze direction (where the candidate is looking)
+- Eye contact percentage with camera
+- Blink rate and duration
+- Pupil dilation
+- Eye openness
+
+**Head Pose**
+- Pitch (up/down nodding)
+- Yaw (left/right turning)
+- Roll (tilting)
+- Head movement frequency
+
+**Facial Landmarks**
+- 68 to 468 key points (eyes, nose, mouth, jawline, eyebrows)
+- Mouth openness (for speaking detection)
+- Smile intensity
+- Eyebrow position (raised, furrowed)
+
+**Engagement & Attention Metrics**
+- Attention score (derived from gaze + head pose)
+- Confidence level (posture + expression)
+- Nervousness indicators (excessive blinking, lip biting, looking away)
+- Stress markers
+
+**Identity & Integrity (anti-cheating)**
+- Face presence detection (is the candidate there?)
+- Identity verification (matches ID photo)
+- Multiple faces detection (someone else in frame)
+- Liveness detection (real person vs photo/video)
+
+**Demographics (optional, use with caution)**
+- Age estimation
+- Gender estimation
+- *Note: avoid using these for scoring to prevent bias*
+
+**Derived Interview Metrics**
+- Overall composure score
+- Authenticity indicator
+- Speaking vs listening states
+- Response timing patterns
+
+**Important considerations:**
+- Get explicit candidate consent (GDPR/privacy laws)
+- Use facial data as *supplementary* signals, not primary scoring — emotion AI has known accuracy and bias issues
+- Be transparent about what you're measuring
+- Some jurisdictions (Illinois BIPA, EU AI Act) restrict emotion recognition in hiring
+
+Want me to suggest which tool from the previous list best fits these needs?
