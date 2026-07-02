@@ -11,8 +11,22 @@ async function request(method, url, body){
   return res.status === 204 ? null : res.json();
 }
 
+const _SC_KEY = 'molave_sessions_cache';
+const _SC_TTL = 60_000;
+function _scRead(){ try { const r = sessionStorage.getItem(_SC_KEY); if (!r) return null; const { ts, data } = JSON.parse(r); if (Date.now() - ts < _SC_TTL) return data; } catch(_){} return null; }
+function _scWrite(data){ try { sessionStorage.setItem(_SC_KEY, JSON.stringify({ ts: Date.now(), data })); } catch(_){} }
+function _scClear(){ try { sessionStorage.removeItem(_SC_KEY); } catch(_){} }
+
 export const api = {
-  listSessions:   ()        => request('GET',    '/api/sessions'),
+  listSessions: async () => {
+    const cached = _scRead();
+    if (cached) return { sessions: cached };
+    const data = await request('GET', '/api/sessions');
+    _scWrite(data.sessions || []);
+    return data;
+  },
+  invalidateSessionsCache: _scClear,
+  updateSessionsCache: _scWrite,
   getSession:     (id)      => request('GET',    '/api/sessions/' + encodeURIComponent(id)),
   deleteSession:  (id)      => request('DELETE', '/api/sessions/' + encodeURIComponent(id)),
   renameSession:  (id, lbl) => request('PATCH',  '/api/sessions/' + encodeURIComponent(id), { label: lbl }),

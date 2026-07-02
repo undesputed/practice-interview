@@ -1,52 +1,55 @@
 # backend/report.py
-from __future__ import annotations  # PEP 604 (X | Y) on Python 3.9
-import csv, json, logging, os
+from __future__ import annotations
+import csv, io, json, logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import matplotlib
-matplotlib.use("Agg")  # headless backend — no display needed
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from backend.analysis import (matrix_to_euler, SMILE_THRESHOLD, GAZE_MAX,
                               UPRIGHT_RATIO, FRAME_ASPECT)
 from backend.emotion import EMOTION_CLASSES
+from backend import storage, sessions_store
 
 
-def _write_csv(path: str, frames: list[dict]) -> None:
+def _csv_bytes(frames: list[dict]) -> bytes:
     import math as _m
-    with open(path, "w", newline="", encoding="utf-8") as fh:
-        w = csv.writer(fh)
-        w.writerow(["t", "turn", "face", "pitch", "yaw", "roll",
-                    "smileL", "smileR", "blinkL", "blinkR",
-                    "gaze_on", "pose_present", "upright", "shoulder_tilt", "hands_present"])
-        for f in frames:
-            pitch, yaw, roll = matrix_to_euler(f["m"]) if f.get("face") else (0, 0, 0)
-            bs = f.get("bs", {})
-            horiz = max(bs.get("eyeLookOutLeft", 0), bs.get("eyeLookOutRight", 0),
-                        bs.get("eyeLookInLeft", 0), bs.get("eyeLookInRight", 0))
-            vert = max(bs.get("eyeLookUpLeft", 0), bs.get("eyeLookUpRight", 0),
-                       bs.get("eyeLookDownLeft", 0), bs.get("eyeLookDownRight", 0))
-            gaze_on = int(bool(f.get("face")) and horiz < GAZE_MAX and vert < GAZE_MAX)
-            p = f.get("pose")
-            if p:
-                width = abs(p["leftShoulder"]["x"] - p["rightShoulder"]["x"]) or 1e-6
-                mid_y = (p["leftShoulder"]["y"] + p["rightShoulder"]["y"]) / 2.0
-                upright = int(((mid_y - p["nose"]["y"]) / FRAME_ASPECT) / width > UPRIGHT_RATIO)
-                tilt = round(abs(_m.degrees(_m.atan2(
-                    (p["rightShoulder"]["y"] - p["leftShoulder"]["y"]) / FRAME_ASPECT,
-                    p["rightShoulder"]["x"] - p["leftShoulder"]["x"]))), 2)
-            else:
-                upright, tilt = "", ""
-            w.writerow([f["t"], f.get("turn"), int(bool(f.get("face"))),
-                        round(pitch, 2), round(yaw, 2), round(roll, 2),
-                        bs.get("mouthSmileLeft", 0), bs.get("mouthSmileRight", 0),
-                        bs.get("eyeBlinkLeft", 0), bs.get("eyeBlinkRight", 0),
-                        gaze_on, int(p is not None), upright, tilt,
-                        int(f.get("hands") is not None)])
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["t", "turn", "face", "pitch", "yaw", "roll",
+                "smileL", "smileR", "blinkL", "blinkR",
+                "gaze_on", "pose_present", "upright", "shoulder_tilt", "hands_present"])
+    for f in frames:
+        pitch, yaw, roll = matrix_to_euler(f["m"]) if f.get("face") else (0, 0, 0)
+        bs = f.get("bs", {})
+        horiz = max(bs.get("eyeLookOutLeft", 0), bs.get("eyeLookOutRight", 0),
+                    bs.get("eyeLookInLeft", 0), bs.get("eyeLookInRight", 0))
+        vert = max(bs.get("eyeLookUpLeft", 0), bs.get("eyeLookUpRight", 0),
+                   bs.get("eyeLookDownLeft", 0), bs.get("eyeLookDownRight", 0))
+        gaze_on = int(bool(f.get("face")) and horiz < GAZE_MAX and vert < GAZE_MAX)
+        p = f.get("pose")
+        if p:
+            width = abs(p["leftShoulder"]["x"] - p["rightShoulder"]["x"]) or 1e-6
+            mid_y = (p["leftShoulder"]["y"] + p["rightShoulder"]["y"]) / 2.0
+            upright = int(((mid_y - p["nose"]["y"]) / FRAME_ASPECT) / width > UPRIGHT_RATIO)
+            tilt = round(abs(_m.degrees(_m.atan2(
+                (p["rightShoulder"]["y"] - p["leftShoulder"]["y"]) / FRAME_ASPECT,
+                p["rightShoulder"]["x"] - p["leftShoulder"]["x"]))), 2)
+        else:
+            upright, tilt = "", ""
+        w.writerow([f["t"], f.get("turn"), int(bool(f.get("face"))),
+                    round(pitch, 2), round(yaw, 2), round(roll, 2),
+                    bs.get("mouthSmileLeft", 0), bs.get("mouthSmileRight", 0),
+                    bs.get("eyeBlinkLeft", 0), bs.get("eyeBlinkRight", 0),
+                    gaze_on, int(p is not None), upright, tilt,
+                    int(f.get("hands") is not None)])
+    return buf.getvalue().encode()
 
 
-def _build_charts(path: str, frames: list[dict]) -> None:
+def _charts_png(frames: list[dict]) -> bytes:
     ts = [f["t"] / 1000.0 for f in frames]
     smile, yaw_s, pitch_s = [], [], []
     for f in frames:
-        bs = f["bs"]
+        bs = f.get("bs", {})
         smile.append((bs.get("mouthSmileLeft", 0) + bs.get("mouthSmileRight", 0)) / 2.0)
         if f.get("face"):
             pitch, yaw, _ = matrix_to_euler(f["m"])
@@ -54,7 +57,6 @@ def _build_charts(path: str, frames: list[dict]) -> None:
             pitch, yaw = 0.0, 0.0
         yaw_s.append(yaw); pitch_s.append(pitch)
 
-    # vertical lines where the interviewer turn changes
     boundaries = [frames[i]["t"] / 1000.0 for i in range(1, len(frames))
                   if frames[i]["turn"] != frames[i - 1]["turn"]]
 
@@ -64,7 +66,8 @@ def _build_charts(path: str, frames: list[dict]) -> None:
         if p:
             width = abs(p["leftShoulder"]["x"] - p["rightShoulder"]["x"]) or 1e-6
             mid_y = (p["leftShoulder"]["y"] + p["rightShoulder"]["y"]) / 2.0
-            upright_series.append(1 if ((mid_y - p["nose"]["y"]) / FRAME_ASPECT) / width > UPRIGHT_RATIO else 0)
+            upright_series.append(
+                1 if ((mid_y - p["nose"]["y"]) / FRAME_ASPECT) / width > UPRIGHT_RATIO else 0)
             ts_pose.append(f["t"] / 1000.0)
 
     mouth, gaze_on, ts_face = [], [], []
@@ -94,15 +97,17 @@ def _build_charts(path: str, frames: list[dict]) -> None:
             ax.axvline(b, color="red", lw=0.6, alpha=0.5)
     fig.suptitle("Interview timeline (red = new question)")
     fig.tight_layout()
-    fig.savefig(path, dpi=120)
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=120)
     plt.close(fig)
+    buf.seek(0)
+    return buf.read()
 
 
-def _build_emotion_chart(path: str, emotion: dict) -> None:
-    """Line-per-emotion score over time, with red lines at question boundaries."""
+def _emotion_png(emotion: dict) -> bytes | None:
     timeline = emotion.get("timeline", [])
     if not timeline:
-        return
+        return None
     ts = [s["t"] / 1000.0 for s in timeline]
     boundaries = [timeline[i]["t"] / 1000.0 for i in range(1, len(timeline))
                   if timeline[i]["turn"] != timeline[i - 1]["turn"]]
@@ -115,32 +120,53 @@ def _build_emotion_chart(path: str, emotion: dict) -> None:
     ax.legend(loc="upper right", ncol=4, fontsize=8)
     fig.suptitle("Emotion over time (red = new question)")
     fig.tight_layout()
-    fig.savefig(path, dpi=120)
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=120)
     plt.close(fig)
+    buf.seek(0)
+    return buf.read()
 
 
-def save_session(session_dir: str, frames: list[dict], transcript: dict,
+def save_session(session_id: str, frames: list[dict], transcript: dict,
                  summary: dict, coaching: dict | None) -> None:
-    os.makedirs(session_dir, exist_ok=True)
-    _write_csv(os.path.join(session_dir, "data.csv"), frames)
-    with open(os.path.join(session_dir, "data.json"), "w", encoding="utf-8") as fh:
-        json.dump(frames, fh)
+    prefix = f"sessions/{session_id}"
+
+    # Generate all content on this thread first (matplotlib is not thread-safe).
     out = dict(summary)
     out["coaching"] = coaching
-    with open(os.path.join(session_dir, "summary.json"), "w", encoding="utf-8") as fh:
-        json.dump(out, fh, indent=2)
-    with open(os.path.join(session_dir, "transcript.txt"), "w", encoding="utf-8") as fh:
-        fh.write(transcript.get("full_text", ""))
-    _build_charts(os.path.join(session_dir, "charts.png"), frames)
+    uploads = [
+        (f"{prefix}/data.csv",       _csv_bytes(frames),                    "text/csv"),
+        (f"{prefix}/data.json",      json.dumps(frames).encode(),            "application/json"),
+        (f"{prefix}/summary.json",   json.dumps(out, indent=2).encode(),     "application/json"),
+        (f"{prefix}/transcript.txt", transcript.get("full_text", "").encode(),"text/plain"),
+        (f"{prefix}/charts.png",     _charts_png(frames),                    "image/png"),
+    ]
     emotion = summary.get("emotion") or {}
     if emotion.get("available"):
         try:
-            _build_emotion_chart(os.path.join(session_dir, "emotion.png"), emotion)
-        except Exception as exc:  # a malformed emotion payload must not lose the session
+            png = _emotion_png(emotion)
+            if png:
+                uploads.append((f"{prefix}/emotion.png", png, "image/png"))
+        except Exception as exc:
             logging.warning("emotion chart skipped: %s", exc)
+
     emotion_mp = summary.get("emotion_mediapipe") or {}
     if emotion_mp.get("available"):
         try:
-            _build_emotion_chart(os.path.join(session_dir, "emotion_mediapipe.png"), emotion_mp)
-        except Exception as exc:  # a malformed payload must not lose the session
+            png = _emotion_png(emotion_mp)
+            if png:
+                uploads.append((f"{prefix}/emotion_mediapipe.png", png, "image/png"))
+        except Exception as exc:
             logging.warning("mediapipe emotion chart skipped: %s", exc)
+
+    # Upload all files in parallel.
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        futs = [ex.submit(storage.put, key, body, ct) for key, body, ct in uploads]
+        for f in as_completed(futs):
+            f.result()  # re-raise any S3 error immediately
+
+    # Update the session index so list_sessions stays fast.
+    try:
+        sessions_store.add_to_index(session_id, summary)
+    except Exception as exc:
+        logging.warning("index update failed (non-fatal): %s", exc)

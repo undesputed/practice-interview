@@ -47,6 +47,16 @@ function showStart(label){ const b = byId('lv-start'); if (b){ b.style.display =
 
 function onStats(s){ setText('lv-time', fmtTime(s.elapsedMs)); }
 
+const SCORE_STEPS = ['Analyzing camera & presence', 'Analyzing your voice', 'Generating your report'];
+function showScoreSteps(activeIdx){
+  const el = byId('lv-steps'); if (!el) return;
+  el.innerHTML = SCORE_STEPS.map((s, i) =>
+    '<div class="lv-step ' + (i < activeIdx ? 'done' : i === activeIdx ? 'active' : '') + '">' + s + '</div>'
+  ).join('');
+  el.style.display = 'flex';
+}
+function hideScoreSteps(){ const el = byId('lv-steps'); if (el) el.style.display = 'none'; }
+
 const LIVE_FACS = [
   ['mouthSmileLeft',  'Smile'],
   ['browInnerUp',     'Brow up'],
@@ -224,11 +234,13 @@ async function submitScore(payload){
   try {
     const resp = await api.createSession(payload);
     pendingScore = null;
-    location.hash = '#/thanks/' + resp.session_id;   // thank-you page; results via its button or Progress
+    hideScoreSteps();
+    location.hash = '#/thanks/' + resp.session_id;
   } catch (e){
     pendingScore = payload;
+    hideScoreSteps();
     setState('Error'); setVoice('—');
-    overlay('Couldn’t score the interview.');
+    overlay("Couldn’t score the interview.");
     showStart('Retry scoring');
   }
 }
@@ -239,28 +251,27 @@ async function finishInterview(){
   if (finishing) return;
   finishing = true;
   stopMetrics();
-  // Show the loading state immediately, before tearing down / awaiting the recorder.
-  showControls(false); loading('Wrapping up…'); setState('Processing…'); setVoice('—');
-  const frames = engine.getFrames().slice();   // copy before stop() releases it
+  showControls(false); loading('Scoring your interview…'); setState('Processing…'); setVoice('—');
+  showScoreSteps(0);
+  const frames = engine.getFrames().slice();
   const rec = recorder; recorder = null;
   stopAgent();
-  const audio = rec ? await rec.stop() : null;   // finalize the recording before we drop the stream
+  const audio = rec ? await rec.stop() : null;
   engine.stop();
 
   if (!frames.length){
-    overlay('Nothing to score.'); showStart('Start');
+    hideScoreSteps(); overlay('Nothing to score.'); showStart('Start');
     return;
   }
 
-  // Voice (Delivery) analysis — non-fatal; a failure just omits the Delivery signal.
   let voice = null;
   if (audio && audio.blob){
-    loading('Analyzing your voice… (step 1 of 2)');
+    showScoreSteps(1);
     const acoustic = await computeAcousticFeatures(audio.blob);
     voice = await api.analyzeVoice(audio.blob, acoustic || {});
   }
 
-  loading('Generating your results… (step 2 of 2)');
+  showScoreSteps(2);
   const full_text = segments
     .map((s) => (s.speaker === 'interviewer' ? 'INTERVIEWER: ' : 'CANDIDATE: ') + s.text)
     .join('\n');
@@ -428,7 +439,7 @@ export function live(){
         '<div class="lv-wpm-row"><span class="lv-wpm-num" id="lm-wpm">—</span><span class="lv-wpm-unit">wpm</span></div>' +
       '</div>' +
     '</aside>' +
-    '<div class="li-ph" id="lv-ph"><span class="li-spin" id="lv-spin"></span><span id="lv-ph-txt">Loading model…</span></div>' +
+    '<div class="li-ph" id="lv-ph"><span class="li-spin" id="lv-spin"></span><span id="lv-ph-txt">Loading model…</span><div class="lv-steps" id="lv-steps" style="display:none"></div></div>' +
     '<button class="li-start" id="lv-start" type="button" style="display:none">Start</button>' +
     '<aside class="li-transcript" id="lv-transcript">' +
       '<div class="li-tx-head"><h3>Conversation</h3><button class="li-tx-close" id="lv-tx-close" type="button" aria-label="Close">✕</button></div>' +
