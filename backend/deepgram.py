@@ -67,10 +67,10 @@ TONE_GUIDANCE = {
 
 # Tone -> Deepgram Aura-2 voice (verified IDs). Falls back to TTS_MODEL.
 TONE_VOICE = {
-    "Friendly": "aura-2-helena-en",       # Caring, Natural, Friendly
-    "Professional": "aura-2-thalia-en",   # current default voice (unchanged)
-    "Stern": "aura-2-saturn-en",          # Knowledgeable, Confident, Baritone
-    "Intimidating": "aura-2-zeus-en",     # Deep, Trustworthy, Smooth
+    "Friendly":     "aura-2-amalthea-en",  # female, warm
+    "Professional": "aura-2-thalia-en",    # female, balanced
+    "Stern":        "aura-2-hera-en",      # female, authoritative
+    "Intimidating": "aura-2-athena-en",    # female, commanding
 }
 
 # Japanese Aura-2 voices by tone.
