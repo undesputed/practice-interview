@@ -406,7 +406,9 @@ body.live-immersive .content{padding:0}
   background:rgba(10,18,14,.88);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
   border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:14px 16px;color:#fff;
   opacity:0;transform:translateY(-8px) scale(.97);transform-origin:top left;pointer-events:none;
-  transition:opacity .22s ease,transform .22s ease}
+  transition:opacity .22s ease,transform .22s ease;
+  scrollbar-width:none}
+.li-stats::-webkit-scrollbar{display:none}
 .li-stats.open{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
 .li-st-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .li-st-head h3{font-size:14px;font-weight:700;font-family:var(--font-display);color:#fff}
@@ -415,6 +417,11 @@ body.live-immersive .content{padding:0}
 .lv-section{border-top:1px solid rgba(255,255,255,.1);padding:10px 0}
 .lv-section:first-of-type{border-top:none;padding-top:0}
 .lv-sec-lbl{font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-bottom:8px}
+.lv-expr-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.lv-expr-head .lv-sec-lbl{margin-bottom:0}
+.lv-dom-chip{text-align:right}
+.lv-dom-name{display:block;font-size:15px;font-weight:700;color:var(--brand);text-transform:capitalize;line-height:1.1}
+.lv-dom-pct{display:block;font-size:10px;color:rgba(255,255,255,.45);margin-top:1px}
 /* presence score cards */
 .lv-score-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:2px}
 .lv-score-card{background:rgba(255,255,255,.09);border-radius:10px;padding:10px 6px;text-align:center}

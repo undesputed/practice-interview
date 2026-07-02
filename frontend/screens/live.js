@@ -82,7 +82,9 @@ function updateLiveStats(){
 
   const dom = dominantEmotion(bs);
   const domEl = byId('lm-emo-dom');
+  const domPct = byId('lm-emo-pct');
   if (domEl) domEl.textContent = (dom && dom.emotion) ? dom.emotion : '—';
+  if (domPct) domPct.textContent = (dom && dom.value != null) ? Math.round(dom.value) + '%' : '';
 
   const scores = emotionScores(bs);
   const emoBarsEl = byId('lm-emo-bars');
@@ -402,7 +404,10 @@ export function live(){
         '</div>' +
       '</div>' +
       '<div class="lv-section">' +
-        '<div class="lv-sec-lbl">Expression · <span id="lm-emo-dom">—</span></div>' +
+        '<div class="lv-expr-head">' +
+          '<span class="lv-sec-lbl">Expression</span>' +
+          '<div class="lv-dom-chip"><span class="lv-dom-name" id="lm-emo-dom">—</span><span class="lv-dom-pct" id="lm-emo-pct"></span></div>' +
+        '</div>' +
         '<div id="lm-emo-bars"></div>' +
       '</div>' +
       '<div class="lv-section">' +
