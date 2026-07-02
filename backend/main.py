@@ -1,4 +1,5 @@
 # backend/main.py
+import asyncio
 import logging
 import os
 import json
@@ -199,7 +200,7 @@ async def voice_analyze(meta: str = Form(...), audio: UploadFile = File(...)):
 
 
 @app.post("/api/session")
-def session(req: SessionRequest):
+async def session(req: SessionRequest):
     if not req.frames:
         raise HTTPException(400, "no frames captured")
     questions = questions_from_transcript(req.transcript.get("segments", []))
@@ -214,28 +215,35 @@ def session(req: SessionRequest):
         summary["emotion_mediapipe"].get("overall_distribution", {}))
     summary["voice"] = req.voice if (req.voice and req.voice.get("available")) else {"available": False}
 
-    coaching = None
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
     full_text = req.transcript.get("full_text", "")
     run_claude = bool(anthropic_key and full_text.strip())
-    if run_claude:
-        try:
-            coaching = generate_coaching(anthropic_key, full_text, req.role, req.scenario)
-        except Exception as exc:
-            logging.warning("coaching unavailable: %s", exc)
 
     # Fused readiness verdict: Delivery (voice) + Presence (composites) + Content (Claude).
     presence = verdict_mod.presence_score(summary["overall"])
     delivery = summary["voice"].get("delivery_score") if summary["voice"].get("available") else None
+
+    coaching = None
     explanation = None
     content = None
+
     if run_claude:
-        try:
-            explanation = generate_verdict(anthropic_key, full_text, req.role, delivery, presence,
-                                           req.scenario)
-            content = explanation.get("content_score")
-        except Exception as exc:
-            logging.warning("verdict unavailable: %s", exc)
+        # Run coaching and verdict in parallel — they are independent Claude calls.
+        raw = await asyncio.gather(
+            asyncio.to_thread(generate_coaching, anthropic_key, full_text, req.role, req.scenario),
+            asyncio.to_thread(generate_verdict, anthropic_key, full_text, req.role, delivery,
+                              presence, req.scenario),
+            return_exceptions=True,
+        )
+        if isinstance(raw[0], Exception):
+            logging.warning("coaching unavailable: %s", raw[0])
+        else:
+            coaching = raw[0]
+        if isinstance(raw[1], Exception):
+            logging.warning("verdict unavailable: %s", raw[1])
+        else:
+            explanation = raw[1]
+            content = explanation.get("content_score") if explanation else None
     readiness = verdict_mod.compute_readiness(delivery, presence, content)
     summary["verdict"] = {
         "readiness_score": readiness["readiness_score"],

@@ -72,9 +72,17 @@ function updateLiveStats(){
 
   const m = computeLiveMetrics(frames, segments);
   if (m){
-    const att = byId('lm-att'); if (att) att.textContent = m.attention;
-    const comp = byId('lm-comp'); if (comp) comp.textContent = m.composure;
-    const eye = byId('lm-eye'); if (eye) eye.textContent = m.eyeContact + '%';
+    const setCard = (numId, barId, val, suffix) => {
+      const el = byId(numId);
+      if (el){
+        el.textContent = val + (suffix || '');
+        el.className = 'lv-score-num ' + (val >= 70 ? 'lv-good' : val >= 50 ? 'lv-mid' : 'lv-low');
+      }
+      const bar = byId(barId); if (bar) bar.style.width = Math.max(0, Math.min(100, val)) + '%';
+    };
+    setCard('lm-att',  'lm-att-bar',  m.attention, '');
+    setCard('lm-comp', 'lm-comp-bar', m.composure, '');
+    setCard('lm-eye',  'lm-eye-bar',  m.eyeContact, '%');
   }
 
   const latest = allFrames[allFrames.length - 1];
@@ -232,7 +240,7 @@ async function finishInterview(){
   finishing = true;
   stopMetrics();
   // Show the loading state immediately, before tearing down / awaiting the recorder.
-  showControls(false); loading('Processing…'); setState('Processing…'); setVoice('—');
+  showControls(false); loading('Wrapping up…'); setState('Processing…'); setVoice('—');
   const frames = engine.getFrames().slice();   // copy before stop() releases it
   const rec = recorder; recorder = null;
   stopAgent();
@@ -247,11 +255,12 @@ async function finishInterview(){
   // Voice (Delivery) analysis — non-fatal; a failure just omits the Delivery signal.
   let voice = null;
   if (audio && audio.blob){
-    loading('Analyzing your voice…');
+    loading('Analyzing your voice… (step 1 of 2)');
     const acoustic = await computeAcousticFeatures(audio.blob);
     voice = await api.analyzeVoice(audio.blob, acoustic || {});
   }
 
+  loading('Generating your results… (step 2 of 2)');
   const full_text = segments
     .map((s) => (s.speaker === 'interviewer' ? 'INTERVIEWER: ' : 'CANDIDATE: ') + s.text)
     .join('\n');
@@ -398,9 +407,9 @@ export function live(){
       '<div class="lv-section">' +
         '<div class="lv-sec-lbl">Presence</div>' +
         '<div class="lv-score-grid">' +
-          '<div class="lv-score-card"><div class="lv-score-num" id="lm-att">—</div><div class="lv-score-lbl">Attention</div></div>' +
-          '<div class="lv-score-card"><div class="lv-score-num" id="lm-comp">—</div><div class="lv-score-lbl">Composure</div></div>' +
-          '<div class="lv-score-card"><div class="lv-score-num" id="lm-eye">—</div><div class="lv-score-lbl">Eye contact</div></div>' +
+          '<div class="lv-score-card"><div class="lv-score-num" id="lm-att">—</div><div class="lv-score-lbl">Attention</div><div class="lv-score-bar"><i id="lm-att-bar"></i></div></div>' +
+          '<div class="lv-score-card"><div class="lv-score-num" id="lm-comp">—</div><div class="lv-score-lbl">Composure</div><div class="lv-score-bar"><i id="lm-comp-bar"></i></div></div>' +
+          '<div class="lv-score-card"><div class="lv-score-num" id="lm-eye">—</div><div class="lv-score-lbl">Eye contact</div><div class="lv-score-bar"><i id="lm-eye-bar"></i></div></div>' +
         '</div>' +
       '</div>' +
       '<div class="lv-section">' +
