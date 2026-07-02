@@ -78,7 +78,7 @@ function view(sessions){
   if (!sessions.length){
     return '<div class="placeholder-card"><p>No interviews to chart yet.</p>' +
       '<p class="muted">Finish a session or two and your trends show up here.</p>' +
-      '<p style="margin-top:12px"><a class="btn btn-green" style="text-decoration:none" href="#/new">＋ New interview</a></p></div>';
+      '<p style="margin-top:12px"><a class="btn btn-green" style="text-decoration:none" href="#/practice-interview">＋ New practice interview</a></p></div>';
   }
   const intro = '<p class="muted" style="font-size:13px;margin:-6px 0 16px">' +
     'Trends across your ' + sessions.length + ' session' + (sessions.length === 1 ? '' : 's') +

@@ -4,7 +4,7 @@ import { history } from './history.js';
 import { report } from './report.js';
 import { facial } from './facial.js';
 import { progress } from './progress.js';
-import { newInterview } from './new.js';
+import { newInterview } from './practice-interview.js';
 import { live } from './live.js';
 import { thanks } from './thanks.js';
 
@@ -13,7 +13,7 @@ export const screens = [
   ['/',            dashboard],
   ['/history',     history],
   ['/progress',    progress],
-  ['/new',         newInterview],
+  ['/practice-interview',         newInterview],
   ['/live',        live],
   ['/thanks/:id',  thanks],
   ['/thanks',      thanks],

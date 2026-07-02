@@ -95,6 +95,6 @@ export function history(){
     }
   });
   return '<div class="screen"><div class="screen-head"><h1>History</h1>' +
-    '<a class="btn btn-green" style="text-decoration:none" href="#/new">＋ New interview</a></div>' +
+    '<a class="btn btn-green" style="text-decoration:none" href="#/practice-interview">＋ New practice interview</a></div>' +
     '<div id="history-body"><p class="muted">Loading…</p></div></div>';
 }

@@ -13,7 +13,7 @@ export function thanks(params){
     '<div class="thanks-actions">' +
       viewBtn +
       '<a class="btn btn-ghost" style="text-decoration:none" href="#/progress">See your progress</a>' +
-      '<a class="btn btn-ghost" style="text-decoration:none" href="#/new">New interview</a>' +
+      '<a class="btn btn-ghost" style="text-decoration:none" href="#/practice-interview">New practice interview</a>' +
     '</div>' +
   '</div></div>';
 }
