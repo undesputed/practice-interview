@@ -342,6 +342,7 @@ body.live-immersive .content{padding:0}
 
 .li-top{position:absolute;top:16px;left:16px;right:16px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;z-index:4}
 .li-left{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.li-right{display:flex;gap:8px;align-items:center}
 .li-pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;padding:6px 11px;border-radius:var(--r-pill);background:rgba(0,0,0,.45);color:#fff;border:none;font-family:inherit}
 .li-pill.ghost{background:rgba(255,255,255,.88);color:#16201b;cursor:pointer}
 .li-pill.live{background:var(--brand)}
