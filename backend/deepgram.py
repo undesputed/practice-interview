@@ -26,6 +26,14 @@ SCENARIO_GREETING = {
     "language": "Hi! Let's chat. Whenever you're ready, feel free to start.",
 }
 
+SCENARIO_GREETING_JA = {
+    "present":  "こんにちは。準備ができましたら、プレゼンテーションを始めてください。",
+    "tough":    "こんにちは。私が相手役を担当します。準備ができましたらどうぞ。",
+    "pitch":    "こんにちは。お時間をいただきありがとうございます。準備ができましたらピッチをお願いします。",
+    "teach":    "こんにちは！準備ができましたら、説明を始めてください。",
+    "language": "こんにちは！準備ができましたら、自由に話し始めてください。",
+}
+
 # How the Practice Interview "Focus" choice shapes the kinds of questions Claude asks.
 FOCUS_GUIDANCE = {
     "Behavioral": "Ask behavioral and situational questions, and encourage STAR-style answers "
@@ -132,10 +140,25 @@ def build_interviewer_prompt(role: str, focus: str = "Mixed", difficulty: str = 
         f"Do not ask another question. Do not offer feedback. Do not say anything after "
         f"calling end_interview."
     )
-    return intro + tts + body + conduct + ending_rule
+    lang_rule = (
+        " LANGUAGE RULE — this is mandatory: you MUST speak and respond in Japanese at all "
+        "times throughout this session, including your goodbye. Never switch to English."
+    ) if language == "ja" else ""
+    return intro + tts + body + conduct + ending_rule + lang_rule
 
 
-def build_greeting(role: str, has_questions: bool = False, scenario: str = "job") -> str:
+def build_greeting(role: str, has_questions: bool = False, scenario: str = "job",
+                   language: str = "en") -> str:
+    if language == "ja":
+        if scenario != "job":
+            return SCENARIO_GREETING_JA.get(scenario, SCENARIO_GREETING_JA["present"])
+        role_ja = role or "一般"
+        if has_questions:
+            return (f"こんにちは。本日は面接にお越しいただきありがとうございます。"
+                    f"{role_ja}のポジションの面接を始めましょう。")
+        return (f"こんにちは。本日は面接にお越しいただきありがとうございます。"
+                f"{role_ja}のポジションについてお話しします。"
+                f"準備ができましたら、まず自己紹介をお願いします。")
     if scenario != "job":
         # Non-job scenarios don't use the self-intro-as-Q1 pattern, so the same
         # greeting works for both bound and improv mode.
@@ -188,7 +211,7 @@ def build_agent_config(role: str, focus: str = "Mixed", difficulty: str = "Reali
                 }],
             },
             "speak": {"provider": {"type": "deepgram", "model": speak_model}},
-            "greeting": build_greeting(role, bool(questions), scenario),
+            "greeting": build_greeting(role, bool(questions), scenario, language),
         },
     }
 
