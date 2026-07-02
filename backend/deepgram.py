@@ -75,10 +75,10 @@ TONE_VOICE = {
 
 # Japanese Aura-2 voices by tone.
 TONE_VOICE_JA = {
-    "Friendly":     "aura-2-izanami-ja",
-    "Professional": "aura-2-fujin-ja",
-    "Stern":        "aura-2-ebisu-ja",
-    "Intimidating": "aura-2-uzume-ja",
+    "Friendly":     "aura-2-izanami-ja",   # female
+    "Professional": "aura-2-ama-ja",        # female
+    "Stern":        "aura-2-uzume-ja",      # female
+    "Intimidating": "aura-2-uzume-ja",      # female
 }
 
 
@@ -181,7 +181,7 @@ def build_agent_config(role: str, focus: str = "Mixed", difficulty: str = "Reali
     if role:
         keyterms.append(role)
     voice_map = TONE_VOICE_JA if language == "ja" else TONE_VOICE
-    speak_model = voice_map.get(tone, "aura-2-fujin-ja" if language == "ja" else TTS_MODEL)
+    speak_model = voice_map.get(tone, "aura-2-izanami-ja" if language == "ja" else TTS_MODEL)
     return {
         "type": "Settings",
         "audio": {
