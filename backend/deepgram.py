@@ -65,19 +65,30 @@ TONE_VOICE = {
     "Intimidating": "aura-2-zeus-en",     # Deep, Trustworthy, Smooth
 }
 
+# Japanese Aura-2 voices by tone.
+TONE_VOICE_JA = {
+    "Friendly":     "aura-2-izanami-ja",
+    "Professional": "aura-2-fujin-ja",
+    "Stern":        "aura-2-ebisu-ja",
+    "Intimidating": "aura-2-uzume-ja",
+}
+
 
 def build_interviewer_prompt(role: str, focus: str = "Mixed", difficulty: str = "Realistic",
                              question_count: int = 5, questions=None,
-                             tone: str = "Professional", scenario: str = "job") -> str:
+                             tone: str = "Professional", scenario: str = "job",
+                             language: str = "en") -> str:
     """System prompt for the Claude 'think' provider. In 'bound mode' (a question list is
     given) the interviewer asks those exact questions in order; otherwise it improvises.
     The `scenario` controls the AI persona and session framing."""
+    lang_line = ("Conduct the entire interview in Japanese. Ask all questions in Japanese "
+                 "and respond only in Japanese. ") if language == "ja" else ""
     focus_line = FOCUS_GUIDANCE.get(focus, FOCUS_GUIDANCE["Mixed"])
     difficulty_line = DIFFICULTY_GUIDANCE.get(difficulty, DIFFICULTY_GUIDANCE["Realistic"])
     tone_line = TONE_GUIDANCE.get(tone, TONE_GUIDANCE["Professional"])
     role_ctx = f" for the {role} role" if role else ""
     intro_tmpl = SCENARIO_INTRO.get(scenario, SCENARIO_INTRO["job"])
-    intro = (f"{intro_tmpl.format(role=role or 'general', role_ctx=role_ctx)} "
+    intro = (f"{lang_line}{intro_tmpl.format(role=role or 'general', role_ctx=role_ctx)} "
              f"{focus_line} {difficulty_line} {tone_line} ")
     tts = ("Everything you say is read aloud by a text-to-speech voice, so reply in plain, "
            "natural spoken sentences only — no markdown, asterisks, bullet points, headings, "
@@ -140,11 +151,14 @@ def build_greeting(role: str, has_questions: bool = False, scenario: str = "job"
 
 def build_agent_config(role: str, focus: str = "Mixed", difficulty: str = "Realistic",
                        question_count: int = 5, questions=None,
-                       tone: str = "Professional", scenario: str = "job") -> dict:
+                       tone: str = "Professional", scenario: str = "job",
+                       language: str = "en") -> dict:
     """Deepgram Voice Agent Settings payload (sent as first WS message)."""
     keyterms = ["STAR", "behavioral", "strengths", "weaknesses"]
     if role:
         keyterms.append(role)
+    voice_map = TONE_VOICE_JA if language == "ja" else TONE_VOICE
+    speak_model = voice_map.get(tone, "aura-2-fujin-ja" if language == "ja" else TTS_MODEL)
     return {
         "type": "Settings",
         "audio": {
@@ -152,13 +166,13 @@ def build_agent_config(role: str, focus: str = "Mixed", difficulty: str = "Reali
             "output": {"encoding": "linear16", "sample_rate": 24000, "container": "none"},
         },
         "agent": {
-            "language": "en",
+            "language": language,
             "listen": {"provider": {"type": "deepgram", "model": "nova-3",
-                                    "keyterms": keyterms}},
+                                    "language": language, "keyterms": keyterms}},
             "think": {
                 "provider": {"type": "anthropic", "model": THINK_MODEL},
                 "prompt": build_interviewer_prompt(role, focus, difficulty, question_count,
-                                                   questions, tone, scenario),
+                                                   questions, tone, scenario, language),
                 # Client-side function (no server endpoint) the interviewer calls when the
                 # session is over. The browser ACKs it and closes the socket, which ends
                 # and scores the session. Without this the agent never stops on its own.
@@ -173,7 +187,7 @@ def build_agent_config(role: str, focus: str = "Mixed", difficulty: str = "Reali
                     "parameters": {"type": "object", "properties": {}},
                 }],
             },
-            "speak": {"provider": {"type": "deepgram", "model": TONE_VOICE.get(tone, TTS_MODEL)}},
+            "speak": {"provider": {"type": "deepgram", "model": speak_model}},
             "greeting": build_greeting(role, bool(questions), scenario),
         },
     }

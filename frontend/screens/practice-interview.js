@@ -35,12 +35,14 @@ function currentSettings(root) {
   const onText = (sel, fb) => { const el = root.querySelector(sel); return el ? el.textContent.trim() : fb; };
   const sc = root.querySelector('.role-card.on');
   const rc = root.querySelector('#role-chips .role-card.on');
+  const langBtn = root.querySelector('[data-group="language"] button.on');
   return {
     scenario:       sc  ? sc.dataset.scenario                       : 'job',
     role:           (sc && sc.dataset.scenario === 'job' && rc) ? [rc.querySelector('.rt'), rc.querySelector('.rd')].filter(Boolean).map((el) => el.textContent.trim()).join(' ') : '',
     focus:          onText('[data-group="focus"] button.on',      'Mixed'),
     difficulty:     onText('[data-group="difficulty"] button.on', 'Realistic'),
     question_count: parseInt(root.querySelector('#ni-qval').textContent, 10) || 5,
+    language:       langBtn ? langBtn.dataset.lang : 'en',
   };
 }
 
@@ -182,7 +184,9 @@ function saveSettings(root) {
   const difficulty    = onText('[data-group="difficulty"] button.on', 'Realistic');
   const tone          = onText('[data-group="tone"] button.on',       'Professional');
   const questionCount = parseInt(root.querySelector('#ni-qval').textContent, 10) || 5;
-  setInterviewConfig({ scenario, role, focus, difficulty, tone, questionCount, questions: generatedQuestions });
+  const langBtn       = root.querySelector('[data-group="language"] button.on');
+  const language      = langBtn ? langBtn.dataset.lang : 'en';
+  setInterviewConfig({ scenario, role, focus, difficulty, tone, questionCount, questions: generatedQuestions, language });
 }
 
 export function newInterview() {
@@ -288,6 +292,8 @@ export function newInterview() {
             '<button>Warm-up</button><button class="on">Realistic</button><button>Hard</button></div></div>' +
           '<div><span class="ql">Tone</span><div class="ni-seg" data-group="tone">' +
             '<button>Friendly</button><button class="on">Professional</button><button>Stern</button><button>Intimidating</button></div></div>' +
+          '<div><span class="ql">Language</span><div class="ni-seg" data-group="language">' +
+            '<button class="on" data-lang="en">English</button><button data-lang="ja">日本語</button></div></div>' +
           '<div><span class="ql">Questions</span><div class="stepper">' +
             '<button data-step="-1">−</button><span class="val" id="ni-qval">6</span><button data-step="1">+</button></div></div>' +
         '</div>' +

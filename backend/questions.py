@@ -39,16 +39,17 @@ def parse_questions(raw: str) -> list:
 
 
 def generate_questions(api_key: str, role: str, focus: str, difficulty: str, n: int,
-                       scenario: str = "job") -> list:
+                       scenario: str = "job", language: str = "en") -> list:
     """One Claude call returning up to `n` scenario-appropriate questions for the settings."""
     n = max(1, int(n))
     focus_line = FOCUS_GUIDANCE.get(focus, FOCUS_GUIDANCE["Mixed"])
     difficulty_line = DIFFICULTY_GUIDANCE.get(difficulty, DIFFICULTY_GUIDANCE["Realistic"])
     scenario_ctx = SCENARIO_QUESTION_CONTEXT.get(scenario, SCENARIO_QUESTION_CONTEXT["job"])
+    lang_instruction = " Write all questions in Japanese." if language == "ja" else ""
     system_prompt = (
         f"{scenario_ctx} Given a scenario, role, focus, and difficulty, return ONLY a JSON array "
         "of concise questions or prompts (strings) tailored to them — no preamble, no numbering, "
-        "no markdown, just the JSON array."
+        f"no markdown, just the JSON array.{lang_instruction}"
     )
     item_word = "questions" if scenario == "job" else "questions or prompts"
     client = Anthropic(api_key=api_key)

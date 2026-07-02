@@ -42,6 +42,7 @@ class TokenRequest(BaseModel):
     question_count: int = 5
     questions: list[str] = []
     tone: str = "Professional"
+    language: str = "en"
 
 
 class QuestionsRequest(BaseModel):
@@ -50,6 +51,7 @@ class QuestionsRequest(BaseModel):
     focus: str = "Mixed"
     difficulty: str = "Realistic"
     question_count: int = 5
+    language: str = "en"
 
 
 class SessionRequest(BaseModel):
@@ -104,7 +106,8 @@ async def interview_token(req: TokenRequest):
     return {"url": DEEPGRAM_AGENT_URL, "token": token, "scheme": scheme,
             "config": build_agent_config(req.role, req.focus, req.difficulty,
                                          req.question_count, req.questions,
-                                         tone=req.tone, scenario=req.scenario)}
+                                         tone=req.tone, scenario=req.scenario,
+                                         language=req.language)}
 
 
 @app.post("/api/questions")
@@ -116,7 +119,7 @@ def questions_endpoint(req: QuestionsRequest):
         return {"questions": []}
     try:
         qs = generate_questions(api_key, req.role, req.focus, req.difficulty,
-                                req.question_count, req.scenario)
+                                req.question_count, req.scenario, req.language)
     except Exception as exc:  # network / model failure -> degrade
         logging.warning("question generation unavailable: %s", exc)
         return {"questions": []}
