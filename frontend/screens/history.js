@@ -46,7 +46,7 @@ async function onClick(e){
   if (act === 'view'){ location.hash = '#/session/' + encodeURIComponent(id); return; }
   if (act === 'delete'){
     if (!confirm('Delete this session permanently?')) return;
-    try { await api.deleteSession(id); CACHE = CACHE.filter((s) => s.id !== id); paint(); }
+    try { await api.deleteSession(id); CACHE = CACHE.filter((s) => s.id !== id); api.updateSessionsCache(CACHE); paint(); }
     catch (err){ alert('Delete failed: ' + (err.message || err)); }
     return;
   }
@@ -57,7 +57,7 @@ async function onClick(e){
     try {
       await api.renameSession(id, label);
       const row = CACHE.find((s) => s.id === id); if (row) row.label = label;
-      paint();
+      api.updateSessionsCache(CACHE); paint();
     } catch (err){ alert('Rename failed: ' + (err.message || err)); }
   }
 }
@@ -72,8 +72,9 @@ export function history(){
     if (!root) return;
     try {
       const data = await api.listSessions();
+      const sessions = data.sessions || [];
       if (!document.body.contains(root)) return;
-      CACHE = data.sessions || [];
+      CACHE = sessions;
       root.innerHTML =
         '<div class="filters">' +
           '<input id="history-q" class="field grow" placeholder="Search by role or label…">' +
@@ -95,6 +96,6 @@ export function history(){
     }
   });
   return '<div class="screen"><div class="screen-head"><h1>History</h1>' +
-    '<a class="btn btn-green" style="text-decoration:none" href="#/new">＋ New interview</a></div>' +
+    '<a class="btn btn-green" style="text-decoration:none" href="#/practice-interview">＋ New practice interview</a></div>' +
     '<div id="history-body"><p class="muted">Loading…</p></div></div>';
 }

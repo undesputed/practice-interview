@@ -24,8 +24,7 @@ function recentRow(s){
 function view(sessions){
   if (!sessions.length){
     return '<div class="placeholder-card"><p>No interviews yet.</p>' +
-      '<p class="muted">Start your first one to see stats and history here.</p>' +
-      '<p style="margin-top:12px"><a class="btn btn-green" style="text-decoration:none" href="#/new">＋ New interview</a></p></div>';
+      '<p class="muted">Start your first one to see stats and history here.</p>'
   }
   const conf = mean(sessions.map((s) => s.scores.confidence));
   const nerv = mean(sessions.map((s) => s.scores.nervousness));
@@ -57,6 +56,6 @@ export function dashboard(){
     }
   });
   return '<div class="screen"><div class="screen-head"><h1>Dashboard</h1>' +
-    '<a class="btn btn-green" style="text-decoration:none" href="#/new">＋ New interview</a></div>' +
+    '<a class="btn btn-green" style="text-decoration:none" href="#/practice-interview">＋ New practice interview</a></div>' +
     '<div id="dashboard-body"><p class="muted">Loading…</p></div></div>';
 }

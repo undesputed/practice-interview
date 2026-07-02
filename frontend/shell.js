@@ -5,7 +5,7 @@ const NAV = [
     { path: '/',         icon: '◷', label: 'Dashboard' },
     { path: '/history',  icon: '▤', label: 'History' },
     { path: '/progress', icon: '◴', label: 'Progress' },
-    { path: '/new',      icon: '＋', label: 'Practice Interview' },
+    { path: '/practice-interview',      icon: '＋', label: 'Practice Interview' },
   ]},
   { group: 'Live tools', items: [
     { path: '/facial', icon: '◉', label: 'Facial Analysis' },

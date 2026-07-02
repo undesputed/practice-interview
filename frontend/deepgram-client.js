@@ -87,8 +87,15 @@ export function startVoiceAgent({ url, token, scheme, config, micStream, onTrans
           if (f.name === "end_interview") endRequested = true;
         }
         if (endRequested) {
-          if (nextStart <= outCtx.currentTime + 0.05) setTimeout(closeForEnd, 600); // goodbye already done
-          setTimeout(closeForEnd, 8000);                                            // hard fallback
+          // AgentAudioDone is the primary close signal — fires when goodbye TTS finishes.
+          // This fallback covers the edge case where FunctionCallRequest arrives *after*
+          // audio is already done (AgentAudioDone won't fire again). The 2500ms window
+          // gives any in-flight goodbye TTS time to arrive and start playing before we
+          // check; if audio is still playing we skip and let AgentAudioDone close instead.
+          setTimeout(() => {
+            if (!closedForEnd && nextStart <= outCtx.currentTime + 0.1) closeForEnd();
+          }, 2500);
+          setTimeout(closeForEnd, 8000); // absolute hard fallback
         }
       } else if (msg.type === "AgentAudioDone") {
         if (endRequested) closeForEnd();   // goodbye finished — end the interview

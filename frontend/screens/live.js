@@ -5,6 +5,8 @@ import { api } from '../api.js';
 import { esc } from '../util.js';
 import { startRecording } from '../audio-recorder.js';
 import { computeAcousticFeatures } from '../acoustic-features.js';
+import { computeLiveMetrics } from '../live-metrics.js';
+import { emotionScores, dominantEmotion } from '../emotion.js';
 
 let agent = null;          // active Deepgram voice agent, or null
 let convoCount = 0;        // conversation lines seen this run
@@ -18,9 +20,11 @@ let finishing = false;     // guard so End + agent-close don't double-submit; st
 let pendingScore = null;   // payload from a failed score POST, kept for retry
 let recorder = null;       // active audio recorder handle, or null
 let role = '';             // interview role captured at start
+let scenario = 'job';     // interview scenario captured at start
 let muted = false;         // mic muted?
 let camOn = true;          // camera on?
 let leaveHandler = null;   // active hashchange teardown listener, so re-entry can't stack them
+let metricsInterval = null;
 
 const MIC_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"></rect><path d="M5 10v2a7 7 0 0 0 14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line><line x1="8" y1="22" x2="16" y2="22"></line></svg>';
 const CAM_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2"></rect></svg>';
@@ -42,6 +46,97 @@ function overlay(text){ setOverlay(text, false); }   // text only (errors), or n
 function showStart(label){ const b = byId('lv-start'); if (b){ b.style.display = label ? '' : 'none'; if (label) b.textContent = label; } }
 
 function onStats(s){ setText('lv-time', fmtTime(s.elapsedMs)); }
+
+const SCORE_STEPS = ['Analyzing camera & presence', 'Analyzing your voice', 'Generating your report'];
+function showScoreSteps(activeIdx){
+  const el = byId('lv-steps'); if (!el) return;
+  el.innerHTML = SCORE_STEPS.map((s, i) =>
+    '<div class="lv-step ' + (i < activeIdx ? 'done' : i === activeIdx ? 'active' : '') + '">' + s + '</div>'
+  ).join('');
+  el.style.display = 'flex';
+}
+function hideScoreSteps(){ const el = byId('lv-steps'); if (el) el.style.display = 'none'; }
+
+const LIVE_FACS = [
+  ['mouthSmileLeft',  'Smile'],
+  ['browInnerUp',     'Brow up'],
+  ['browDownLeft',    'Brow down'],
+  ['jawOpen',         'Jaw open'],
+  ['eyeSquintLeft',   'Squint'],
+  ['eyeWideLeft',     'Eye wide'],
+];
+
+function liveBar(label, pct){
+  const p = Math.round(Math.max(0, Math.min(100, pct)));
+  return '<div class="lv-bar-row"><span class="lv-bar-nm">' + label + '</span>' +
+    '<span class="lv-bar-tk"><span class="lv-bar-fi" style="width:' + p + '%"></span></span>' +
+    '<span class="lv-bar-pct">' + p + '</span></div>';
+}
+
+function updateLiveStats(){
+  const panel = byId('lv-stats');
+  if (!panel || !panel.classList.contains('open')) return;
+
+  const allFrames = engine.getFrames();
+  const frames = allFrames.length > 90 ? allFrames.slice(-90) : allFrames;
+
+  const m = computeLiveMetrics(frames, segments);
+  if (m){
+    const setCard = (numId, barId, val, suffix) => {
+      const el = byId(numId);
+      if (el){
+        el.textContent = val + (suffix || '');
+        el.className = 'lv-score-num ' + (val >= 70 ? 'lv-good' : val >= 50 ? 'lv-mid' : 'lv-low');
+      }
+      const bar = byId(barId); if (bar) bar.style.width = Math.max(0, Math.min(100, val)) + '%';
+    };
+    setCard('lm-att',  'lm-att-bar',  m.attention, '');
+    setCard('lm-comp', 'lm-comp-bar', m.composure, '');
+    setCard('lm-eye',  'lm-eye-bar',  m.eyeContact, '%');
+  }
+
+  const latest = allFrames[allFrames.length - 1];
+  const bs = (latest && latest.bs) || {};
+
+  const dom = dominantEmotion(bs);
+  const domEl = byId('lm-emo-dom');
+  const domPct = byId('lm-emo-pct');
+  if (domEl) domEl.textContent = (dom && dom.emotion) ? dom.emotion : '—';
+  if (domPct) domPct.textContent = (dom && dom.value != null) ? Math.round(dom.value) + '%' : '';
+
+  const scores = emotionScores(bs);
+  const emoBarsEl = byId('lm-emo-bars');
+  if (emoBarsEl && scores){
+    const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+    emoBarsEl.innerHTML = sorted.slice(0, 6).map(([emo, val]) => liveBar(emo, val)).join('');
+  }
+
+  const facsBarsEl = byId('lm-facs-bars');
+  if (facsBarsEl){
+    facsBarsEl.innerHTML = LIVE_FACS.map(([key, lbl]) => liveBar(lbl, (bs[key] || 0) * 100)).join('');
+  }
+
+  const wpmEl = byId('lm-wpm');
+  if (wpmEl){
+    if (segments.length >= 2){
+      const cand = segments.filter(s => s.speaker === 'candidate');
+      const words = cand.reduce((n, s) => n + (s.text || '').trim().split(/\s+/).filter(Boolean).length, 0);
+      const elMin = (segments[segments.length - 1].t - segments[0].t) / 60000;
+      wpmEl.textContent = (elMin > 0.1 && words > 0) ? Math.round(words / elMin) + '~' : '—';
+    } else {
+      wpmEl.textContent = '—';
+    }
+  }
+}
+
+function stopMetrics(){ if (metricsInterval){ clearInterval(metricsInterval); metricsInterval = null; } }
+
+function toggleStats(){
+  const p = byId('lv-stats');
+  if (!p) return;
+  p.classList.toggle('open');
+  if (p.classList.contains('open')) updateLiveStats();
+}
 
 // Actions are still captured for the post-interview report (no live panel now).
 function onAction(ev){ events.push(ev); }
@@ -78,8 +173,9 @@ async function startAgent(){
   setVoice('Connecting…');
   try {
     const tok = await api.interviewToken({
-      role: cfg.role, focus: cfg.focus, difficulty: cfg.difficulty, question_count: cfg.questionCount,
-      questions: cfg.questions || [], tone: cfg.tone,
+      scenario: cfg.scenario, role: cfg.role, focus: cfg.focus, difficulty: cfg.difficulty,
+      question_count: cfg.questionCount, questions: cfg.questions || [], tone: cfg.tone,
+      language: cfg.language || 'en',
     });
     const stream = engine.getStream();
     if (!stream || !engine.isRunning()) return;   // stopped / navigated away during the token fetch
@@ -121,7 +217,8 @@ function clearImmersive(){ document.body.classList.remove('live-immersive'); }
 
 // Leave WITHOUT scoring (confirm first). Tears down and returns to the dashboard.
 function exitInterview(){
-  if (!window.confirm('Leave without scoring? Your interview won’t be saved.')) return;
+  if (!window.confirm("Leave without scoring? Your interview won’t be saved.")) return;
+  stopMetrics();
   stopAgent();
   if (recorder && recorder.stop){ try { recorder.stop(); } catch (_){} }
   recorder = null;
@@ -138,11 +235,13 @@ async function submitScore(payload){
   try {
     const resp = await api.createSession(payload);
     pendingScore = null;
-    location.hash = '#/thanks/' + resp.session_id;   // thank-you page; results via its button or Progress
+    hideScoreSteps();
+    location.hash = '#/thanks/' + resp.session_id;
   } catch (e){
     pendingScore = payload;
+    hideScoreSteps();
     setState('Error'); setVoice('—');
-    overlay('Couldn’t score the interview.');
+    overlay("Couldn’t score the interview.");
     showStart('Retry scoring');
   }
 }
@@ -152,31 +251,32 @@ async function submitScore(payload){
 async function finishInterview(){
   if (finishing) return;
   finishing = true;
-  // Show the loading state immediately, before tearing down / awaiting the recorder.
-  showControls(false); loading('Processing…'); setState('Processing…'); setVoice('—');
-  const frames = engine.getFrames().slice();   // copy before stop() releases it
+  stopMetrics();
+  showControls(false); loading('Scoring your interview…'); setState('Processing…'); setVoice('—');
+  showScoreSteps(0);
+  const frames = engine.getFrames().slice();
   const rec = recorder; recorder = null;
   stopAgent();
-  const audio = rec ? await rec.stop() : null;   // finalize the recording before we drop the stream
+  const audio = rec ? await rec.stop() : null;
   engine.stop();
 
   if (!frames.length){
-    overlay('Nothing to score.'); showStart('Start');
+    hideScoreSteps(); overlay('Nothing to score.'); showStart('Start');
     return;
   }
 
-  // Voice (Delivery) analysis — non-fatal; a failure just omits the Delivery signal.
   let voice = null;
   if (audio && audio.blob){
-    loading('Analyzing your voice…');
+    showScoreSteps(1);
     const acoustic = await computeAcousticFeatures(audio.blob);
     voice = await api.analyzeVoice(audio.blob, acoustic || {});
   }
 
+  showScoreSteps(2);
   const full_text = segments
     .map((s) => (s.speaker === 'interviewer' ? 'INTERVIEWER: ' : 'CANDIDATE: ') + s.text)
     .join('\n');
-  await submitScore({ role, frames, transcript: { full_text, segments }, events, emotion: null, voice });
+  await submitScore({ scenario, role, frames, transcript: { full_text, segments }, events, emotion: null, voice });
 }
 
 function resetConvo(){
@@ -184,6 +284,7 @@ function resetConvo(){
   const cap = byId('lv-cap'); if (cap){ cap.className = 'li-cap'; cap.innerHTML = ''; }
   const convo = byId('lv-convo'); if (convo) convo.innerHTML = '<div class="fa-note">The interviewer will greet you when the connection is ready…</div>';
   const panel = byId('lv-transcript'); if (panel) panel.classList.remove('open');
+  const sp = byId('lv-stats'); if (sp) sp.classList.remove('open');
   onAiSpeaking(false);
 }
 
@@ -193,6 +294,7 @@ function resetConvo(){
 function voiceAgentFailed(message){
   if (finishing) return;          // a normal finish already ran
   finishing = true;
+  stopMetrics();
   if (recorder && recorder.stop){ try { recorder.stop(); } catch (_){} }
   recorder = null;
   stopAgent();
@@ -217,7 +319,8 @@ async function startEngine(){
 
   convoCount = 0; turn = -1;
   segments = []; events = []; startTs = performance.now(); finishing = false;
-  pendingScore = null; role = getInterviewConfig().role; recorder = null;
+  pendingScore = null; role = getInterviewConfig().role;
+  scenario = getInterviewConfig().scenario || 'job'; recorder = null;
   muted = false; camOn = true;
   const imm = byId('live-imm'); if (imm) imm.classList.remove('cam-off');
   const mb = byId('lv-mute'); if (mb){ mb.classList.remove('off'); mb.disabled = false; }
@@ -238,6 +341,8 @@ async function startEngine(){
   if (!engine.isRunning()) return;   // superseded (navigated away or restarted mid-load)
   overlay(null); showControls(true);
   setState('Detecting');
+  stopMetrics();
+  metricsInterval = setInterval(updateLiveStats, 2000);
   if (micOk){
     startAgent();
     recorder = startRecording(engine.getStream());   // capture audio for Delivery analysis
@@ -275,7 +380,9 @@ export function live(){
     wire('lv-exit', exitInterview);
     wire('lv-tx-btn', toggleTranscript);
     wire('lv-tx-close', toggleTranscript);
-    startEngine();   // auto-start: the user already pressed "Start interview" on /new
+    wire('lv-stats-btn', toggleStats);
+    wire('lv-stats-close', toggleStats);
+    startEngine();   // auto-start: the user already pressed "Start session" on /practice-interview
   });
 
   return '' +
@@ -290,6 +397,7 @@ export function live(){
         '<span id="lv-state" style="display:none"></span>' +
       '</div>' +
       '<div class="li-right">' +
+        '<button class="li-pill ghost" id="lv-stats-btn" type="button">Stats</button>' +
         '<button class="li-pill ghost" id="lv-tx-btn" type="button">Transcript</button>' +
       '</div>' +
     '</div>' +
@@ -303,7 +411,36 @@ export function live(){
       '<button class="li-ctrl" id="lv-cam" type="button" title="Turn camera off" aria-label="Camera">' + CAM_SVG + '</button>' +
       '<button class="li-ctrl end" id="lv-end" type="button">End interview</button>' +
     '</div>' +
-    '<div class="li-ph" id="lv-ph"><span class="li-spin" id="lv-spin"></span><span id="lv-ph-txt">Loading model…</span></div>' +
+    '<aside class="li-stats" id="lv-stats">' +
+      '<div class="li-st-head">' +
+        '<h3>Live stats</h3>' +
+        '<button class="li-tx-close" id="lv-stats-close" type="button" aria-label="Close">✕</button>' +
+      '</div>' +
+      '<div class="lv-section">' +
+        '<div class="lv-sec-lbl">Presence</div>' +
+        '<div class="lv-score-grid">' +
+          '<div class="lv-score-card"><div class="lv-score-num" id="lm-att">—</div><div class="lv-score-lbl">Attention</div><div class="lv-score-bar"><i id="lm-att-bar"></i></div></div>' +
+          '<div class="lv-score-card"><div class="lv-score-num" id="lm-comp">—</div><div class="lv-score-lbl">Composure</div><div class="lv-score-bar"><i id="lm-comp-bar"></i></div></div>' +
+          '<div class="lv-score-card"><div class="lv-score-num" id="lm-eye">—</div><div class="lv-score-lbl">Eye contact</div><div class="lv-score-bar"><i id="lm-eye-bar"></i></div></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="lv-section">' +
+        '<div class="lv-expr-head">' +
+          '<span class="lv-sec-lbl">Expression</span>' +
+          '<div class="lv-dom-chip"><span class="lv-dom-name" id="lm-emo-dom">—</span><span class="lv-dom-pct" id="lm-emo-pct"></span></div>' +
+        '</div>' +
+        '<div id="lm-emo-bars"></div>' +
+      '</div>' +
+      '<div class="lv-section">' +
+        '<div class="lv-sec-lbl">FACS signals</div>' +
+        '<div id="lm-facs-bars"></div>' +
+      '</div>' +
+      '<div class="lv-section">' +
+        '<div class="lv-sec-lbl">Speaking pace</div>' +
+        '<div class="lv-wpm-row"><span class="lv-wpm-num" id="lm-wpm">—</span><span class="lv-wpm-unit">wpm</span></div>' +
+      '</div>' +
+    '</aside>' +
+    '<div class="li-ph" id="lv-ph"><span class="li-spin" id="lv-spin"></span><span id="lv-ph-txt">Loading model…</span><div class="lv-steps" id="lv-steps" style="display:none"></div></div>' +
     '<button class="li-start" id="lv-start" type="button" style="display:none">Start</button>' +
     '<aside class="li-transcript" id="lv-transcript">' +
       '<div class="li-tx-head"><h3>Conversation</h3><button class="li-tx-close" id="lv-tx-close" type="button" aria-label="Close">✕</button></div>' +

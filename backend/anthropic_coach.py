@@ -4,11 +4,41 @@ from anthropic import Anthropic
 
 COACH_MODEL = "claude-sonnet-4-6"
 
-SYSTEM_PROMPT = (
-    "You are an expert interview coach. Given an interview transcript, return ONLY a JSON "
-    "object with keys: summary (string), strengths (string[]), improvements (string[]), "
-    "score (integer 1-10), rationale (string). No prose outside the JSON."
-)
+# Scenario -> coach persona and session label used in system prompts.
+_SCENARIO_COACH = {
+    "job":      ("an expert interview coach",           "mock job interview"),
+    "present":  ("an expert presentation coach",        "practice presentation"),
+    "tough":    ("a communication coach",               "tough conversation practice"),
+    "pitch":    ("a pitch and persuasion coach",        "pitch/persuasion practice"),
+    "teach":    ("an expert educator",                  "teaching or explanation session"),
+    "language": ("a language fluency coach",            "spoken language practice session"),
+}
+
+
+def _coaching_system_prompt(scenario: str = "job") -> str:
+    coach, label = _SCENARIO_COACH.get(scenario, _SCENARIO_COACH["job"])
+    return (
+        f"You are {coach}. Given a {label} transcript, return ONLY a JSON object with keys: "
+        "summary (string), strengths (string[]), improvements (string[]), score (integer 1-10), "
+        "rationale (string). No prose outside the JSON."
+    )
+
+
+def _verdict_system_prompt(scenario: str = "job") -> str:
+    coach, label = _SCENARIO_COACH.get(scenario, _SCENARIO_COACH["job"])
+    return (
+        f"You are {coach} giving READINESS feedback for a {label} (self-improvement, never a "
+        "hiring decision). You are given the candidate's transcript plus two already-computed "
+        "scores: a Delivery score (voice: pace, fillers, pauses, expressiveness) and a Presence "
+        "score (on-camera: eye contact, posture, composure), each 0-100. Judge ONLY the Content "
+        "of their performance yourself. Return ONLY a JSON object with keys: content_score "
+        "(integer 0-100 rating clarity, structure, specificity, and relevance of WHAT they said), "
+        "headline (one warm sentence), delivery_note (one line on their voice, referencing the "
+        "Delivery score), presence_note (one line on their on-camera presence, referencing the "
+        "Presence score), content_note (one line on their content), strengths (string[] of 2-3), "
+        "improvements (string[] of 2-3), next_action (one concrete next step). Plain, encouraging "
+        "language. No prose outside the JSON."
+    )
 
 
 def parse_coaching(raw: str) -> dict:
@@ -33,33 +63,21 @@ def parse_coaching(raw: str) -> dict:
                 "strengths": [], "improvements": [], "score": None, "rationale": ""}
 
 
-def generate_coaching(api_key: str, transcript_text: str, role: str) -> dict:
-    """Call Claude to produce structured interview coaching. Prompt caching on the system block."""
+def generate_coaching(api_key: str, transcript_text: str, role: str,
+                      scenario: str = "job") -> dict:
+    """Call Claude to produce structured coaching. System prompt is scenario-aware."""
     client = Anthropic(api_key=api_key)
     resp = client.messages.create(
         model=COACH_MODEL,
         max_tokens=1024,
-        system=[{"type": "text", "text": SYSTEM_PROMPT,
+        system=[{"type": "text", "text": _coaching_system_prompt(scenario),
                  "cache_control": {"type": "ephemeral"}}],
         messages=[{"role": "user",
-                   "content": f"Role: {role}\n\nTranscript:\n{transcript_text}"}],
+                   "content": (f"Scenario: {scenario}\nRole: {role or 'general'}\n\n"
+                                f"Transcript:\n{transcript_text}")}],
     )
     return parse_coaching(resp.content[0].text)
 
-
-VERDICT_SYSTEM_PROMPT = (
-    "You are a supportive interview coach giving READINESS feedback for a practice "
-    "interview (self-improvement, never a hiring decision). You are given the candidate's "
-    "transcript plus two already-computed scores: a Delivery score (voice: pace, fillers, "
-    "pauses, expressiveness) and a Presence score (on-camera: eye contact, posture, "
-    "composure), each 0-100. Judge ONLY the Content of their answers yourself. "
-    "Return ONLY a JSON object with keys: content_score (integer 0-100 rating clarity, "
-    "structure, specificity, and relevance of WHAT they said), headline (one warm sentence), "
-    "delivery_note (one line on their voice, referencing the Delivery score), presence_note "
-    "(one line on their on-camera presence, referencing the Presence score), content_note "
-    "(one line on their answers), strengths (string[] of 2-3), improvements (string[] of 2-3), "
-    "next_action (one concrete next step). Plain, encouraging language. No prose outside the JSON."
-)
 
 
 def parse_verdict(raw: str) -> dict:
@@ -90,19 +108,21 @@ def parse_verdict(raw: str) -> dict:
 
 
 def generate_verdict(api_key: str, transcript_text: str, role: str,
-                     delivery_score=None, presence_score=None) -> dict:
+                     delivery_score=None, presence_score=None,
+                     scenario: str = "job") -> dict:
     """One Claude call: score Content (0-100) and write the readiness explanation,
-    given the already-computed Delivery + Presence numbers."""
+    given the already-computed Delivery + Presence numbers. Scenario-aware."""
     client = Anthropic(api_key=api_key)
     d = "n/a" if delivery_score is None else str(delivery_score)
     p = "n/a" if presence_score is None else str(presence_score)
     resp = client.messages.create(
         model=COACH_MODEL,
         max_tokens=1024,
-        system=[{"type": "text", "text": VERDICT_SYSTEM_PROMPT,
+        system=[{"type": "text", "text": _verdict_system_prompt(scenario),
                  "cache_control": {"type": "ephemeral"}}],
         messages=[{"role": "user",
-                   "content": (f"Role: {role}\nDelivery score (voice): {d}/100\n"
+                   "content": (f"Scenario: {scenario}\nRole: {role or 'general'}\n"
+                               f"Delivery score (voice): {d}/100\n"
                                f"Presence score (face/body): {p}/100\n\n"
                                f"Transcript:\n{transcript_text}")}],
     )

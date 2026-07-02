@@ -133,7 +133,7 @@ sessions/                 saved interview reports (created at runtime)
 ```bash
 # 1. Create a virtual environment and install dependencies
 python3 -m venv .venv
-source .venv/bin/activate            # Windows: .venv\Scripts\activate
+source .venv/bin/activate            # Windows: . .venv/Scripts/activate
 pip install -r backend/requirements.txt
 
 # 2. Configure secrets

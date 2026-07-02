@@ -1,18 +1,21 @@
 # backend/main.py
+import asyncio
 import logging
 import os
+import re
 import json
 from datetime import datetime
 import httpx
 from dotenv import load_dotenv
 from typing import Optional
 from fastapi import FastAPI, HTTPException, File, Form, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from backend.analysis import compute_metrics, questions_from_transcript, transcript_metrics, integrity_metrics, summarize_actions, emotion_from_blendshapes, action_units, compound_emotion
 from backend.report import save_session
+from backend import storage
 from backend.deepgram import build_agent_config, grant_ephemeral_token, DEEPGRAM_AGENT_URL
 from backend.anthropic_coach import generate_coaching, generate_verdict
 from backend.questions import generate_questions
@@ -23,31 +26,37 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)  # ensure our INFO/WARNING logs reach the console
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SESSIONS_DIR = os.path.join(ROOT, "sessions")
 FRONTEND_DIR = os.path.join(ROOT, "frontend")
-os.makedirs(SESSIONS_DIR, exist_ok=True)
+
+_SESSION_ID_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{6}\Z")
+_SAFE_ASSET = re.compile(r"^[a-z_]+\.(?:png|json|txt|csv)$")
 
 app = FastAPI(title="molave.ai")
 
 
 class TokenRequest(BaseModel):
+    scenario: str = "job"
     role: str = "Software Engineer"
     focus: str = "Mixed"
     difficulty: str = "Realistic"
     question_count: int = 5
     questions: list[str] = []
     tone: str = "Professional"
+    language: str = "en"
 
 
 class QuestionsRequest(BaseModel):
+    scenario: str = "job"
     role: str = "Software Engineer"
     focus: str = "Mixed"
     difficulty: str = "Realistic"
     question_count: int = 5
+    language: str = "en"
 
 
 class SessionRequest(BaseModel):
-    role: str = "Software Engineer"
+    scenario: str = "job"
+    role: str = ""
     frames: list[dict]
     transcript: dict
     events: list = []
@@ -96,7 +105,9 @@ async def interview_token(req: TokenRequest):
             raise HTTPException(502, f"Deepgram token grant failed: {exc.response.status_code}")
     return {"url": DEEPGRAM_AGENT_URL, "token": token, "scheme": scheme,
             "config": build_agent_config(req.role, req.focus, req.difficulty,
-                                         req.question_count, req.questions, tone=req.tone)}
+                                         req.question_count, req.questions,
+                                         tone=req.tone, scenario=req.scenario,
+                                         language=req.language)}
 
 
 @app.post("/api/questions")
@@ -107,7 +118,8 @@ def questions_endpoint(req: QuestionsRequest):
     if not api_key:
         return {"questions": []}
     try:
-        qs = generate_questions(api_key, req.role, req.focus, req.difficulty, req.question_count)
+        qs = generate_questions(api_key, req.role, req.focus, req.difficulty,
+                                req.question_count, req.scenario, req.language)
     except Exception as exc:  # network / model failure -> degrade
         logging.warning("question generation unavailable: %s", exc)
         return {"questions": []}
@@ -194,82 +206,98 @@ async def voice_analyze(meta: str = Form(...), audio: UploadFile = File(...)):
 
 
 @app.post("/api/session")
-def session(req: SessionRequest):
+async def session(req: SessionRequest):
     if not req.frames:
         raise HTTPException(400, "no frames captured")
-    questions = questions_from_transcript(req.transcript.get("segments", []))
-    summary = compute_metrics(req.frames, questions)
-    summary["timing"] = transcript_metrics(req.transcript.get("segments", []))
-    summary["integrity"] = integrity_metrics(req.frames)
-    summary["actions"] = summarize_actions(req.events)
-    summary["emotion"] = req.emotion if (req.emotion and req.emotion.get("available")) else {"available": False}
-    summary["emotion_mediapipe"] = emotion_from_blendshapes(req.frames)
-    summary["action_units"] = action_units(req.frames)
-    summary["emotion_compound"] = compound_emotion(
-        summary["emotion_mediapipe"].get("overall_distribution", {}))
-    summary["voice"] = req.voice if (req.voice and req.voice.get("available")) else {"available": False}
+    try:
+        questions = questions_from_transcript(req.transcript.get("segments", []))
+        summary = compute_metrics(req.frames, questions)
+        summary["timing"] = transcript_metrics(req.transcript.get("segments", []))
+        summary["integrity"] = integrity_metrics(req.frames)
+        summary["actions"] = summarize_actions(req.events)
+        summary["emotion"] = req.emotion if (req.emotion and req.emotion.get("available")) else {"available": False}
+        summary["emotion_mediapipe"] = emotion_from_blendshapes(req.frames)
+        summary["action_units"] = action_units(req.frames)
+        summary["emotion_compound"] = compound_emotion(
+            summary["emotion_mediapipe"].get("overall_distribution", {}))
+        summary["voice"] = req.voice if (req.voice and req.voice.get("available")) else {"available": False}
 
-    coaching = None
-    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-    full_text = req.transcript.get("full_text", "")
-    run_claude = bool(anthropic_key and full_text.strip())
-    if run_claude:
-        try:
-            coaching = generate_coaching(anthropic_key, full_text, req.role)
-        except Exception as exc:
-            logging.warning("coaching unavailable: %s", exc)
+        anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+        full_text = req.transcript.get("full_text", "")
+        run_claude = bool(anthropic_key and full_text.strip())
 
-    # Fused readiness verdict: Delivery (voice) + Presence (composites) + Content (Claude).
-    presence = verdict_mod.presence_score(summary["overall"])
-    delivery = summary["voice"].get("delivery_score") if summary["voice"].get("available") else None
-    explanation = None
-    content = None
-    if run_claude:
-        try:
-            explanation = generate_verdict(anthropic_key, full_text, req.role, delivery, presence)
-            content = explanation.get("content_score")
-        except Exception as exc:
-            logging.warning("verdict unavailable: %s", exc)
-    readiness = verdict_mod.compute_readiness(delivery, presence, content)
-    summary["verdict"] = {
-        "readiness_score": readiness["readiness_score"],
-        "band": readiness["band"],
-        "components": readiness["components"],
-        "weights_used": readiness["weights_used"],
-        "content_score": content,
-        "headline": (explanation or {}).get("headline", ""),
-        "delivery_note": (explanation or {}).get("delivery_note", ""),
-        "presence_note": (explanation or {}).get("presence_note", ""),
-        "content_note": (explanation or {}).get("content_note", ""),
-        "strengths": (explanation or {}).get("strengths", []),
-        "improvements": (explanation or {}).get("improvements", []),
-        "next_action": (explanation or {}).get("next_action", ""),
-    }
+        # Fused readiness verdict: Delivery (voice) + Presence (composites) + Content (Claude).
+        presence = verdict_mod.presence_score(summary["overall"])
+        delivery = summary["voice"].get("delivery_score") if summary["voice"].get("available") else None
 
-    session_id = datetime.now().strftime("%Y-%m-%dT%H%M%S")
-    summary["role"] = req.role
-    summary["created_at"] = datetime.strptime(session_id, "%Y-%m-%dT%H%M%S").isoformat()
-    save_session(os.path.join(SESSIONS_DIR, session_id),
-                 req.frames, req.transcript, summary, coaching)
+        coaching = None
+        explanation = None
+        content = None
 
-    emotion_chart_url = (f"/sessions/{session_id}/emotion.png"
-                         if summary["emotion"].get("available") else None)
-    emotion_mp_chart_url = (f"/sessions/{session_id}/emotion_mediapipe.png"
-                            if summary["emotion_mediapipe"].get("available") else None)
-    return {"session_id": session_id, "summary": summary, "coaching": coaching,
-            "charts_url": f"/sessions/{session_id}/charts.png",
-            "emotion_chart_url": emotion_chart_url,
-            "emotion_mediapipe_chart_url": emotion_mp_chart_url}
+        if run_claude:
+            # Run coaching and verdict in parallel — they are independent Claude calls.
+            raw = await asyncio.gather(
+                asyncio.to_thread(generate_coaching, anthropic_key, full_text, req.role, req.scenario),
+                asyncio.to_thread(generate_verdict, anthropic_key, full_text, req.role, delivery,
+                                  presence, req.scenario),
+                return_exceptions=True,
+            )
+            if isinstance(raw[0], Exception):
+                logging.warning("coaching unavailable: %s", raw[0])
+            else:
+                coaching = raw[0]
+            if isinstance(raw[1], Exception):
+                logging.warning("verdict unavailable: %s", raw[1])
+            else:
+                explanation = raw[1]
+                content = explanation.get("content_score") if explanation else None
+
+        readiness = verdict_mod.compute_readiness(delivery, presence, content)
+        summary["verdict"] = {
+            "readiness_score": readiness["readiness_score"],
+            "band": readiness["band"],
+            "components": readiness["components"],
+            "weights_used": readiness["weights_used"],
+            "content_score": content,
+            "headline": (explanation or {}).get("headline", ""),
+            "delivery_note": (explanation or {}).get("delivery_note", ""),
+            "presence_note": (explanation or {}).get("presence_note", ""),
+            "content_note": (explanation or {}).get("content_note", ""),
+            "strengths": (explanation or {}).get("strengths", []),
+            "improvements": (explanation or {}).get("improvements", []),
+            "next_action": (explanation or {}).get("next_action", ""),
+        }
+
+        session_id = datetime.now().strftime("%Y-%m-%dT%H%M%S")
+        summary["scenario"] = req.scenario
+        summary["role"] = req.role
+        summary["created_at"] = datetime.strptime(session_id, "%Y-%m-%dT%H%M%S").isoformat()
+        await asyncio.to_thread(save_session, session_id, req.frames, req.transcript, summary, coaching)
+
+        emotion_chart_url = (f"/sessions/{session_id}/emotion.png"
+                             if summary["emotion"].get("available") else None)
+        emotion_mp_chart_url = (f"/sessions/{session_id}/emotion_mediapipe.png"
+                                if summary["emotion_mediapipe"].get("available") else None)
+        return {"session_id": session_id, "summary": summary, "coaching": coaching,
+                "charts_url": f"/sessions/{session_id}/charts.png",
+                "emotion_chart_url": emotion_chart_url,
+                "emotion_mediapipe_chart_url": emotion_mp_chart_url}
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logging.exception("session scoring failed: %s", exc)
+        raise HTTPException(500, f"Scoring error: {type(exc).__name__}: {exc}")
 
 
 @app.get("/api/sessions")
 def list_sessions_endpoint():
-    return {"sessions": sessions_store.list_sessions(SESSIONS_DIR)}
+    return {"sessions": sessions_store.list_sessions()}
 
 
 @app.get("/api/sessions/{session_id}")
 def get_session_endpoint(session_id: str):
-    data = sessions_store.load_session(SESSIONS_DIR, session_id)
+    data = sessions_store.load_session(None, session_id)
     if data is None:
         raise HTTPException(404, "session not found")
     return data
@@ -277,21 +305,33 @@ def get_session_endpoint(session_id: str):
 
 @app.delete("/api/sessions/{session_id}")
 def delete_session_endpoint(session_id: str):
-    if not sessions_store.delete_session(SESSIONS_DIR, session_id):
+    if not sessions_store.delete_session(None, session_id):
         raise HTTPException(404, "session not found")
     return {"deleted": session_id}
 
 
 @app.patch("/api/sessions/{session_id}")
 def rename_session_endpoint(session_id: str, req: LabelRequest):
-    data = sessions_store.set_label(SESSIONS_DIR, session_id, req.label)
+    data = sessions_store.set_label(None, session_id, req.label)
     if data is None:
         raise HTTPException(404, "session not found")
     return data
 
 
-# static mounts last so /api routes win
-app.mount("/sessions", StaticFiles(directory=SESSIONS_DIR), name="sessions")
+_ASSET_CTYPE = {"png": "image/png", "json": "application/json",
+                "txt": "text/plain", "csv": "text/csv"}
+
+
+@app.get("/sessions/{session_id}/{filename}")
+def session_asset(session_id: str, filename: str):
+    """Proxy S3 session assets (charts, data files) so existing URL paths work."""
+    if not _SESSION_ID_RE.match(session_id) or not _SAFE_ASSET.match(filename):
+        raise HTTPException(404)
+    data = storage.get_bytes(f"sessions/{session_id}/{filename}")
+    if data is None:
+        raise HTTPException(404)
+    ext = filename.rsplit(".", 1)[-1]
+    return Response(content=data, media_type=_ASSET_CTYPE.get(ext, "application/octet-stream"))
 
 if os.path.isdir(FRONTEND_DIR):
     @app.get("/")
