@@ -196,7 +196,7 @@ function clearImmersive(){ document.body.classList.remove('live-immersive'); }
 
 // Leave WITHOUT scoring (confirm first). Tears down and returns to the dashboard.
 function exitInterview(){
-  if (!window.confirm(‘Leave without scoring? Your interview won’t be saved.’)) return;
+  if (!window.confirm("Leave without scoring? Your interview won’t be saved.")) return;
   stopMetrics();
   stopAgent();
   if (recorder && recorder.stop){ try { recorder.stop(); } catch (_){} }
