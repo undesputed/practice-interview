@@ -18,6 +18,7 @@ let finishing = false;     // guard so End + agent-close don't double-submit; st
 let pendingScore = null;   // payload from a failed score POST, kept for retry
 let recorder = null;       // active audio recorder handle, or null
 let role = '';             // interview role captured at start
+let scenario = 'job';     // interview scenario captured at start
 let muted = false;         // mic muted?
 let camOn = true;          // camera on?
 let leaveHandler = null;   // active hashchange teardown listener, so re-entry can't stack them
@@ -78,8 +79,8 @@ async function startAgent(){
   setVoice('Connecting…');
   try {
     const tok = await api.interviewToken({
-      role: cfg.role, focus: cfg.focus, difficulty: cfg.difficulty, question_count: cfg.questionCount,
-      questions: cfg.questions || [], tone: cfg.tone,
+      scenario: cfg.scenario, role: cfg.role, focus: cfg.focus, difficulty: cfg.difficulty,
+      question_count: cfg.questionCount, questions: cfg.questions || [], tone: cfg.tone,
     });
     const stream = engine.getStream();
     if (!stream || !engine.isRunning()) return;   // stopped / navigated away during the token fetch
@@ -176,7 +177,7 @@ async function finishInterview(){
   const full_text = segments
     .map((s) => (s.speaker === 'interviewer' ? 'INTERVIEWER: ' : 'CANDIDATE: ') + s.text)
     .join('\n');
-  await submitScore({ role, frames, transcript: { full_text, segments }, events, emotion: null, voice });
+  await submitScore({ scenario, role, frames, transcript: { full_text, segments }, events, emotion: null, voice });
 }
 
 function resetConvo(){
@@ -217,7 +218,8 @@ async function startEngine(){
 
   convoCount = 0; turn = -1;
   segments = []; events = []; startTs = performance.now(); finishing = false;
-  pendingScore = null; role = getInterviewConfig().role; recorder = null;
+  pendingScore = null; role = getInterviewConfig().role;
+  scenario = getInterviewConfig().scenario || 'job'; recorder = null;
   muted = false; camOn = true;
   const imm = byId('live-imm'); if (imm) imm.classList.remove('cam-off');
   const mb = byId('lv-mute'); if (mb){ mb.classList.remove('off'); mb.disabled = false; }
@@ -275,7 +277,7 @@ export function live(){
     wire('lv-exit', exitInterview);
     wire('lv-tx-btn', toggleTranscript);
     wire('lv-tx-close', toggleTranscript);
-    startEngine();   // auto-start: the user already pressed "Start interview" on /new
+    startEngine();   // auto-start: the user already pressed "Start session" on /practice-interview
   });
 
   return '' +

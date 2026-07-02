@@ -6,7 +6,27 @@ THINK_MODEL = "claude-sonnet-4-6"
 TTS_MODEL = "aura-2-thalia-en"
 
 
-# How the New-interview "Focus" choice shapes the kinds of questions Claude asks.
+# Scenario -> interviewer persona. {role} / {role_ctx} substituted at build time.
+# role_ctx is " for the {role} role" when a role was chosen, or "" otherwise.
+SCENARIO_INTRO = {
+    "job":      "You are an interviewer conducting a mock job interview for a {role} position.",
+    "present":  "You are a session evaluator watching the candidate deliver a practice presentation{role_ctx}.",
+    "tough":    "You are a conversation partner helping the candidate practise a tough, high-stakes conversation{role_ctx}.",
+    "pitch":    "You are a potential investor or client evaluating a practice pitch{role_ctx}.",
+    "teach":    "You are a learner or evaluator listening to the candidate teach or explain a topic{role_ctx}.",
+    "language": "You are a native-speaker conversation partner helping the candidate practise speaking another language{role_ctx}.",
+}
+
+# Scenario -> opening greeting. Non-job scenarios don't use the self-intro-as-Q1 pattern.
+SCENARIO_GREETING = {
+    "present":  "Hi, thanks for joining. Whenever you're ready, go ahead and start.",
+    "tough":    "Hi, thanks for joining. I'll play the other party here — let's begin whenever you're ready.",
+    "pitch":    "Hi, thanks for your time. Whenever you're ready, go ahead with your pitch.",
+    "teach":    "Hi! I'm ready to learn. Whenever you're ready, please go ahead.",
+    "language": "Hi! Let's chat. Whenever you're ready, feel free to start.",
+}
+
+# How the Practice Interview "Focus" choice shapes the kinds of questions Claude asks.
 FOCUS_GUIDANCE = {
     "Behavioral": "Ask behavioral and situational questions, and encourage STAR-style answers "
                   "(Situation, Task, Action, Result).",
@@ -48,45 +68,67 @@ TONE_VOICE = {
 
 def build_interviewer_prompt(role: str, focus: str = "Mixed", difficulty: str = "Realistic",
                              question_count: int = 5, questions=None,
-                             tone: str = "Professional") -> str:
+                             tone: str = "Professional", scenario: str = "job") -> str:
     """System prompt for the Claude 'think' provider. In 'bound mode' (a question list is
-    given) the interviewer asks those exact questions in order; otherwise it improvises."""
+    given) the interviewer asks those exact questions in order; otherwise it improvises.
+    The `scenario` controls the AI persona and session framing."""
     focus_line = FOCUS_GUIDANCE.get(focus, FOCUS_GUIDANCE["Mixed"])
     difficulty_line = DIFFICULTY_GUIDANCE.get(difficulty, DIFFICULTY_GUIDANCE["Realistic"])
     tone_line = TONE_GUIDANCE.get(tone, TONE_GUIDANCE["Professional"])
-    intro = (f"You are an interviewer conducting a mock job interview for a {role} position. "
+    role_ctx = f" for the {role} role" if role else ""
+    intro_tmpl = SCENARIO_INTRO.get(scenario, SCENARIO_INTRO["job"])
+    intro = (f"{intro_tmpl.format(role=role or 'general', role_ctx=role_ctx)} "
              f"{focus_line} {difficulty_line} {tone_line} ")
     tts = ("Everything you say is read aloud by a text-to-speech voice, so reply in plain, "
            "natural spoken sentences only — no markdown, asterisks, bullet points, headings, "
-           "numbered lists, emoji, or labels like 'First Question:'. Just ask the question "
-           "conversationally. ")
+           "numbered lists, emoji, or labels like 'First Question:'. Just speak naturally. ")
+    session_word = "interview" if scenario == "job" else "session"
     if questions:
         items = " ".join(f"{i + 1}) {q}" for i, q in enumerate(questions))
-        body = (f"The interview is already in progress. Ask the candidate these exact questions, "
-                f"one at a time, in this order: {items} "
-                f"Ask each question once (you may add a brief natural follow-up to clarify an "
-                f"answer), do not add new questions, and never restart or re-ask a question. ")
+        body = (f"The {session_word} is already in progress. Ask the candidate these exact "
+                f"questions, one at a time, in this order: {items} "
+                f"Ask each question once. A brief clarifying follow-up does not count as a new "
+                f"question, but do not add extra questions beyond the list. Never restart or "
+                f"re-ask a question. ")
+        n = len(questions)
     else:
         n = max(1, int(question_count))
         plural = "s" if n != 1 else ""
-        body = (f"The interview is already in progress: you have greeted the candidate and asked "
-                f"them to tell you about themselves, which counts as question 1 of {n}. The "
-                f"candidate's first message is their answer to question 1, so do NOT greet again, "
-                f"do NOT ask them to introduce themselves again, and never say things like 'let's "
-                f"start' or 'let's begin the real interview' — it has already begun. "
-                f"Ask exactly {n} question{plural} total, one at a time, in strict order, keeping a "
-                f"private count of which question you are on. After each answer, move directly to "
-                f"the next unanswered question. Never restart, repeat, or re-ask a question you "
-                f"already asked. ")
-    closing = ("Keep your turns short (1-3 sentences). Listen to the candidate's full answer "
-               "before asking the next question. Do not give feedback during the interview; just "
-               "conduct it naturally. Once the candidate has answered the last question, thank "
-               "them, give a brief goodbye, then call the end_interview function to finish. After "
-               "that, do not ask anything else.")
-    return intro + tts + body + closing
+        if scenario == "job":
+            body = (f"The {session_word} is already in progress: you have greeted the candidate "
+                    f"and asked them to tell you about themselves, which counts as question 1 of "
+                    f"{n}. The candidate's first message is their answer to question 1, so do NOT "
+                    f"greet again, do NOT ask them to introduce themselves again, and never say "
+                    f"things like 'let's start' or 'let's begin' — it has already begun. "
+                    f"Ask exactly {n} question{plural} total, keeping a private running count. "
+                    f"A brief clarifying follow-up does not count as a new question. After each "
+                    f"main answer, move directly to the next unanswered question. Never restart "
+                    f"or re-ask a question. ")
+        else:
+            body = (f"The {session_word} is already in progress: you have greeted the candidate "
+                    f"and invited them to begin, which counts as prompt 1 of {n}. Do NOT greet "
+                    f"again. Ask exactly {n} question{plural} or prompt{plural} total, keeping a "
+                    f"private running count. A brief clarifying follow-up does not count as a new "
+                    f"prompt. After each main response, move directly to the next prompt. Never "
+                    f"restart or re-ask. ")
+    conduct = ("Keep your turns short (1-3 sentences). Do not give feedback or coaching during "
+               "the session. ")
+    # Make the ending rule a clearly labelled, mandatory instruction so Claude doesn't skip it.
+    ending_rule = (
+        f"ENDING THE SESSION — this is mandatory: after the candidate answers your {n}th and "
+        f"final question, say a brief goodbye in one sentence, then IMMEDIATELY call "
+        f"end_interview. You MUST call end_interview — the session cannot close without it. "
+        f"Do not ask another question. Do not offer feedback. Do not say anything after "
+        f"calling end_interview."
+    )
+    return intro + tts + body + conduct + ending_rule
 
 
-def build_greeting(role: str, has_questions: bool = False) -> str:
+def build_greeting(role: str, has_questions: bool = False, scenario: str = "job") -> str:
+    if scenario != "job":
+        # Non-job scenarios don't use the self-intro-as-Q1 pattern, so the same
+        # greeting works for both bound and improv mode.
+        return SCENARIO_GREETING.get(scenario, SCENARIO_GREETING["present"])
     if has_questions:
         # Bound mode: the first listed question is asked by the model, so the greeting must
         # NOT also ask for a self-introduction (that would duplicate / conflict).
@@ -98,8 +140,11 @@ def build_greeting(role: str, has_questions: bool = False) -> str:
 
 def build_agent_config(role: str, focus: str = "Mixed", difficulty: str = "Realistic",
                        question_count: int = 5, questions=None,
-                       tone: str = "Professional") -> dict:
+                       tone: str = "Professional", scenario: str = "job") -> dict:
     """Deepgram Voice Agent Settings payload (sent as first WS message)."""
+    keyterms = ["STAR", "behavioral", "strengths", "weaknesses"]
+    if role:
+        keyterms.append(role)
     return {
         "type": "Settings",
         "audio": {
@@ -109,23 +154,27 @@ def build_agent_config(role: str, focus: str = "Mixed", difficulty: str = "Reali
         "agent": {
             "language": "en",
             "listen": {"provider": {"type": "deepgram", "model": "nova-3",
-                                    "keyterms": ["STAR", "behavioral", "strengths", "weaknesses", role]}},
+                                    "keyterms": keyterms}},
             "think": {
                 "provider": {"type": "anthropic", "model": THINK_MODEL},
-                "prompt": build_interviewer_prompt(role, focus, difficulty, question_count, questions, tone),
+                "prompt": build_interviewer_prompt(role, focus, difficulty, question_count,
+                                                   questions, tone, scenario),
                 # Client-side function (no server endpoint) the interviewer calls when the
-                # interview is over. The browser ACKs it and closes the socket, which ends
-                # and scores the interview. Without this the agent never stops on its own.
+                # session is over. The browser ACKs it and closes the socket, which ends
+                # and scores the session. Without this the agent never stops on its own.
                 "functions": [{
                     "name": "end_interview",
-                    "description": ("End the interview. Call this only after you have asked all the "
-                                    "questions, the candidate has answered the final one, and you "
-                                    "have thanked them and said goodbye."),
+                    "description": (
+                        "End the session. You MUST call this immediately after saying your "
+                        "goodbye, once the candidate has answered the final question. "
+                        "Do not call it before all questions are done. "
+                        "Do not continue speaking after calling it."
+                    ),
                     "parameters": {"type": "object", "properties": {}},
                 }],
             },
             "speak": {"provider": {"type": "deepgram", "model": TONE_VOICE.get(tone, TTS_MODEL)}},
-            "greeting": build_greeting(role, bool(questions)),
+            "greeting": build_greeting(role, bool(questions), scenario),
         },
     }
 

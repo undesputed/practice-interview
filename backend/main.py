@@ -31,6 +31,7 @@ app = FastAPI(title="molave.ai")
 
 
 class TokenRequest(BaseModel):
+    scenario: str = "job"
     role: str = "Software Engineer"
     focus: str = "Mixed"
     difficulty: str = "Realistic"
@@ -40,6 +41,7 @@ class TokenRequest(BaseModel):
 
 
 class QuestionsRequest(BaseModel):
+    scenario: str = "job"
     role: str = "Software Engineer"
     focus: str = "Mixed"
     difficulty: str = "Realistic"
@@ -47,7 +49,8 @@ class QuestionsRequest(BaseModel):
 
 
 class SessionRequest(BaseModel):
-    role: str = "Software Engineer"
+    scenario: str = "job"
+    role: str = ""
     frames: list[dict]
     transcript: dict
     events: list = []
@@ -96,7 +99,8 @@ async def interview_token(req: TokenRequest):
             raise HTTPException(502, f"Deepgram token grant failed: {exc.response.status_code}")
     return {"url": DEEPGRAM_AGENT_URL, "token": token, "scheme": scheme,
             "config": build_agent_config(req.role, req.focus, req.difficulty,
-                                         req.question_count, req.questions, tone=req.tone)}
+                                         req.question_count, req.questions,
+                                         tone=req.tone, scenario=req.scenario)}
 
 
 @app.post("/api/questions")
@@ -107,7 +111,8 @@ def questions_endpoint(req: QuestionsRequest):
     if not api_key:
         return {"questions": []}
     try:
-        qs = generate_questions(api_key, req.role, req.focus, req.difficulty, req.question_count)
+        qs = generate_questions(api_key, req.role, req.focus, req.difficulty,
+                                req.question_count, req.scenario)
     except Exception as exc:  # network / model failure -> degrade
         logging.warning("question generation unavailable: %s", exc)
         return {"questions": []}
@@ -215,7 +220,7 @@ def session(req: SessionRequest):
     run_claude = bool(anthropic_key and full_text.strip())
     if run_claude:
         try:
-            coaching = generate_coaching(anthropic_key, full_text, req.role)
+            coaching = generate_coaching(anthropic_key, full_text, req.role, req.scenario)
         except Exception as exc:
             logging.warning("coaching unavailable: %s", exc)
 
@@ -226,7 +231,8 @@ def session(req: SessionRequest):
     content = None
     if run_claude:
         try:
-            explanation = generate_verdict(anthropic_key, full_text, req.role, delivery, presence)
+            explanation = generate_verdict(anthropic_key, full_text, req.role, delivery, presence,
+                                           req.scenario)
             content = explanation.get("content_score")
         except Exception as exc:
             logging.warning("verdict unavailable: %s", exc)
@@ -247,6 +253,7 @@ def session(req: SessionRequest):
     }
 
     session_id = datetime.now().strftime("%Y-%m-%dT%H%M%S")
+    summary["scenario"] = req.scenario
     summary["role"] = req.role
     summary["created_at"] = datetime.strptime(session_id, "%Y-%m-%dT%H%M%S").isoformat()
     save_session(os.path.join(SESSIONS_DIR, session_id),

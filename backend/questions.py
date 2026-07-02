@@ -1,6 +1,6 @@
 # backend/questions.py
 """Generate a tailored set of interview questions with Claude for the Practice
-Interview page. The chosen set drives the live interview (see deepgram.py)."""
+Interview page. The chosen set drives the live session (see deepgram.py)."""
 import json
 import re
 
@@ -8,11 +8,15 @@ from anthropic import Anthropic
 
 from backend.deepgram import FOCUS_GUIDANCE, DIFFICULTY_GUIDANCE, THINK_MODEL
 
-SYSTEM_PROMPT = (
-    "You write interview questions for a mock job interview. Given a role, a focus, and a "
-    "difficulty, return ONLY a JSON array of concise interview questions (strings) tailored to "
-    "them — no preamble, no numbering, no markdown, just the JSON array."
-)
+# Scenario -> what kind of questions/prompts Claude should generate.
+SCENARIO_QUESTION_CONTEXT = {
+    "job":      "You write interview questions for a mock job interview.",
+    "present":  "You write evaluator prompts for a practice presentation session.",
+    "tough":    "You write scenario prompts for practising a tough, high-stakes conversation.",
+    "pitch":    "You write evaluator questions for a practice pitch or persuasion session.",
+    "teach":    "You write prompts for a teaching or explanation practice session.",
+    "language": "You write conversation topics and prompts for spoken language practice.",
+}
 
 
 def parse_questions(raw: str) -> list:
@@ -34,21 +38,30 @@ def parse_questions(raw: str) -> list:
     return [q.strip() for q in data if isinstance(q, str) and q.strip()]
 
 
-def generate_questions(api_key: str, role: str, focus: str, difficulty: str, n: int) -> list:
-    """One Claude call returning up to `n` interview questions for the settings."""
+def generate_questions(api_key: str, role: str, focus: str, difficulty: str, n: int,
+                       scenario: str = "job") -> list:
+    """One Claude call returning up to `n` scenario-appropriate questions for the settings."""
     n = max(1, int(n))
     focus_line = FOCUS_GUIDANCE.get(focus, FOCUS_GUIDANCE["Mixed"])
     difficulty_line = DIFFICULTY_GUIDANCE.get(difficulty, DIFFICULTY_GUIDANCE["Realistic"])
+    scenario_ctx = SCENARIO_QUESTION_CONTEXT.get(scenario, SCENARIO_QUESTION_CONTEXT["job"])
+    system_prompt = (
+        f"{scenario_ctx} Given a scenario, role, focus, and difficulty, return ONLY a JSON array "
+        "of concise questions or prompts (strings) tailored to them — no preamble, no numbering, "
+        "no markdown, just the JSON array."
+    )
+    item_word = "questions" if scenario == "job" else "questions or prompts"
     client = Anthropic(api_key=api_key)
     resp = client.messages.create(
         model=THINK_MODEL,
         max_tokens=1024,
         temperature=0.9,
-        system=SYSTEM_PROMPT,
+        system=system_prompt,
         messages=[{"role": "user", "content": (
-            f"Role: {role}\nFocus: {focus} — {focus_line}\n"
+            f"Scenario: {scenario}\nRole: {role or 'general'}\n"
+            f"Focus: {focus} — {focus_line}\n"
             f"Difficulty: {difficulty} — {difficulty_line}\n"
-            f"Write exactly {n} interview questions for this candidate as a JSON array of strings."
+            f"Write exactly {n} {item_word} as a JSON array of strings."
         )}],
     )
     return parse_questions(resp.content[0].text)[:n]
