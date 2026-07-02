@@ -383,7 +383,7 @@ body.live-immersive .content{padding:0}
 /* Floating glassy card (not a full-height sheet) so it overlays the video without
    splitting the layout. Anchored under the Transcript button; height-capped so it
    clears the AI tile + controls. */
-.li-transcript{position:absolute;top:62px;right:16px;width:min(360px,calc(100% - 32px));max-height:56vh;z-index:8;
+.li-transcript{position:absolute;top:62px;right:16px;width:min(360px,calc(100% - 32px));max-height:44vh;z-index:8;
   background:color-mix(in srgb,var(--surface) 92%,transparent);color:var(--ink);
   border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-lg);
   -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
@@ -394,7 +394,8 @@ body.live-immersive .content{padding:0}
 .li-tx-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .li-tx-head h3{font-size:15px;font-weight:700;font-family:var(--font-display)}
 .li-tx-close{background:none;border:none;font-size:16px;cursor:pointer;color:var(--ink-2);font-family:inherit}
-.li-transcript .convo{max-height:none;height:auto;flex:1;overflow:auto}
+.li-transcript .convo{max-height:none;height:auto;flex:1;overflow:auto;scrollbar-width:none}
+.li-transcript .convo::-webkit-scrollbar{display:none}
 
 /* Post-interview thank-you screen (results are reached from here or Progress) */
 .thanks-wrap{max-width:520px;margin:8vh auto 0;text-align:center;display:flex;flex-direction:column;align-items:center;gap:14px}
@@ -442,7 +443,7 @@ body.live-immersive .content{padding:0}
 @media(max-width:640px){
   .li-ai{width:180px;height:124px;bottom:84px}
   .li-cap{max-width:86%;bottom:86px}
-  .li-transcript{width:calc(100% - 32px);max-height:50vh}
+  .li-transcript{width:calc(100% - 32px);max-height:40vh}
   .li-stats{width:calc(100% - 32px);max-height:55vh}
 }
 
