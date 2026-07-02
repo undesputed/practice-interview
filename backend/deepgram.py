@@ -75,8 +75,8 @@ TONE_VOICE = {
 
 # Japanese Aura-2 voices by tone.
 TONE_VOICE_JA = {
-    "Friendly":     "aura-2-izanami-ja",   # female
-    "Professional": "aura-2-ama-ja",        # female
+    "Friendly":     "aura-2-ama-ja",   # female
+    "Professional": "aura-2-izanami-ja",        # female
     "Stern":        "aura-2-uzume-ja",      # female
     "Intimidating": "aura-2-uzume-ja",      # female
 }
@@ -90,7 +90,8 @@ def build_interviewer_prompt(role: str, focus: str = "Mixed", difficulty: str = 
     given) the interviewer asks those exact questions in order; otherwise it improvises.
     The `scenario` controls the AI persona and session framing."""
     lang_line = ("Conduct the entire interview in Japanese. Ask all questions in Japanese "
-                 "and respond only in Japanese. ") if language == "ja" else ""
+                 "and respond only in Japanese — even if the candidate speaks English or "
+                 "any other language, always reply in Japanese. Never switch to English. ") if language == "ja" else ""
     focus_line = FOCUS_GUIDANCE.get(focus, FOCUS_GUIDANCE["Mixed"])
     difficulty_line = DIFFICULTY_GUIDANCE.get(difficulty, DIFFICULTY_GUIDANCE["Realistic"])
     tone_line = TONE_GUIDANCE.get(tone, TONE_GUIDANCE["Professional"])
@@ -141,8 +142,10 @@ def build_interviewer_prompt(role: str, focus: str = "Mixed", difficulty: str = 
         f"calling end_interview."
     )
     lang_rule = (
-        " LANGUAGE RULE — this is mandatory: you MUST speak and respond in Japanese at all "
-        "times throughout this session, including your goodbye. Never switch to English."
+        " LANGUAGE RULE — this is mandatory: you MUST respond in Japanese at all times, "
+        "including your goodbye. If the candidate speaks English or any other language, "
+        "you still reply in Japanese only. Never switch to or use English under any "
+        "circumstances."
     ) if language == "ja" else ""
     return intro + tts + body + conduct + ending_rule + lang_rule
 
