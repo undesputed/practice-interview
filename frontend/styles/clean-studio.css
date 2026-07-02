@@ -401,18 +401,41 @@ body.live-immersive .content{padding:0}
 .thanks-wrap h1{font-size:30px;font-weight:700;font-family:var(--font-display)}
 .thanks-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:8px}
 
-/* Live metrics panel — bottom-left corner, mirrors the four report score-cards */
-.lm-panel{position:absolute;left:16px;bottom:96px;z-index:4;display:grid;grid-template-columns:1fr 1fr;gap:6px;opacity:0;pointer-events:none;transition:opacity .3s}
-.lm-panel.lm-visible{opacity:1}
-.lm-item{background:rgba(0,0,0,.45);border-radius:8px;padding:8px 10px;text-align:center;min-width:58px}
-.lm-val{display:block;font-size:18px;font-weight:800;color:#fff;line-height:1}
-.lm-label{display:block;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.7);margin-top:3px}
+/* Live stats panel — slide-in from left, mirrors .li-transcript on the right */
+.li-stats{position:absolute;top:62px;left:16px;width:min(300px,calc(100% - 32px));max-height:72vh;overflow-y:auto;z-index:8;
+  background:rgba(10,18,14,.88);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+  border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:14px 16px;color:#fff;
+  opacity:0;transform:translateY(-8px) scale(.97);transform-origin:top left;pointer-events:none;
+  transition:opacity .22s ease,transform .22s ease}
+.li-stats.open{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
+.li-st-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.li-st-head h3{font-size:14px;font-weight:700;font-family:var(--font-display);color:#fff}
+/* re-use .li-tx-close for the ✕ button — already white-friendly via color:var(--ink-2) */
+.li-stats .li-tx-close{color:rgba(255,255,255,.55)}
+.lv-section{border-top:1px solid rgba(255,255,255,.1);padding:10px 0}
+.lv-section:first-of-type{border-top:none;padding-top:0}
+.lv-sec-lbl{font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-bottom:8px}
+/* presence score cards */
+.lv-score-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:2px}
+.lv-score-card{background:rgba(255,255,255,.09);border-radius:10px;padding:10px 6px;text-align:center}
+.lv-score-num{font-size:22px;font-weight:800;line-height:1;color:#fff;font-family:var(--font-display)}
+.lv-score-lbl{font-size:9px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-top:4px}
+/* emotion + FACS bars */
+.lv-bar-row{display:flex;align-items:center;gap:5px;margin-bottom:5px;font-size:11px}
+.lv-bar-nm{width:62px;flex:none;color:rgba(255,255,255,.75);text-transform:capitalize;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lv-bar-tk{flex:1;height:5px;background:rgba(255,255,255,.12);border-radius:3px;overflow:hidden}
+.lv-bar-fi{height:100%;background:var(--brand);border-radius:3px;transition:width .6s ease}
+.lv-bar-pct{width:24px;flex:none;text-align:right;color:rgba(255,255,255,.45);font-variant-numeric:tabular-nums}
+/* speaking pace */
+.lv-wpm-row{display:flex;align-items:baseline;gap:7px;margin-top:4px}
+.lv-wpm-num{font-size:28px;font-weight:800;color:#fff;font-family:var(--font-display);line-height:1}
+.lv-wpm-unit{font-size:11px;color:rgba(255,255,255,.5)}
 
 @media(max-width:640px){
   .li-ai{width:180px;height:124px;bottom:84px}
   .li-cap{max-width:86%;bottom:86px}
   .li-transcript{width:calc(100% - 32px);max-height:50vh}
-  .lm-panel{display:none}
+  .li-stats{width:calc(100% - 32px);max-height:55vh}
 }
 
 /* Practice Interview — "Your questions" section */
