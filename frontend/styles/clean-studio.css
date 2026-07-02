@@ -401,10 +401,18 @@ body.live-immersive .content{padding:0}
 .thanks-wrap h1{font-size:30px;font-weight:700;font-family:var(--font-display)}
 .thanks-actions{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:8px}
 
+/* Live metrics panel — bottom-left corner, mirrors the four report score-cards */
+.lm-panel{position:absolute;left:16px;bottom:96px;z-index:4;display:grid;grid-template-columns:1fr 1fr;gap:6px;opacity:0;pointer-events:none;transition:opacity .3s}
+.lm-panel.lm-visible{opacity:1}
+.lm-item{background:rgba(0,0,0,.45);border-radius:8px;padding:8px 10px;text-align:center;min-width:58px}
+.lm-val{display:block;font-size:18px;font-weight:800;color:#fff;line-height:1}
+.lm-label{display:block;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(255,255,255,.7);margin-top:3px}
+
 @media(max-width:640px){
   .li-ai{width:180px;height:124px;bottom:84px}
   .li-cap{max-width:86%;bottom:86px}
   .li-transcript{width:calc(100% - 32px);max-height:50vh}
+  .lm-panel{display:none}
 }
 
 /* Practice Interview — "Your questions" section */

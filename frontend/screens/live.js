@@ -5,6 +5,7 @@ import { api } from '../api.js';
 import { esc } from '../util.js';
 import { startRecording } from '../audio-recorder.js';
 import { computeAcousticFeatures } from '../acoustic-features.js';
+import { computeLiveMetrics } from '../live-metrics.js';
 
 let agent = null;          // active Deepgram voice agent, or null
 let convoCount = 0;        // conversation lines seen this run
@@ -42,7 +43,27 @@ function loading(text){ setOverlay(text, true); }    // spinner + text (busy sta
 function overlay(text){ setOverlay(text, false); }   // text only (errors), or null to hide
 function showStart(label){ const b = byId('lv-start'); if (b){ b.style.display = label ? '' : 'none'; if (label) b.textContent = label; } }
 
-function onStats(s){ setText('lv-time', fmtTime(s.elapsedMs)); }
+function onStats(s){
+  setText('lv-time', fmtTime(s.elapsedMs));
+  updateMetrics();
+}
+
+function setMetricVal(id, val, suffix){
+  const el = byId(id);
+  if (el) el.textContent = val == null ? '—' : val + (suffix || '');
+}
+
+function updateMetrics(){
+  const m = computeLiveMetrics(engine.getFrames(), segments);
+  const panel = byId('lv-metrics');
+  if (!panel) return;
+  if (!m){ panel.classList.remove('lm-visible'); return; }
+  panel.classList.add('lm-visible');
+  setMetricVal('lm-att',  m.attention);
+  setMetricVal('lm-comp', m.composure);
+  setMetricVal('lm-eye',  m.eyeContact, '%');
+  setMetricVal('lm-wpm',  m.wpm);
+}
 
 // Actions are still captured for the post-interview report (no live panel now).
 function onAction(ev){ events.push(ev); }
@@ -185,6 +206,7 @@ function resetConvo(){
   const cap = byId('lv-cap'); if (cap){ cap.className = 'li-cap'; cap.innerHTML = ''; }
   const convo = byId('lv-convo'); if (convo) convo.innerHTML = '<div class="fa-note">The interviewer will greet you when the connection is ready…</div>';
   const panel = byId('lv-transcript'); if (panel) panel.classList.remove('open');
+  const mp = byId('lv-metrics'); if (mp) mp.classList.remove('lm-visible');
   onAiSpeaking(false);
 }
 
@@ -304,6 +326,12 @@ export function live(){
       '<button class="li-ctrl" id="lv-mute" type="button" title="Mute" aria-label="Mute">' + MIC_SVG + '</button>' +
       '<button class="li-ctrl" id="lv-cam" type="button" title="Turn camera off" aria-label="Camera">' + CAM_SVG + '</button>' +
       '<button class="li-ctrl end" id="lv-end" type="button">End interview</button>' +
+    '</div>' +
+    '<div class="lm-panel" id="lv-metrics">' +
+      '<div class="lm-item"><span class="lm-val" id="lm-att">—</span><span class="lm-label">Attention</span></div>' +
+      '<div class="lm-item"><span class="lm-val" id="lm-comp">—</span><span class="lm-label">Composure</span></div>' +
+      '<div class="lm-item"><span class="lm-val" id="lm-eye">—</span><span class="lm-label">Eye contact</span></div>' +
+      '<div class="lm-item"><span class="lm-val" id="lm-wpm">—</span><span class="lm-label">WPM</span></div>' +
     '</div>' +
     '<div class="li-ph" id="lv-ph"><span class="li-spin" id="lv-spin"></span><span id="lv-ph-txt">Loading model…</span></div>' +
     '<button class="li-start" id="lv-start" type="button" style="display:none">Start</button>' +
