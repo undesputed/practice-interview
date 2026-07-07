@@ -91,8 +91,10 @@ export function stop(){
   session = null;
 }
 
-// Start the camera and detection loop. `onFrame({mode, detections, fps, blendshapes})`
-// is called once per frame; `blendshapes` is non-null only in face mode.
+// Start the camera and detection loop. `onFrame({mode, detections, fps, blendshapes, gestures})`
+// is called once per frame. `blendshapes` is non-null whenever the face detector ran this
+// frame (face mode, or any mode while effects are on via setEffects). `gestures` is a
+// `string[]` of gesture names when the gesture recognizer ran this frame, else `undefined`.
 export async function start(canvas, mode, onFrame){
   stop();
   const myToken = {};
