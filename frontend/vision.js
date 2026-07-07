@@ -142,7 +142,7 @@ function launch(canvas, video, stream, mode, onFrame){
     const now = performance.now();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const out = { mode: session.mode, detections: 0, fps: session.fps, blendshapes: null, gestures: undefined };
+    const out = { mode: session.mode, detections: 0, fps: session.fps, blendshapes: null, gestures: undefined, faceLandmarks: undefined, handLandmarks: undefined };
     const m = session.mode;
     const faceMode = m === 'face', poseMode = m === 'pose', handsMode = m === 'hands';
     // The current mode's detector runs every frame (as before). Effects-only
@@ -155,6 +155,7 @@ function launch(canvas, video, stream, mode, onFrame){
         const r = tasks.face.detectForVideo(video, now);
         const faces = r.faceLandmarks || [];
         session._face = faces[0] || null;
+        out.faceLandmarks = faces[0] || undefined;
         if (faceMode){
           out.detections = faces.length;
           for (const fl of faces){
@@ -171,6 +172,7 @@ function launch(canvas, video, stream, mode, onFrame){
       if (gestDue){
         const r = tasks.hands.recognizeForVideo(video, now);
         const hands = r.landmarks || [];
+        out.handLandmarks = hands.length ? hands : undefined;
         if (handsMode){
           out.detections = hands.length;
           for (const lm of hands){
