@@ -1,52 +1,78 @@
 // frontend/face-effects.js
-// Floating-emoji reaction overlay for the Face Analysis page. Composes the pure
-// reaction-trigger and renders each returned emoji as a short burst of DOM spans
-// animated by CSS. No network, no scoring — purely cosmetic.
+// Canvas overlay + render loop for the Face Analysis reaction effects. Composes the
+// pure trigger (which emotion is active + gesture onsets) with per-effect emitters that
+// draw custom art anchored to face/hand landmarks. No network, no scoring — cosmetic.
 import { createReactionTrigger } from './reaction-trigger.js';
+import { EMOTION_EMITTERS, GESTURE_CALLOUTS, createCalloutLayer } from './fx/emitters.js';
+import { extractAnchors, mapPoint } from './fx/anchors.js';
 
-const PARTICLES = 6;
-const MAX_ACTIVE = 24;
-
-export function createFaceEffects(container) {
+export function createFaceEffects(canvas) {
+  const ctx = canvas.getContext('2d');
   const trigger = createReactionTrigger();
-  let enabled = false;
-  let active = 0;
-  const reduceMotion = typeof matchMedia === 'function'
-    && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const emitters = {};
+  for (const name in EMOTION_EMITTERS) emitters[name] = EMOTION_EMITTERS[name]();
+  const callouts = createCalloutLayer();
 
-  function clear() {
-    container.innerHTML = '';
-    active = 0;
+  let enabled = false, rafId = 0, lastT = 0;
+  let activeEmotion = null;
+  let latest = null; // last fed { faceLandmarks, handLandmarks }
+
+  function resize() {
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.round(canvas.clientWidth * dpr));
+    canvas.height = Math.max(1, Math.round(canvas.clientHeight * dpr));
   }
 
-  function burst(emoji) {
-    const count = reduceMotion ? 2 : PARTICLES;
-    for (let i = 0; i < count; i++) {
-      if (active >= MAX_ACTIVE) break;
-      const el = document.createElement('span');
-      el.className = 'fx-emoji' + (reduceMotion ? ' reduced' : '');
-      el.textContent = emoji;
-      el.style.left = (40 + Math.random() * 20).toFixed(1) + '%';           // start near center
-      el.style.setProperty('--x', (Math.random() * 60 - 30).toFixed(0) + 'px');
-      el.style.setProperty('--dx', (Math.random() * 80 - 40).toFixed(0) + 'px'); // drift
-      el.style.setProperty('--rot', (Math.random() * 40 - 20).toFixed(0) + 'deg');
-      el.style.setProperty('--scale', (0.8 + Math.random() * 0.6).toFixed(2));
-      active += 1;
-      el.addEventListener('animationend', () => { el.remove(); active -= 1; }, { once: true });
-      container.appendChild(el);
+  function clearAll() {
+    activeEmotion = null;
+    for (const k in emitters) emitters[k].clear();
+    callouts.clear();
+    if (canvas.width && canvas.height) ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function handAnchor(handLandmarks) {
+    if (!handLandmarks || !handLandmarks.length || !handLandmarks[0].length) return null;
+    return mapPoint(handLandmarks[0][0], canvas.width, canvas.height); // wrist (landmark 0), mirrored
+  }
+
+  function loop(now) {
+    if (!enabled) return;
+    const dt = lastT ? Math.min(50, now - lastT) : 16;
+    lastT = now;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const anchors = latest && latest.faceLandmarks
+      ? extractAnchors(latest.faceLandmarks, canvas.width, canvas.height) : null;
+    // Update/draw every emitter, but only the ACTIVE one receives anchors (spawns). Inactive
+    // emitters get null, so they stop spawning and their particles drain and fade out
+    // naturally — a smooth exit/switch without an abrupt clear. Idle emitters hold 0 particles.
+    for (const name in emitters) {
+      emitters[name].update(name === activeEmotion ? anchors : null, dt);
+      emitters[name].draw(ctx);
     }
+    callouts.update(dt);
+    callouts.draw(ctx);
+    rafId = requestAnimationFrame(loop);
   }
 
   return {
     setEnabled(on) {
       enabled = !!on;
-      if (!enabled) clear();
+      if (enabled) { resize(); lastT = 0; rafId = requestAnimationFrame(loop); window.addEventListener('resize', resize); }
+      else { cancelAnimationFrame(rafId); window.removeEventListener('resize', resize); clearAll(); }
     },
     feed(sample) {
       if (!enabled) return;
-      for (const emoji of trigger.feed(sample)) burst(emoji);
+      latest = sample;
+      const { activeEmotion: ae, gestureOnsets } = trigger.feed({
+        bs: sample.bs, gestures: sample.gestures, t: sample.t,
+      });
+      activeEmotion = ae; // on change, the previously-active emitter drains itself in the loop
+      for (const g of gestureOnsets) {
+        const c = GESTURE_CALLOUTS[g];
+        if (c) callouts.spawn(c.text, c.color, handAnchor(sample.handLandmarks), canvas.width, canvas.height);
+      }
     },
-    clear,
-    destroy() { clear(); },
+    clear() { clearAll(); },
+    destroy() { enabled = false; cancelAnimationFrame(rafId); window.removeEventListener('resize', resize); clearAll(); },
   };
 }
