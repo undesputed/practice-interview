@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createTearsEmitter, createFireEmitter, createConfusedEmitter } from './emitters.js';
+import { createTearsEmitter, createFireEmitter, createConfusedEmitter,
+         createSparkleEmitter, createSurpriseEmitter, createDisgustEmitter, createFearEmitter } from './emitters.js';
 
 // Minimal Canvas-2D stand-in: records nothing, never throws.
 function mockCtx() {
@@ -20,7 +21,11 @@ const anchors = {
   mouth: { x: 150, y: 160 }, faceBox: { x: 80, y: 40, w: 140, h: 160 }, scale: 1,
 };
 
-for (const [name, make] of [['tears', createTearsEmitter], ['fire', createFireEmitter], ['confused', createConfusedEmitter]]) {
+for (const [name, make] of [
+  ['tears', createTearsEmitter], ['fire', createFireEmitter], ['confused', createConfusedEmitter],
+  ['sparkle', createSparkleEmitter], ['surprise', createSurpriseEmitter],
+  ['disgust', createDisgustEmitter], ['fear', createFearEmitter],
+]) {
   test(`${name}: spawns with an anchor, draws without throwing, drains when anchor is gone`, () => {
     const e = make();
     for (let i = 0; i < 30; i++) e.update(anchors, 16);

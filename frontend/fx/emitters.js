@@ -111,3 +111,109 @@ export function createConfusedEmitter() {
     count() { return glyphs.length; },
   };
 }
+
+// ── Happy: twinkling sparkles scattered around the face box ──
+export function createSparkleEmitter() {
+  return baseEmitter(
+    (parts, a, dt, acc) => {
+      acc = rate(dt, 14, acc);
+      while (acc >= 1) {
+        acc -= 1;
+        const b = a.faceBox;
+        parts.push(createParticle({
+          x: b.x + Math.random() * b.w, y: b.y + Math.random() * b.h,
+          life: 700 + Math.random() * 400, size: (4 + Math.random() * 4) * a.scale,
+          color: '#fff3b0', vr: Math.random() * 4 - 2, rot: Math.random() * Math.PI,
+        }));
+      }
+      return acc;
+    },
+    (ctx, parts) => {
+      for (const p of parts) {
+        const k = lifeProgress(p);
+        const s = p.size * Math.sin(k * Math.PI); // scale in then out (twinkle)
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        ctx.globalAlpha = Math.sin(k * Math.PI); ctx.fillStyle = p.color;
+        ctx.beginPath();
+        for (let i = 0; i < 8; i++) { const r = i % 2 ? s * 0.4 : s; const ang = (i / 8) * Math.PI * 2;
+          const fn = i ? 'lineTo' : 'moveTo'; ctx[fn](Math.cos(ang) * r, Math.sin(ang) * r); }
+        ctx.closePath(); ctx.fill(); ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+    });
+}
+
+// ── Surprise: a bobbing "!" plus expanding rings above the head ──
+export function createSurpriseEmitter() {
+  return baseEmitter(
+    (parts, a, dt, acc) => {
+      acc = rate(dt, 3, acc); // slow ring cadence
+      while (acc >= 1) {
+        acc -= 1;
+        parts.push(createParticle({ x: a.foreheadTop.x, y: a.foreheadTop.y - 26 * a.scale,
+          life: 700, size: 6 * a.scale, color: '#ffd54a', data: 'ring' }));
+      }
+      return acc;
+    },
+    (ctx, parts) => {
+      for (const p of parts) {
+        const k = lifeProgress(p);
+        ctx.globalAlpha = (1 - k) * 0.8; ctx.strokeStyle = p.color; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size + k * 26, 0, Math.PI * 2); ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+      // The "!" itself: anchored, drawn once, only when there are anchors (rings imply anchors).
+      if (parts.length) {
+        const p = parts[parts.length - 1];
+        ctx.fillStyle = '#ffd54a'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.font = `bold ${Math.round(p.size * 4)}px sans-serif`; ctx.fillText('!', p.x, p.y);
+      }
+    });
+}
+
+// ── Disgust: greenish wavy particles drifting sideways near the mouth ──
+export function createDisgustEmitter() {
+  return baseEmitter(
+    (parts, a, dt, acc) => {
+      acc = rate(dt, 10, acc);
+      while (acc >= 1) {
+        acc -= 1;
+        const dir = Math.random() < 0.5 ? -1 : 1;
+        parts.push(createParticle({ x: a.mouth.x, y: a.mouth.y + 6 * a.scale,
+          vx: dir * 26 * a.scale, vy: -6 * a.scale, life: 900, size: (5 + Math.random() * 4) * a.scale,
+          color: '#8bd44f', rot: Math.random() * Math.PI }));
+      }
+      return acc;
+    },
+    (ctx, parts) => {
+      for (const p of parts) {
+        const k = lifeProgress(p);
+        ctx.globalAlpha = (1 - k) * 0.6; ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.ellipse(p.x, p.y, p.size, p.size * 0.6, p.rot, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    });
+}
+
+// ── Fear: cold-sweat droplets sliding down from the temples ──
+export function createFearEmitter() {
+  return baseEmitter(
+    (parts, a, dt, acc) => {
+      acc = rate(dt, 5, acc);
+      while (acc >= 1) {
+        acc -= 1;
+        const t = Math.random() < 0.5 ? a.leftTemple : a.rightTemple;
+        parts.push(createParticle({ x: t.x, y: t.y, vy: 30 * a.scale, ay: 90 * a.scale,
+          vx: (Math.random() * 6 - 3), life: 1100, size: 3 * a.scale, color: '#bfe6ff' }));
+      }
+      return acc;
+    },
+    (ctx, parts) => {
+      for (const p of parts) {
+        const k = lifeProgress(p);
+        ctx.globalAlpha = (1 - k) * 0.8; ctx.fillStyle = p.color;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    });
+}
