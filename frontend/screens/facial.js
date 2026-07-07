@@ -124,7 +124,7 @@ function onFrame(out){
   setStatus(out);
   paintPanel(out);
   if (effects && effectsOn){
-    effects.feed({ bs: out.blendshapes, gestures: out.gestures, t: performance.now() });
+    effects.feed({ bs: out.blendshapes, gestures: out.gestures, faceLandmarks: out.faceLandmarks, handLandmarks: out.handLandmarks, t: performance.now() });
   }
 }
 
@@ -229,7 +229,7 @@ export function facial(){
       '</div>' +
       '<div><div class="fa-stage"><div class="fa-live" id="fa-live"><span class="dot"></span> LIVE</div>' +
         '<canvas id="fa-canvas"></canvas>' +
-        '<div class="fa-fx" id="fa-fx"></div>' +
+        '<canvas class="fa-fx" id="fa-fx"></canvas>' +
         '<div class="ph" id="fa-ph">Press "Start camera" to begin. Video stays on your device.</div></div>' +
         '<div class="fa-panel" id="fa-panel"></div></div>' +
     '</div></div></div>';
