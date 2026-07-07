@@ -11,7 +11,7 @@ const MAX_PER_EMITTER = 120;
 // Global size dial. The canvas backing store is DPR-scaled, so raw pixel sizes render at
 // ~half-size on retina and read as faint specks — S scales every effect up so it stands
 // out over the camera image. Turn this one number up/down for overall bigness.
-const S = 3.6;
+const S = 6;
 
 // A dark outline + soft shadow makes bright shapes and text pop against a busy video frame.
 function glow(ctx, blur) { ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = blur; }
@@ -114,10 +114,11 @@ export function createConfusedEmitter() {
       if (glyphs.length === 0)
         for (let i = 0; i < 3; i++) glyphs.push({ base: (i - 1) });
       phase += (REDUCED ? 0 : dt / 1000);
+      const gs = 26 * S * anchors.scale; // glyph size; space + lift relative to it so big "?"s don't overlap
       for (const g of glyphs) {
-        g.x = anchors.foreheadTop.x + g.base * 46 * anchors.scale + Math.sin(phase * 2 + g.base) * 10;
-        g.y = anchors.foreheadTop.y - 42 * anchors.scale + Math.cos(phase * 2 + g.base) * 10;
-        g.size = 26 * S * anchors.scale;
+        g.x = anchors.foreheadTop.x + g.base * gs * 0.72 + Math.sin(phase * 2 + g.base) * gs * 0.14;
+        g.y = anchors.foreheadTop.y - gs * 0.95 + Math.cos(phase * 2 + g.base) * gs * 0.14;
+        g.size = gs;
       }
     },
     draw(ctx) {
@@ -169,7 +170,7 @@ export function createSurpriseEmitter() {
       acc = rate(dt, 4, acc); // slow ring cadence
       while (acc >= 1) {
         acc -= 1;
-        parts.push(createParticle({ x: a.foreheadTop.x, y: a.foreheadTop.y - 34 * a.scale,
+        parts.push(createParticle({ x: a.foreheadTop.x, y: a.foreheadTop.y - 13 * S * a.scale,
           life: 720, size: 8 * S * a.scale, color: '#ffd54a', data: 'ring' }));
       }
       return acc;
@@ -177,15 +178,15 @@ export function createSurpriseEmitter() {
     (ctx, parts) => {
       for (const p of parts) {
         const k = lifeProgress(p);
-        ctx.globalAlpha = (1 - k) * 0.85; ctx.strokeStyle = p.color; ctx.lineWidth = 5;
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.size + k * 55, 0, Math.PI * 2); ctx.stroke();
+        ctx.globalAlpha = (1 - k) * 0.85; ctx.strokeStyle = p.color; ctx.lineWidth = 7;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.size + k * 90, 0, Math.PI * 2); ctx.stroke();
       }
       ctx.globalAlpha = 1;
       // The "!" itself: anchored, drawn once (rings imply anchors are present).
       if (parts.length) {
         const p = parts[parts.length - 1];
         glow(ctx, 8);
-        outlinedText(ctx, '!', p.x, p.y, p.size * 3.2, '#ffd54a');
+        outlinedText(ctx, '!', p.x, p.y, p.size * 2.8, '#ffd54a');
         clearGlow(ctx);
       }
     });
@@ -247,7 +248,7 @@ export function createCalloutLayer() {
   return {
     spawn(text, color, anchor, w, h) {
       const x = anchor ? anchor.x : w / 2;
-      const y = anchor ? anchor.y - 52 : h * 0.16;
+      const y = anchor ? anchor.y - 70 : h * 0.14;
       items.push({ text, color, x, y, age: 0 });
     },
     update(dt) {
@@ -259,14 +260,14 @@ export function createCalloutLayer() {
         const scale = k < 0.18 ? k / 0.18 : 1;        // scale-in over first 18%
         const alpha = k > 0.7 ? (1 - k) / 0.3 : 1;    // fade-out over last 30%
         ctx.save(); ctx.translate(it.x, it.y); ctx.scale(scale, scale); ctx.globalAlpha = alpha;
-        ctx.font = 'bold 46px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        const wpx = ctx.measureText(it.text).width + 44;
+        ctx.font = 'bold 64px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        const wpx = ctx.measureText(it.text).width + 60;
         ctx.fillStyle = 'rgba(18,16,14,0.82)';
-        ctx.beginPath(); ctx.roundRect(-wpx / 2, -36, wpx, 72, 20); ctx.fill();
-        ctx.lineWidth = 3; ctx.strokeStyle = it.color; ctx.stroke();
-        ctx.lineJoin = 'round'; ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(15,14,12,0.9)';
-        ctx.strokeText(it.text, 0, 2);
-        ctx.fillStyle = it.color; ctx.fillText(it.text, 0, 2);
+        ctx.beginPath(); ctx.roundRect(-wpx / 2, -48, wpx, 96, 26); ctx.fill();
+        ctx.lineWidth = 4; ctx.strokeStyle = it.color; ctx.stroke();
+        ctx.lineJoin = 'round'; ctx.lineWidth = 8; ctx.strokeStyle = 'rgba(15,14,12,0.9)';
+        ctx.strokeText(it.text, 0, 3);
+        ctx.fillStyle = it.color; ctx.fillText(it.text, 0, 3);
         ctx.restore();
       }
       ctx.globalAlpha = 1;
