@@ -28,6 +28,12 @@ server.
   a Delivery score.
 - **Optional facial emotion.** When enabled, face crops are scored with HSEmotion
   (AffectNet, via ONNX Runtime) for a per-question emotion track.
+- **Reaction effects (Face Analysis screen).** On the Face Analysis page, a toggle-on
+  overlay bursts floating emoji when your face shows a strong emotion (happy 😄, sad 😢,
+  surprise 😮, angry 😠, disgust 🤢, fear 😨, contempt 😒) or your hand makes a gesture
+  (👍 👎 ✌️ ✋ ✊ ☝️ 🤟) — both react at once. On by default; turn it off with the
+  "Reaction effects" control in the left rail. Purely visual, and computed in the browser —
+  it adds no network calls and doesn't change any analysis or scoring.
 - **Fused readiness verdict.** The report combines three signals — Delivery (voice),
   Presence (face/body), and Content (transcript, scored by Claude) — into one readiness
   score and band, with written coaching.
