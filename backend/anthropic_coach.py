@@ -10,8 +10,8 @@ _SCENARIO_COACH = {
     "present":  ("an expert presentation coach",        "practice presentation"),
     "tough":    ("a communication coach",               "tough conversation practice"),
     "pitch":    ("a pitch and persuasion coach",        "pitch/persuasion practice"),
-    "teach":    ("an expert educator",                  "teaching or explanation session"),
-    "language": ("a language fluency coach",            "spoken language practice session"),
+    "negotiate": ("a negotiation coach",                  "negotiation practice session"),
+    "case":      ("a case interview coach",               "case interview practice session"),
 }
 
 

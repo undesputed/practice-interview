@@ -11,8 +11,8 @@ const SCENARIOS = [
   { id: 'present',  icon: '▶', title: 'Deliver a presentation', desc: 'See where your delivery held attention and where it slipped.', tags: ['delivery', 'slides'] },
   { id: 'tough',    icon: '⚡', title: 'Handle a tough talk',    desc: 'Check how steady and clear you stayed under pressure.',    tags: ['pressure', 'clarity'] },
   { id: 'pitch',    icon: '◈', title: 'Pitch and persuade',     desc: 'See how convincing and specific you sounded.',             tags: ['persuasion'] },
-  { id: 'teach',    icon: '◎', title: 'Teach or explain',       desc: 'Find the moments your explanation got fuzzy.',             tags: ['explanation'] },
-  { id: 'language', icon: '⌘', title: 'Speak another language', desc: 'Track your fluency, pace, and pauses.',                   tags: ['fluency', 'pace'] },
+  { id: 'negotiate', icon: '◎', title: 'Negotiate a deal',        desc: 'See how persuasive and composed you are under pushback.',  tags: ['negotiation', 'pressure'] },
+  { id: 'case',      icon: '⌘', title: 'Crack a case interview',  desc: 'Work through a business problem and sharpen your structure.', tags: ['case', 'consulting'] },
 ];
 
 // Job roles — only shown when scenario === 'job'.
