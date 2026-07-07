@@ -1,7 +1,8 @@
 // frontend/reaction-trigger.js
 // Pure decision core for the Face Analysis reaction effects. Given per-frame
-// { bs, gestures, t } samples, decides which emoji to burst, with debounce +
-// cooldown so a held expression/gesture fires once. No DOM — unit-tested.
+// { bs, gestures, t } samples, decides which emoji to burst. Emotions fire on
+// sustained onset and may re-fire after their cooldown while still held; a held
+// gesture fires once on its rising edge and not again while held. No DOM — unit-tested.
 import { dominantEmotion } from './emotion.js';
 
 export const EMOTION_EMOJI = {
@@ -72,7 +73,6 @@ export function createReactionTrigger(opts = {}) {
       }
 
       return out;
-    },
-    reset() { candidate = null; streak = 0; activeGestures = new Set(); },
+    }
   };
 }

@@ -65,6 +65,14 @@ test('None gesture is ignored', () => {
   assert.deepEqual(trig.feed({ gestures: ['None'], t: 0 }), []);
 });
 
+test('a continuously held gesture never re-fires, even past its cooldown', () => {
+  const trig = createReactionTrigger(stub);
+  assert.deepEqual(trig.feed({ gestures: ['Thumb_Up'], t: 0 }), ['👍']); // onset fires
+  assert.deepEqual(trig.feed({ gestures: ['Thumb_Up'], t: 800 }), []);
+  assert.deepEqual(trig.feed({ gestures: ['Thumb_Up'], t: 1600 }), []); // past 1500ms cooldown, still held
+  assert.deepEqual(trig.feed({ gestures: ['Thumb_Up'], t: 3000 }), []);
+});
+
 test('emotion and gesture can fire together', () => {
   const trig = createReactionTrigger(stub);
   trig.feed({ bs: happy, t: 0 }); trig.feed({ bs: happy, t: 10 });
