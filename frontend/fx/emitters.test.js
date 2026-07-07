@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTearsEmitter, createFireEmitter, createConfusedEmitter,
-         createSparkleEmitter, createSurpriseEmitter, createDisgustEmitter, createFearEmitter } from './emitters.js';
+         createSparkleEmitter, createSurpriseEmitter, createDisgustEmitter, createFearEmitter,
+         createCalloutLayer, EMOTION_EMITTERS, GESTURE_CALLOUTS } from './emitters.js';
 
 // Minimal Canvas-2D stand-in: records nothing, never throws.
 function mockCtx() {
@@ -41,4 +42,31 @@ test('clear() empties an emitter', () => {
   for (let i = 0; i < 20; i++) e.update(anchors, 16);
   e.clear();
   assert.equal(e.count(), 0);
+});
+
+test('EMOTION_EMITTERS covers all seven emotions with factories', () => {
+  const keys = ['happy', 'sad', 'surprise', 'angry', 'disgust', 'fear', 'confused'];
+  for (const k of keys) assert.equal(typeof EMOTION_EMITTERS[k], 'function');
+  assert.equal(Object.keys(EMOTION_EMITTERS).length, keys.length);
+});
+
+test('GESTURE_CALLOUTS maps Thumb_Up to OK! green', () => {
+  assert.deepEqual(GESTURE_CALLOUTS.Thumb_Up, { text: 'OK!', color: '#3ddc84' });
+  assert.equal(Object.keys(GESTURE_CALLOUTS).length, 7);
+});
+
+test('callout spawns, draws, and expires', () => {
+  const c = createCalloutLayer();
+  c.spawn('OK!', '#3ddc84', { x: 50, y: 50 }, 200, 200);
+  assert.equal(c.count(), 1);
+  c.draw(mockCtx()); // must not throw
+  for (let i = 0; i < 120; i++) c.update(16); // ~1.9s > 1s life
+  assert.equal(c.count(), 0);
+});
+
+test('callout falls back to top-center when anchor is null', () => {
+  const c = createCalloutLayer();
+  c.spawn('Hi!', '#7fc7ff', null, 200, 400);
+  c.draw(mockCtx()); // must not throw with a null anchor
+  assert.equal(c.count(), 1);
 });

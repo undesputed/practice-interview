@@ -217,3 +217,53 @@ export function createFearEmitter() {
       ctx.globalAlpha = 1;
     });
 }
+
+// ── Gesture callouts: transient labeled badges (scale-in -> hold -> fade) ──
+const CALLOUT_LIFE = 1000;
+export function createCalloutLayer() {
+  const items = [];
+  return {
+    spawn(text, color, anchor, w, h) {
+      const x = anchor ? anchor.x : w / 2;
+      const y = anchor ? anchor.y - 30 : h * 0.18;
+      items.push({ text, color, x, y, age: 0 });
+    },
+    update(dt) {
+      for (let i = items.length - 1; i >= 0; i--) { items[i].age += dt; if (items[i].age >= CALLOUT_LIFE) items.splice(i, 1); }
+    },
+    draw(ctx) {
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      for (const it of items) {
+        const k = it.age / CALLOUT_LIFE;
+        const scale = k < 0.2 ? k / 0.2 : 1;          // scale-in over first 20%
+        const alpha = k > 0.7 ? (1 - k) / 0.3 : 1;    // fade-out over last 30%
+        ctx.save(); ctx.translate(it.x, it.y); ctx.scale(scale, scale); ctx.globalAlpha = alpha;
+        ctx.font = 'bold 26px sans-serif';
+        const wpx = ctx.measureText(it.text).width + 24;
+        ctx.fillStyle = 'rgba(20,18,16,0.72)';
+        ctx.beginPath(); ctx.roundRect(-wpx / 2, -20, wpx, 40, 12); ctx.fill();
+        ctx.fillStyle = it.color; ctx.fillText(it.text, 0, 1);
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+    },
+    clear() { items.length = 0; },
+    count() { return items.length; },
+  };
+}
+
+export const EMOTION_EMITTERS = {
+  happy: createSparkleEmitter, sad: createTearsEmitter, surprise: createSurpriseEmitter,
+  angry: createFireEmitter, disgust: createDisgustEmitter, fear: createFearEmitter,
+  confused: createConfusedEmitter,
+};
+
+export const GESTURE_CALLOUTS = {
+  Thumb_Up: { text: 'OK!', color: '#3ddc84' },
+  Thumb_Down: { text: 'Nope', color: '#ff5c5c' },
+  Victory: { text: 'Nice!', color: '#ffd54a' },
+  Open_Palm: { text: 'Hi!', color: '#7fc7ff' },
+  Closed_Fist: { text: 'Strong!', color: '#ff9f43' },
+  Pointing_Up: { text: 'Idea! 💡', color: '#ffe08a' },
+  ILoveYou: { text: 'Love! 💜', color: '#c98bff' },
+};
