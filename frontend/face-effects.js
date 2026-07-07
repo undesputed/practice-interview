@@ -56,7 +56,9 @@ export function createFaceEffects(canvas) {
 
   return {
     setEnabled(on) {
-      enabled = !!on;
+      on = !!on;
+      if (on === enabled) return; // idempotent: never stack a second rAF loop
+      enabled = on;
       if (enabled) { resize(); lastT = 0; rafId = requestAnimationFrame(loop); window.addEventListener('resize', resize); }
       else { cancelAnimationFrame(rafId); window.removeEventListener('resize', resize); clearAll(); }
     },
@@ -67,9 +69,12 @@ export function createFaceEffects(canvas) {
         bs: sample.bs, gestures: sample.gestures, t: sample.t,
       });
       activeEmotion = ae; // on change, the previously-active emitter drains itself in the loop
-      for (const g of gestureOnsets) {
-        const c = GESTURE_CALLOUTS[g];
-        if (c) callouts.spawn(c.text, c.color, handAnchor(sample.handLandmarks), canvas.width, canvas.height);
+      if (gestureOnsets.length) {
+        const anchor = handAnchor(sample.handLandmarks);
+        for (const g of gestureOnsets) {
+          const c = GESTURE_CALLOUTS[g];
+          if (c) callouts.spawn(c.text, c.color, anchor, canvas.width, canvas.height);
+        }
       }
     },
     clear() { clearAll(); },
