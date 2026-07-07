@@ -3,6 +3,7 @@ import { dashboard } from './dashboard.js';
 import { history } from './history.js';
 import { report } from './report.js';
 import { facial } from './facial.js';
+import { audio } from './audio.js';
 import { progress } from './progress.js';
 import { newInterview } from './practice-interview.js';
 import { live } from './live.js';
@@ -19,7 +20,7 @@ export const screens = [
   ['/thanks',      thanks],
   ['/session/:id', report],
   ['/facial',      facial],
-  ['/audio',       placeholder('Audio & Transcript Analysis', 'Live Deepgram instrument.')],
+  ['/audio',       audio],
   ['/settings',    placeholder('Settings', 'Toggles and preferences.')],
   ['/library',     placeholder('Role & question library', 'Manage interview roles and questions.')],
 ];

@@ -236,18 +236,29 @@ async def session(req: SessionRequest):
 
         if run_claude:
             # Run coaching and verdict in parallel — they are independent Claude calls.
+            # 45-second per-call timeout prevents a slow/overloaded Anthropic API from
+            # hanging the whole session endpoint until the browser itself times out.
+            _CLAUDE_TIMEOUT = 45.0
             raw = await asyncio.gather(
-                asyncio.to_thread(generate_coaching, anthropic_key, full_text, req.role, req.scenario),
-                asyncio.to_thread(generate_verdict, anthropic_key, full_text, req.role, delivery,
-                                  presence, req.scenario),
+                asyncio.wait_for(
+                    asyncio.to_thread(generate_coaching, anthropic_key, full_text, req.role, req.scenario),
+                    timeout=_CLAUDE_TIMEOUT,
+                ),
+                asyncio.wait_for(
+                    asyncio.to_thread(generate_verdict, anthropic_key, full_text, req.role, delivery,
+                                      presence, req.scenario),
+                    timeout=_CLAUDE_TIMEOUT,
+                ),
                 return_exceptions=True,
             )
             if isinstance(raw[0], Exception):
-                logging.warning("coaching unavailable: %s", raw[0])
+                label = "timed out" if isinstance(raw[0], asyncio.TimeoutError) else str(raw[0])
+                logging.warning("coaching unavailable: %s", label)
             else:
                 coaching = raw[0]
             if isinstance(raw[1], Exception):
-                logging.warning("verdict unavailable: %s", raw[1])
+                label = "timed out" if isinstance(raw[1], asyncio.TimeoutError) else str(raw[1])
+                logging.warning("verdict unavailable: %s", label)
             else:
                 explanation = raw[1]
                 content = explanation.get("content_score") if explanation else None

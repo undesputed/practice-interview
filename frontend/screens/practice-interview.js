@@ -1,6 +1,7 @@
 import { esc } from '../util.js';
 import { setInterviewConfig } from '../interview-config.js';
 import { api } from '../api.js';
+import { preload } from '../interview-engine.js';
 
 // Scenarios: what the user is practicing for.
 // The "job" scenario reveals the optional role picker; all others hide it.
@@ -10,8 +11,8 @@ const SCENARIOS = [
   { id: 'present',  icon: '▶', title: 'Deliver a presentation', desc: 'See where your delivery held attention and where it slipped.', tags: ['delivery', 'slides'] },
   { id: 'tough',    icon: '⚡', title: 'Handle a tough talk',    desc: 'Check how steady and clear you stayed under pressure.',    tags: ['pressure', 'clarity'] },
   { id: 'pitch',    icon: '◈', title: 'Pitch and persuade',     desc: 'See how convincing and specific you sounded.',             tags: ['persuasion'] },
-  { id: 'teach',    icon: '◎', title: 'Teach or explain',       desc: 'Find the moments your explanation got fuzzy.',             tags: ['explanation'] },
-  { id: 'language', icon: '⌘', title: 'Speak another language', desc: 'Track your fluency, pace, and pauses.',                   tags: ['fluency', 'pace'] },
+  { id: 'negotiate', icon: '◎', title: 'Negotiate a deal',        desc: 'See how persuasive and composed you are under pushback.',  tags: ['negotiation', 'pressure'] },
+  { id: 'case',      icon: '⌘', title: 'Crack a case interview',  desc: 'Work through a business problem and sharpen your structure.', tags: ['case', 'consulting'] },
 ];
 
 // Job roles — only shown when scenario === 'job'.
@@ -192,6 +193,9 @@ function saveSettings(root) {
 export function newInterview() {
   generatedQuestions = [];
   stopMedia();
+  // Kick off MediaPipe model downloads immediately so they are ready (or nearly so)
+  // by the time the user finishes the form and clicks Start.
+  preload();
   window.addEventListener('hashchange', function leave() {
     if (location.hash.replace(/^#/, '') !== '/practice-interview') {
       stopMedia();
