@@ -1,6 +1,7 @@
 import { esc } from '../util.js';
 import { setInterviewConfig } from '../interview-config.js';
 import { api } from '../api.js';
+import { preload } from '../interview-engine.js';
 
 // Scenarios: what the user is practicing for.
 // The "job" scenario reveals the optional role picker; all others hide it.
@@ -192,6 +193,9 @@ function saveSettings(root) {
 export function newInterview() {
   generatedQuestions = [];
   stopMedia();
+  // Kick off MediaPipe model downloads immediately so they are ready (or nearly so)
+  // by the time the user finishes the form and clicks Start.
+  preload();
   window.addEventListener('hashchange', function leave() {
     if (location.hash.replace(/^#/, '') !== '/practice-interview') {
       stopMedia();

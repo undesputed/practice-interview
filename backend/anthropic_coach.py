@@ -66,10 +66,10 @@ def parse_coaching(raw: str) -> dict:
 def generate_coaching(api_key: str, transcript_text: str, role: str,
                       scenario: str = "job") -> dict:
     """Call Claude to produce structured coaching. System prompt is scenario-aware."""
-    client = Anthropic(api_key=api_key)
+    client = Anthropic(api_key=api_key, timeout=42.0)
     resp = client.messages.create(
         model=COACH_MODEL,
-        max_tokens=1024,
+        max_tokens=700,
         system=[{"type": "text", "text": _coaching_system_prompt(scenario),
                  "cache_control": {"type": "ephemeral"}}],
         messages=[{"role": "user",
@@ -112,12 +112,12 @@ def generate_verdict(api_key: str, transcript_text: str, role: str,
                      scenario: str = "job") -> dict:
     """One Claude call: score Content (0-100) and write the readiness explanation,
     given the already-computed Delivery + Presence numbers. Scenario-aware."""
-    client = Anthropic(api_key=api_key)
+    client = Anthropic(api_key=api_key, timeout=42.0)
     d = "n/a" if delivery_score is None else str(delivery_score)
     p = "n/a" if presence_score is None else str(presence_score)
     resp = client.messages.create(
         model=COACH_MODEL,
-        max_tokens=1024,
+        max_tokens=900,
         system=[{"type": "text", "text": _verdict_system_prompt(scenario),
                  "cache_control": {"type": "ephemeral"}}],
         messages=[{"role": "user",

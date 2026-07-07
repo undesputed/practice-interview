@@ -4,9 +4,9 @@ import { getInterviewConfig } from '../interview-config.js';
 import { api } from '../api.js';
 import { esc } from '../util.js';
 import { startRecording } from '../audio-recorder.js';
-import { computeAcousticFeatures } from '../acoustic-features.js';
 import { computeLiveMetrics } from '../live-metrics.js';
 import { emotionScores, dominantEmotion } from '../emotion.js';
+import { setPendingSession } from '../pending-session.js';
 
 let agent = null;          // active Deepgram voice agent, or null
 let convoCount = 0;        // conversation lines seen this run
@@ -14,10 +14,7 @@ let turn = -1;             // interview question index; advances on each intervi
 let segments = [];         // { speaker, text, t } transcript lines
 let events = [];           // action events captured for the report
 let startTs = 0;           // performance.now() at start, for segment timestamps
-let finishing = false;     // guard so End + agent-close don't double-submit; stays true
-                           // through score retries (retry re-POSTs via submitScore, never
-                           // restarts the engine), so we never reset it after finishInterview
-let pendingScore = null;   // payload from a failed score POST, kept for retry
+let finishing = false;     // guard so End + agent-close don't double-submit
 let recorder = null;       // active audio recorder handle, or null
 let role = '';             // interview role captured at start
 let scenario = 'job';     // interview scenario captured at start
@@ -227,56 +224,36 @@ function exitInterview(){
   location.hash = '#/';
 }
 
-// POST a captured interview and open its report. On failure, keep the payload so
-// the user can retry (the start button becomes "Retry scoring") without data loss.
-async function submitScore(payload){
-  setState('Processing…'); setVoice('Scoring…');
-  loading('Scoring your interview…'); showControls(false); showStart(null);
-  try {
-    const resp = await api.createSession(payload);
-    pendingScore = null;
-    hideScoreSteps();
-    location.hash = '#/thanks/' + resp.session_id;
-  } catch (e){
-    pendingScore = payload;
-    hideScoreSteps();
-    setState('Error'); setVoice('—');
-    overlay("Couldn’t score the interview.");
-    showStart('Retry scoring');
-  }
-}
-
-// End the interview: stop, score, open the report. Grabs frames before teardown
-// (engine.stop() releases the session). Idempotent via the `finishing` guard.
+// End the interview: tear down immediately, hand everything to thanks.js for scoring.
+// The user should leave the camera screen as fast as possible — all async work
+// (voice analysis, Claude) happens on the thanks/pending page instead.
 async function finishInterview(){
   if (finishing) return;
   finishing = true;
   stopMetrics();
-  showControls(false); loading('Scoring your interview…'); setState('Processing…'); setVoice('—');
-  showScoreSteps(0);
+  showControls(false);
+
   const frames = engine.getFrames().slice();
   const rec = recorder; recorder = null;
   stopAgent();
-  const audio = rec ? await rec.stop() : null;
+  const audio = rec ? await rec.stop() : null;  // assemble blob (~0ms), no network
   engine.stop();
 
   if (!frames.length){
-    hideScoreSteps(); overlay('Nothing to score.'); showStart('Start');
+    overlay('Nothing to score.'); showStart('Start');
     return;
   }
 
-  let voice = null;
-  if (audio && audio.blob){
-    showScoreSteps(1);
-    const acoustic = await computeAcousticFeatures(audio.blob);
-    voice = await api.analyzeVoice(audio.blob, acoustic || {});
-  }
-
-  showScoreSteps(2);
   const full_text = segments
     .map((s) => (s.speaker === 'interviewer' ? 'INTERVIEWER: ' : 'CANDIDATE: ') + s.text)
     .join('\n');
-  await submitScore({ scenario, role, frames, transcript: { full_text, segments }, events, emotion: null, voice });
+  setPendingSession({
+    scenario, role, frames,
+    transcript: { full_text, segments },
+    events, emotion: null,
+    audioBlob: audio ? audio.blob : null,
+  });
+  location.hash = '#/thanks/pending';
 }
 
 function resetConvo(){
@@ -319,7 +296,7 @@ async function startEngine(){
 
   convoCount = 0; turn = -1;
   segments = []; events = []; startTs = performance.now(); finishing = false;
-  pendingScore = null; role = getInterviewConfig().role;
+  role = getInterviewConfig().role;
   scenario = getInterviewConfig().scenario || 'job'; recorder = null;
   muted = false; camOn = true;
   const imm = byId('live-imm'); if (imm) imm.classList.remove('cam-off');
@@ -352,8 +329,7 @@ async function startEngine(){
   }
 }
 
-// Start/Retry button: re-submit a failed score if pending, else start fresh.
-function onStartClick(){ return pendingScore ? submitScore(pendingScore) : startEngine(); }
+function onStartClick(){ return startEngine(); }
 
 export function live(){
   // Tear down anything left running; go immersive; arm a one-shot teardown for navigate-away.
