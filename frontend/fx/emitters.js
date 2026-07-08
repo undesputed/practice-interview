@@ -6,7 +6,12 @@ import { createParticle, stepParticle, lifeProgress } from './particles.js';
 
 const REDUCED = typeof matchMedia === 'function'
   && matchMedia('(prefers-reduced-motion: reduce)').matches;
-const MAX_PER_EMITTER = 120;
+const MAX_PER_EMITTER = 280;
+// Effects intensify the longer an expression is held: the per-emitter spawn rate ramps from
+// 1x up to RAMP_MAX over RAMP_MS, then plateaus — so icons keep multiplying while you hold the
+// expression. Resets to 1x when the expression ends so the next one starts fresh.
+const RAMP_MAX = 3.5;
+const RAMP_MS = 2500;
 
 // Global size dial. The canvas backing store is DPR-scaled, so raw pixel sizes render at
 // ~half-size on retina and read as faint specks — S scales every effect up so it stands
@@ -29,15 +34,22 @@ function outlinedText(ctx, text, x, y, px, fill) {
 // Spawn/step/cull helper shared by particle emitters.
 function baseEmitter(spawn, render) {
   const parts = [];
-  let acc = 0; // fractional spawn accumulator
+  let acc = 0;    // fractional spawn accumulator
+  let holdMs = 0; // how long the expression has been continuously held (drives the ramp)
   return {
     update(anchors, dt) {
-      if (anchors) acc = spawn(parts, anchors, dt, acc);
+      if (anchors) {
+        holdMs += dt;
+        const ramp = 1 + Math.min(1, holdMs / RAMP_MS) * (RAMP_MAX - 1); // 1x -> RAMP_MAX over RAMP_MS
+        acc = spawn(parts, anchors, dt, acc, ramp);
+      } else {
+        holdMs = 0; // expression ended — the next hold ramps from the start
+      }
       for (let i = parts.length - 1; i >= 0; i--) if (!stepParticle(parts[i], dt)) parts.splice(i, 1);
       if (parts.length > MAX_PER_EMITTER) parts.splice(0, parts.length - MAX_PER_EMITTER);
     },
     draw(ctx) { render(ctx, parts); },
-    clear() { parts.length = 0; acc = 0; },
+    clear() { parts.length = 0; acc = 0; holdMs = 0; },
     count() { return parts.length; },
   };
 }
@@ -46,8 +58,8 @@ function rate(dt, perSec, acc) { return acc + (dt / 1000) * (REDUCED ? perSec * 
 // ── Sad: fat blue teardrops welling under the eyes and falling ──
 export function createTearsEmitter() {
   return baseEmitter(
-    (parts, a, dt, acc) => {
-      acc = rate(dt, 9, acc);
+    (parts, a, dt, acc, ramp) => {
+      acc = rate(dt, 9 * ramp, acc);
       while (acc >= 1) {
         acc -= 1;
         const eye = Math.random() < 0.5 ? a.leftEye : a.rightEye;
@@ -76,8 +88,8 @@ export function createTearsEmitter() {
 // ── Angry: big flames rising above the forehead (color by life), additive ──
 export function createFireEmitter() {
   return baseEmitter(
-    (parts, a, dt, acc) => {
-      acc = rate(dt, 34, acc);
+    (parts, a, dt, acc, ramp) => {
+      acc = rate(dt, 34 * ramp, acc);
       while (acc >= 1) {
         acc -= 1;
         parts.push(createParticle({
@@ -104,29 +116,35 @@ export function createFireEmitter() {
     });
 }
 
-// ── Confused: three big "?" glyphs bobbing/orbiting above the head ──
+// ── Confused: "?" glyphs above the head that keep piling up the longer you stay confused ──
+const CONFUSED_MAX = 9;
+const CONFUSED_SPAWN_MS = 340; // add one more "?" this often while confusion is held
 export function createConfusedEmitter() {
-  const glyphs = []; // persistent while the face is present
-  let phase = 0;
+  const glyphs = [];
+  let phase = 0, holdMs = 0;
   return {
     update(anchors, dt) {
-      if (!anchors) { glyphs.length = 0; return; } // drop when the face is gone
-      if (glyphs.length === 0)
-        for (let i = 0; i < 3; i++) glyphs.push({ base: (i - 1) });
+      if (!anchors) { glyphs.length = 0; holdMs = 0; return; } // drop when the face is gone
+      holdMs += dt;
       phase += (REDUCED ? 0 : dt / 1000);
-      const gs = 26 * S * anchors.scale; // glyph size; space + lift relative to it so big "?"s don't overlap
-      for (const g of glyphs) {
-        g.x = anchors.foreheadTop.x + g.base * gs * 0.72 + Math.sin(phase * 2 + g.base) * gs * 0.14;
-        g.y = anchors.foreheadTop.y - gs * 0.95 + Math.cos(phase * 2 + g.base) * gs * 0.14;
+      // Accumulate more "?" the longer confusion is held (1 -> CONFUSED_MAX).
+      const target = Math.min(CONFUSED_MAX, 1 + Math.floor(holdMs / CONFUSED_SPAWN_MS));
+      while (glyphs.length < target) glyphs.push({ off: Math.random() * 6, spin: 1 + Math.random() });
+      const gs = 26 * S * anchors.scale;
+      const n = glyphs.length;
+      glyphs.forEach((g, i) => {
+        const spread = n > 1 ? (i / (n - 1) - 0.5) : 0; // fan out across an arc as more appear
+        g.x = anchors.foreheadTop.x + spread * gs * Math.min(n, 8) * 0.55 + Math.sin(phase * g.spin + g.off) * gs * 0.12;
+        g.y = anchors.foreheadTop.y - gs * (0.95 + (i % 2) * 0.5) + Math.cos(phase * g.spin + g.off) * gs * 0.12;
         g.size = gs;
-      }
+      });
     },
     draw(ctx) {
       glow(ctx, 8);
       for (const g of glyphs) outlinedText(ctx, '?', g.x, g.y, g.size, '#ffd54a');
       clearGlow(ctx);
     },
-    clear() { glyphs.length = 0; phase = 0; },
+    clear() { glyphs.length = 0; phase = 0; holdMs = 0; },
     count() { return glyphs.length; },
   };
 }
@@ -134,8 +152,8 @@ export function createConfusedEmitter() {
 // ── Happy: big twinkling sparkles scattered around the face box ──
 export function createSparkleEmitter() {
   return baseEmitter(
-    (parts, a, dt, acc) => {
-      acc = rate(dt, 16, acc);
+    (parts, a, dt, acc, ramp) => {
+      acc = rate(dt, 16 * ramp, acc);
       while (acc >= 1) {
         acc -= 1;
         const b = a.faceBox;
@@ -166,8 +184,8 @@ export function createSparkleEmitter() {
 // ── Surprise: a big bobbing "!" plus expanding rings above the head ──
 export function createSurpriseEmitter() {
   return baseEmitter(
-    (parts, a, dt, acc) => {
-      acc = rate(dt, 4, acc); // slow ring cadence
+    (parts, a, dt, acc, ramp) => {
+      acc = rate(dt, 4 * ramp, acc); // slow ring cadence
       while (acc >= 1) {
         acc -= 1;
         parts.push(createParticle({ x: a.foreheadTop.x, y: a.foreheadTop.y - 13 * S * a.scale,
@@ -195,8 +213,8 @@ export function createSurpriseEmitter() {
 // ── Disgust: greenish wavy blobs drifting sideways near the mouth ──
 export function createDisgustEmitter() {
   return baseEmitter(
-    (parts, a, dt, acc) => {
-      acc = rate(dt, 12, acc);
+    (parts, a, dt, acc, ramp) => {
+      acc = rate(dt, 12 * ramp, acc);
       while (acc >= 1) {
         acc -= 1;
         const dir = Math.random() < 0.5 ? -1 : 1;
@@ -220,8 +238,8 @@ export function createDisgustEmitter() {
 // ── Fear: cold-sweat droplets sliding down from the temples ──
 export function createFearEmitter() {
   return baseEmitter(
-    (parts, a, dt, acc) => {
-      acc = rate(dt, 6, acc);
+    (parts, a, dt, acc, ramp) => {
+      acc = rate(dt, 6 * ramp, acc);
       while (acc >= 1) {
         acc -= 1;
         const t = Math.random() < 0.5 ? a.leftTemple : a.rightTemple;
