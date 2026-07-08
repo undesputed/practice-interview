@@ -97,3 +97,17 @@ test('emotion and gesture fire together', () => {
   assert.equal(r.activeEmotion, 'sad');
   assert.deepEqual(r.gestureOnsets, [{ gesture: 'Thumb_Up', hand: 0 }]);
 });
+
+test('switches to a stronger different emotion after SUSTAIN_FRAMES', () => {
+  const t = createReactionTrigger(opts);
+  for (const ts of [0, 10, 20]) t.feed({ bs: S({ sad: 80 }), t: ts }); // active = sad
+  assert.equal(t.feed({ bs: S({ sad: 30, angry: 80 }), t: 30 }).activeEmotion, 'sad');
+  assert.equal(t.feed({ bs: S({ sad: 30, angry: 80 }), t: 40 }).activeEmotion, 'sad');
+  assert.equal(t.feed({ bs: S({ sad: 30, angry: 80 }), t: 50 }).activeEmotion, 'angry');
+});
+
+test('neutral / below-enter never activates', () => {
+  const t = createReactionTrigger(opts);
+  for (let i = 0; i < 5; i++)
+    assert.equal(t.feed({ bs: S({ happy: 30 }), t: i * 10 }).activeEmotion, null);
+});

@@ -182,7 +182,9 @@ function launch(canvas, video, stream, mode, onFrame){
         } else {
           session._fxGestTs = now;
         }
-        out.gestures = (r.gestures || []).map((g) => g && g[0] && g[0].categoryName).filter(Boolean);
+        // One entry per detected hand ('None' placeholder if unclassified) so the index
+        // stays aligned with out.handLandmarks — the effects anchor callouts by hand index.
+        out.gestures = (r.gestures || []).map((g) => (g && g[0] && g[0].categoryName) || 'None');
       }
 
       if (poseMode){
