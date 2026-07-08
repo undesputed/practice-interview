@@ -7,6 +7,7 @@ export const GESTURE_COMBOS = {
   pumped:  { gestures: ['Closed_Fist', 'Closed_Fist'], text: 'PUMPED!', color: '#ff9f43' },
   woo:     { gestures: ['Open_Palm', 'Open_Palm'], text: 'WOO!', color: '#7fc7ff' },
   love:    { gestures: ['ILoveYou', 'ILoveYou'], text: 'LOVE!!', color: '#c98bff' },
+  double_point: { gestures: ['Pointing_Up', 'Pointing_Up'], text: 'EUREKA!', color: '#ffd54a' },
   mixed:   { gestures: ['Thumb_Up', 'Thumb_Down'], text: 'MIXED', color: '#ffe08a' },
 };
 
