@@ -246,10 +246,10 @@ const CALLOUT_LIFE = 1100;
 export function createCalloutLayer() {
   const items = [];
   return {
-    spawn(text, color, anchor, w, h) {
+    spawn(text, color, anchor, w, h, sizeMul = 1) {
       const x = anchor ? anchor.x : w / 2;
       const y = anchor ? anchor.y - 70 : h * 0.14;
-      items.push({ text, color, x, y, age: 0 });
+      items.push({ text, color, x, y, age: 0, sizeMul });
     },
     update(dt) {
       for (let i = items.length - 1; i >= 0; i--) { items[i].age += dt; if (items[i].age >= CALLOUT_LIFE) items.splice(i, 1); }
@@ -257,7 +257,7 @@ export function createCalloutLayer() {
     draw(ctx) {
       for (const it of items) {
         const k = it.age / CALLOUT_LIFE;
-        const scale = k < 0.18 ? k / 0.18 : 1;        // scale-in over first 18%
+        const scale = (k < 0.18 ? k / 0.18 : 1) * (it.sizeMul || 1); // scale-in, then combo size boost
         const alpha = k > 0.7 ? (1 - k) / 0.3 : 1;    // fade-out over last 30%
         ctx.save(); ctx.translate(it.x, it.y); ctx.scale(scale, scale); ctx.globalAlpha = alpha;
         ctx.font = 'bold 64px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';

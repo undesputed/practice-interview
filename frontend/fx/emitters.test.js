@@ -70,3 +70,10 @@ test('callout falls back to top-center when anchor is null', () => {
   c.draw(mockCtx()); // must not throw with a null anchor
   assert.equal(c.count(), 1);
 });
+
+test('callout spawn accepts a sizeMul without breaking count/draw', () => {
+  const c = createCalloutLayer();
+  c.spawn('AWESOME!', '#3ddc84', { x: 100, y: 100 }, 400, 400, 1.6);
+  assert.equal(c.count(), 1);
+  c.draw(mockCtx()); // must not throw with the larger size
+});
