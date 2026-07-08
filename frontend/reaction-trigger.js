@@ -3,11 +3,13 @@
 // active emotion with enter/exit hysteresis (so effects don't flicker) and reports
 // gesture onsets (debounced by a cooldown). No DOM — unit-tested.
 import { emotionScores } from './emotion.js';
+import { detectCombo } from './fx/combos.js';
 
 const EMOTION_ENTER_SCORE = 45;
 const EMOTION_EXIT_SCORE = 25;
 const SUSTAIN_FRAMES = 3;
 const GESTURE_COOLDOWN_MS = 1500;
+const GESTURE_COMBO_COOLDOWN_MS = 1500;
 const CONFUSED_BROW_MIN = 0.35;
 const CONFUSED_SCORE_SCALE = 130;
 
@@ -32,11 +34,14 @@ export function createReactionTrigger(opts = {}) {
   const exit = opts.exitScore ?? EMOTION_EXIT_SCORE;
   const sustain = opts.sustainFrames ?? SUSTAIN_FRAMES;
   const gestCooldown = opts.gestureCooldownMs ?? GESTURE_COOLDOWN_MS;
+  const comboCooldown = opts.comboCooldownMs ?? GESTURE_COMBO_COOLDOWN_MS;
 
   let active = null;            // currently-active emotion, or null
   let candidate = null, streak = 0;   // building toward acquire/switch
   let activeGestures = new Set();
   const lastGestureAt = {};
+  let activeCombo = null;
+  const lastComboAt = {};
 
   // Combined 0-100 scores across the seven effect emotions.
   function combined(bs) {
@@ -75,22 +80,37 @@ export function createReactionTrigger(opts = {}) {
         }
       }
 
-      const gestureOnsets = [];
+      const gestureOnsets = []; // [{ gesture, hand }]
+      const comboOnsets = [];   // [comboId]
       if (gestures !== undefined) {
+        const comboId = detectCombo(gestures);
         const current = new Set((gestures || []).filter((g) => g && g !== 'None'));
-        for (const g of current) {
-          if (!activeGestures.has(g)) {
-            const last = lastGestureAt[g];
-            if (last == null || t - last >= gestCooldown) { lastGestureAt[g] = t; gestureOnsets.push(g); activeGestures.add(g); }
+        if (comboId) {
+          // Fire once per formation (subject to cooldown); suppress individual onsets.
+          if (comboId !== activeCombo && (lastComboAt[comboId] == null || t - lastComboAt[comboId] >= comboCooldown)) {
+            lastComboAt[comboId] = t; comboOnsets.push(comboId);
           }
-        }
-        // Remove gestures that are no longer in current
-        for (const g of activeGestures) {
-          if (!current.has(g)) activeGestures.delete(g);
+          activeCombo = comboId;
+          // Mark current gestures as seen so breaking the combo (hands still up) doesn't
+          // spuriously fire individuals next frame.
+          activeGestures = current;
+        } else {
+          activeCombo = null;
+          for (const g of current) {
+            if (!activeGestures.has(g)) {
+              const last = lastGestureAt[g];
+              if (last == null || t - last >= gestCooldown) {
+                lastGestureAt[g] = t;
+                gestureOnsets.push({ gesture: g, hand: gestures.indexOf(g) });
+                activeGestures.add(g);
+              }
+            }
+          }
+          for (const g of activeGestures) { if (!current.has(g)) activeGestures.delete(g); }
         }
       }
 
-      return { activeEmotion: active, gestureOnsets };
+      return { activeEmotion: active, gestureOnsets, comboOnsets };
     },
   };
 }
