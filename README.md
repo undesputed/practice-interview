@@ -33,7 +33,9 @@ server.
   under the eyes when you look sad, fire above your head when angry, question marks when
   confused, plus sparkles (happy), a surprise pop, and disgust/fear cues — one at a time,
   fading as your expression changes. Hand gestures add a labeled callout near your hand
-  ("OK!" for 👍, "Nope" for 👎, and so on for ✌️ ✋ ✊ ☝️ 🤟). On by default; turn it off with
+  ("OK!" for 👍, "Nope" for 👎, and so on for ✌️ ✋ ✊ ☝️ 🤟). Two hands make combos — both 👍
+  → "AWESOME!", 👍 + 👎 → "MIXED" — and the whole frame washes with the emotion's color (red
+  when angry, gold when happy, blue when sad, …) as you emote. On by default; turn it off with
   the "Reaction effects" control in the left rail. Purely visual, computed in the browser —
   no network calls, and it changes no analysis or scoring.
 - **Fused readiness verdict.** The report combines three signals — Delivery (voice),
