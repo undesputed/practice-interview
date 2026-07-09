@@ -3,6 +3,7 @@ import { dominantEmotion, EMOTION_CLASSES } from '../emotion.js';
 import { esc } from '../util.js';
 import { api } from '../api.js';
 import { CONFIG } from '../config.js';
+import { createFaceEffects } from '../face-effects.js';
 
 // Curated blendshapes shown as bars, with friendly labels.
 const DISPLAY = [
@@ -16,6 +17,8 @@ const DISPLAY = [
 
 let engine = 'mediapipe';   // 'mediapipe' (live blendshapes) | 'deepface' (server emotion)
 let mode = 'face';          // 'face' | 'pose' | 'hands'
+let effects = null;        // active reaction-effects overlay, or null
+let effectsOn = true;      // reaction effects default ON
 
 // Live server emotion track (~every EMOTION_LIVE_MS). Runs only while engine==='deepface'.
 let dfRunning = false, dfTimer = null;
@@ -116,7 +119,14 @@ function setStatus(out){
   const live = document.getElementById('fa-live'); if (live) live.classList.toggle('on', vision.isRunning());
 }
 
-function onFrame(out){ lastFrame = out; setStatus(out); paintPanel(out); }
+function onFrame(out){
+  lastFrame = out;
+  setStatus(out);
+  paintPanel(out);
+  if (effects && effectsOn){
+    effects.feed({ bs: out.blendshapes, gestures: out.gestures, faceLandmarks: out.faceLandmarks, handLandmarks: out.handLandmarks, t: performance.now() });
+  }
+}
 
 async function startCamera(){
   const btn = document.getElementById('fa-start');
@@ -149,10 +159,11 @@ export function facial(){
   // Stop any camera left running, then re-arm a one-shot teardown for when the
   // user navigates away from this screen.
   vision.stop(); stopDeepface();
-  engine = 'mediapipe'; mode = 'face';
+  engine = 'mediapipe'; mode = 'face'; effectsOn = true;
   window.addEventListener('hashchange', function leave(){
     if (location.hash.replace(/^#/, '') !== '/facial'){
-      vision.stop(); stopDeepface();
+      vision.stop(); stopDeepface(); vision.setEffects(false);
+      if (effects){ effects.destroy(); effects = null; }
       window.removeEventListener('hashchange', leave);
     }
   });
@@ -160,6 +171,19 @@ export function facial(){
   queueMicrotask(() => {
     const root = document.getElementById('facial-body');
     if (!root) return;
+    // Reaction effects overlay (default ON).
+    const fxLayer = document.getElementById('fa-fx');
+    if (fxLayer){
+      effects = createFaceEffects(fxLayer);
+      effects.setEnabled(effectsOn);
+      vision.setEffects(effectsOn);
+    }
+    root.querySelectorAll('[data-fx]').forEach((b) => b.addEventListener('click', () => {
+      effectsOn = b.getAttribute('data-fx') === 'on';
+      root.querySelectorAll('[data-fx]').forEach((x) => x.classList.toggle('on', x === b));
+      vision.setEffects(effectsOn);
+      if (effects) effects.setEnabled(effectsOn);
+    }));
     // wire engine toggle
     root.querySelectorAll('[data-engine]').forEach((b) => b.addEventListener('click', () => {
       engine = b.getAttribute('data-engine');
@@ -194,6 +218,8 @@ export function facial(){
         '<button class="mode on" data-mode="face"><span class="r"></span> Face landmarks</button>' +
         '<button class="mode" data-mode="pose"><span class="r"></span> Pose landmarks</button>' +
         '<button class="mode" data-mode="hands"><span class="r"></span> Hand landmarks</button>' +
+        '<div class="lab" style="margin-top:16px">Reaction effects</div>' +
+        '<div class="seg"><button data-fx="on" class="on">On</button><button data-fx="off">Off</button></div>' +
         '<button class="fa-btn start" id="fa-start">Start camera</button>' +
         '<button class="fa-btn stop" id="fa-stop">Stop</button>' +
         '<div class="lab" style="margin-top:16px">Status</div>' +
@@ -203,6 +229,7 @@ export function facial(){
       '</div>' +
       '<div><div class="fa-stage"><div class="fa-live" id="fa-live"><span class="dot"></span> LIVE</div>' +
         '<canvas id="fa-canvas"></canvas>' +
+        '<canvas class="fa-fx" id="fa-fx"></canvas>' +
         '<div class="ph" id="fa-ph">Press "Start camera" to begin. Video stays on your device.</div></div>' +
         '<div class="fa-panel" id="fa-panel"></div></div>' +
     '</div></div></div>';

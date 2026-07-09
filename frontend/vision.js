@@ -4,6 +4,8 @@ import { CONFIG } from './config.js';
 
 let tasks = null;     // { face, pose, hands } — created once, reused
 let session = null;   // active camera/loop, or null
+let effectsOn = false;   // when true, run face + gesture together for the reaction overlay
+const EFFECTS_INTERVAL_MS = 100;   // throttle effects-only detectors to ~10 fps
 
 // Create the three MediaPipe tasks once (downloads WASM + models on first call).
 async function ensureTasks(){
@@ -37,6 +39,10 @@ function pickBlendshapes(categories){
 export function isRunning(){ return !!(session && session.running); }
 
 export function setMode(mode){ if (session) session.mode = mode; }
+
+// Enable/disable combined face+gesture detection for the reaction-effects overlay.
+// OFF keeps the classic single-detector-per-mode behavior.
+export function setEffects(on){ effectsOn = !!on; }
 
 // Capture a square JPEG crop of the current face from the live video for server-side
 // emotion scoring. Returns a Promise<Blob|null>; null when not running, not in face
@@ -85,8 +91,10 @@ export function stop(){
   session = null;
 }
 
-// Start the camera and detection loop. `onFrame({mode, detections, fps, blendshapes})`
-// is called once per frame; `blendshapes` is non-null only in face mode.
+// Start the camera and detection loop. `onFrame({mode, detections, fps, blendshapes, gestures})`
+// is called once per frame. `blendshapes` is non-null whenever the face detector ran this
+// frame (face mode, or any mode while effects are on via setEffects). `gestures` is a
+// `string[]` of gesture names when the gesture recognizer ran this frame, else `undefined`.
 export async function start(canvas, mode, onFrame){
   stop();
   const myToken = {};
@@ -126,7 +134,7 @@ function launch(canvas, video, stream, mode, onFrame){
   canvas.width = 1280; canvas.height = 720;
   const ctx = canvas.getContext('2d');
   const draw = new DrawingUtils(ctx);
-  session = { stream, video, mode, running: true, rafId: 0, fps: 0, _t: performance.now(), _n: 0, _face: null };
+  session = { stream, video, mode, running: true, rafId: 0, fps: 0, _t: performance.now(), _n: 0, _face: null, _fxFaceTs: 0, _fxGestTs: 0 };
 
   const loop = () => {
     if (!session || !session.running) return;
@@ -134,35 +142,58 @@ function launch(canvas, video, stream, mode, onFrame){
     const now = performance.now();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const out = { mode: session.mode, detections: 0, fps: session.fps, blendshapes: null };
+    const out = { mode: session.mode, detections: 0, fps: session.fps, blendshapes: null, gestures: undefined, faceLandmarks: undefined, handLandmarks: undefined };
+    const m = session.mode;
+    const faceMode = m === 'face', poseMode = m === 'pose', handsMode = m === 'hands';
+    // The current mode's detector runs every frame (as before). Effects-only
+    // detectors run throttled so combined detection stays cheap.
+    const faceDue = faceMode || (effectsOn && now - session._fxFaceTs >= EFFECTS_INTERVAL_MS);
+    const gestDue = handsMode || (effectsOn && now - session._fxGestTs >= EFFECTS_INTERVAL_MS);
 
     try {
-      if (session.mode === 'face'){
+      if (faceDue){
         const r = tasks.face.detectForVideo(video, now);
         const faces = r.faceLandmarks || [];
-        out.detections = faces.length;
         session._face = faces[0] || null;
-        for (const fl of faces){
-          draw.drawConnectors(fl, FaceLandmarker.FACE_LANDMARKS_TESSELATION, { color: '#15794c66', lineWidth: 0.5 });
+        out.faceLandmarks = faces[0] || undefined;
+        if (faceMode){
+          out.detections = faces.length;
+          for (const fl of faces){
+            draw.drawConnectors(fl, FaceLandmarker.FACE_LANDMARKS_TESSELATION, { color: '#15794c66', lineWidth: 0.5 });
+          }
+        } else {
+          session._fxFaceTs = now;
         }
         if (r.faceBlendshapes && r.faceBlendshapes[0]){
           out.blendshapes = pickBlendshapes(r.faceBlendshapes[0].categories);
         }
-      } else if (session.mode === 'pose'){
+      }
+
+      if (gestDue){
+        const r = tasks.hands.recognizeForVideo(video, now);
+        const hands = r.landmarks || [];
+        out.handLandmarks = hands.length ? hands : undefined;
+        if (handsMode){
+          out.detections = hands.length;
+          for (const lm of hands){
+            draw.drawConnectors(lm, HandLandmarker.HAND_CONNECTIONS, { color: '#ffffffcc', lineWidth: 2 });
+            draw.drawLandmarks(lm, { color: '#157a4c', radius: 2 });
+          }
+        } else {
+          session._fxGestTs = now;
+        }
+        // One entry per detected hand ('None' placeholder if unclassified) so the index
+        // stays aligned with out.handLandmarks — the effects anchor callouts by hand index.
+        out.gestures = (r.gestures || []).map((g) => (g && g[0] && g[0].categoryName) || 'None');
+      }
+
+      if (poseMode){
         const r = tasks.pose.detectForVideo(video, now);
         const poses = r.landmarks || [];
         out.detections = poses.length;
         for (const lm of poses){
           draw.drawConnectors(lm, PoseLandmarker.POSE_CONNECTIONS, { color: '#157a4c', lineWidth: 2 });
           draw.drawLandmarks(lm, { color: '#0f5c39', radius: 2 });
-        }
-      } else { // hands
-        const r = tasks.hands.recognizeForVideo(video, now);
-        const hands = r.landmarks || [];
-        out.detections = hands.length;
-        for (const lm of hands){
-          draw.drawConnectors(lm, HandLandmarker.HAND_CONNECTIONS, { color: '#ffffffcc', lineWidth: 2 });
-          draw.drawLandmarks(lm, { color: '#157a4c', radius: 2 });
         }
       }
     } catch (e){ /* a single bad frame must not kill the loop */ }
