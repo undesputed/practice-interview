@@ -1,4 +1,3 @@
-import { placeholder } from './placeholder.js';
 import { dashboard } from './dashboard.js';
 import { history } from './history.js';
 import { report } from './report.js';
@@ -8,6 +7,8 @@ import { progress } from './progress.js';
 import { newInterview } from './practice-interview.js';
 import { live } from './live.js';
 import { thanks } from './thanks.js';
+import { quickdraw } from './quickdraw.js';
+import { notes } from './notes.js';
 
 // Route pattern -> render(params) => htmlString. Phase 1 = placeholders.
 export const screens = [
@@ -21,6 +22,6 @@ export const screens = [
   ['/session/:id', report],
   ['/facial',      facial],
   ['/audio',       audio],
-  ['/settings',    placeholder('Settings', 'Toggles and preferences.')],
-  ['/library',     placeholder('Role & question library', 'Manage interview roles and questions.')],
+  ['/quickdraw',   quickdraw],
+  ['/notes',       notes],
 ];

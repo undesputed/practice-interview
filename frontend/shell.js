@@ -4,16 +4,14 @@ const NAV = [
   { group: null, items: [
     { path: '/',         icon: '◷', label: 'Dashboard' },
     { path: '/history',  icon: '▤', label: 'History' },
+    { path: '/notes',    icon: '☰', label: 'Notebook' },
     { path: '/progress', icon: '◴', label: 'Progress' },
     { path: '/practice-interview',      icon: '＋', label: 'Practice Interview' },
   ]},
   { group: 'Live tools', items: [
-    { path: '/facial', icon: '◉', label: 'Facial Analysis' },
-    { path: '/audio',  icon: '♫', label: 'Audio Analysis' },
-  ]},
-  { group: null, items: [
-    { path: '/settings', icon: '⚙', label: 'Settings' },
-    { path: '/library',  icon: '▥', label: 'Role & question library' },
+    { path: '/facial',    icon: '◉', label: 'Facial Analysis' },
+    { path: '/audio',     icon: '♫', label: 'Audio Analysis' },
+    { path: '/quickdraw', icon: '✏', label: 'Quick Draw' },
   ]},
 ];
 

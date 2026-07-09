@@ -21,6 +21,8 @@ from backend.anthropic_coach import generate_coaching, generate_verdict
 from backend.questions import generate_questions
 from backend.emotion import score_emotions, aggregate_emotions
 from backend import sessions_store, voice, verdict as verdict_mod
+from backend.quickdraw import guess_drawing
+from backend import notes_store
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)  # ensure our INFO/WARNING logs reach the console
@@ -203,6 +205,76 @@ async def voice_analyze(meta: str = Form(...), audio: UploadFile = File(...)):
     except Exception as exc:  # network / Deepgram / parsing failure -> degrade
         logging.warning("voice analysis unavailable: %s", exc)
         return {"available": False}
+
+
+class SpeakRequest(BaseModel):
+    text: str
+
+
+class NotebookSave(BaseModel):
+    title: str
+    role: str = ""
+    scenario: str = "job"
+    pages: list  # list[list[{ts, text}]]
+
+@app.post("/api/quickdraw/speak")
+async def quickdraw_speak(req: SpeakRequest):
+    """Proxy Deepgram TTS (Amalthea voice) for Quick Draw voice announcements."""
+    api_key = os.getenv("DEEPGRAM_API_KEY")
+    text = req.text.strip()[:300]
+    if not api_key or not text:
+        raise HTTPException(503, "TTS unavailable")
+    try:
+        async with httpx.AsyncClient(timeout=12.0) as client:
+            r = await client.post(
+                "https://api.deepgram.com/v1/speak",
+                params={"model": "aura-2-amalthea-en", "encoding": "mp3"},
+                json={"text": text},
+                headers={"Authorization": f"Token {api_key}"},
+            )
+            r.raise_for_status()
+            return Response(content=r.content, media_type="audio/mpeg")
+    except Exception as exc:
+        logging.warning("quickdraw TTS failed: %s", exc)
+        raise HTTPException(502, "TTS failed")
+
+
+@app.post("/api/quickdraw/guess")
+async def quickdraw_guess(prompt: str = Form(...), image: UploadFile = File(...)):
+    """Guess what the player drew and score the match using Claude Vision.
+    Graceful: returns a fallback response when ANTHROPIC_API_KEY is missing or the call fails."""
+    api_key = os.getenv("ANTHROPIC_API_KEY")
+    if not api_key:
+        return {"guess": "mystery drawing", "score": 50, "comment": "AI unavailable — nice try!", "debug": "no_api_key"}
+    try:
+        data = await image.read()
+        if not data:
+            return {"guess": "mystery drawing", "score": 30, "comment": "No image received!", "debug": "empty_image"}
+        return await asyncio.to_thread(guess_drawing, api_key, data, prompt)
+    except Exception as exc:
+        logging.warning("quickdraw guess failed: %s", exc)
+        return {"guess": "mystery drawing", "score": 30, "comment": "Couldn't analyze this one!", "debug": str(exc)[:300]}
+
+
+# ── Notes (single master notebook) ────────────────────────────────────────────
+
+@app.get("/api/notes/master")
+def get_notes_master():
+    try:
+        return notes_store.load_master()
+    except Exception as exc:
+        logging.warning("notes master load failed: %s", exc)
+        return {"title": "My Notebook", "pages": [[] for _ in range(10)]}
+
+
+@app.put("/api/notes/master")
+def put_notes_master(req: NotebookSave):
+    try:
+        notes_store.save_master(req.title, req.pages)
+        return {"ok": True}
+    except Exception as exc:
+        logging.warning("notes master save failed: %s", exc)
+        return {"ok": False, "error": str(exc)[:200]}
 
 
 @app.post("/api/session")
