@@ -3,7 +3,7 @@
 //
 // Auth scheme matters: a raw Deepgram API key uses the "token" subprotocol;
 // an ephemeral token (from /v1/auth/grant) uses "bearer". The backend tells us which.
-export function startVoiceAgent({ url, token, scheme, config, micStream, onTranscript, onError, onClose, onSpeaking }) {
+export function startVoiceAgent({ url, token, scheme, config, micStream, onTranscript, onError, onClose, onSpeaking, onNote }) {
   const sub = scheme || "token";
   console.log(`[dg] connecting: scheme=${sub} tokenLen=${(token || "").length} url=${url}`);
   const ws = new WebSocket(url, [sub, token]);
@@ -79,12 +79,21 @@ export function startVoiceAgent({ url, token, scheme, config, micStream, onTrans
           text: msg.content,
         });
       } else if (msg.type === "FunctionCallRequest") {
-        // The interviewer signals completion by calling the client-side end_interview
-        // function. ACK every function so the agent isn't left waiting, then close the
-        // socket once the goodbye audio has finished (onClose runs the score+report flow).
+        // ACK every function call so the agent isn't left waiting.
         for (const f of (msg.functions || [])) {
-          try { ws.send(JSON.stringify({ type: "FunctionCallResponse", id: f.id, name: f.name, content: "ended" })); } catch (_) {}
+          if (f.name === "take_note" && onNote) {
+            // Deepgram sends function parameters as f.arguments (JSON string) or f.input.
+            // Try both so the handler works regardless of which field the agent uses.
+            try {
+              const raw = f.arguments !== undefined ? f.arguments : (f.input !== undefined ? f.input : '{}');
+              const inp = typeof raw === 'string' ? JSON.parse(raw) : (raw || {});
+              const content = inp.content || inp.text || Object.values(inp)[0] || '';
+              const page = typeof inp.page === 'number' ? inp.page : null;
+              if (content) onNote(String(content), page);
+            } catch (_) {}
+          }
           if (f.name === "end_interview") endRequested = true;
+          try { ws.send(JSON.stringify({ type: "FunctionCallResponse", id: f.id, name: f.name, content: "ok" })); } catch (_) {}
         }
         if (endRequested) {
           // AgentAudioDone is the primary close signal — fires when goodbye TTS finishes.

@@ -87,6 +87,10 @@ export function setCameraOn(on){
 // advances this as the AI interviewer asks each question (was hard-pinned to -1).
 export function setTurn(n){ if (session) session.turn = n; }
 
+// Override the body-detection throttle for screens that need finer hand tracking
+// (e.g. the Quick Draw canvas). Pass null to restore CONFIG.POSE_THROTTLE_MS.
+export function setBodyThrottle(ms){ if (session) session._bodyThrottle = ms ?? null; }
+
 // Identifies the most recent start() in flight. A newer start() (or any stop())
 // supersedes older in-flight attempts so they release their camera and bail —
 // this prevents a double-Start from leaking a stream and running two loops.
@@ -106,7 +110,7 @@ export function stop(){
 // Start the camera (video only) and the detection loop. Callbacks:
 //   onStats({ elapsedMs, face, faceCount, fps, detections }) — throttled to ~4/s.
 //   onAction({ t, turn, kind, label, icon }) — once per detected action onset.
-export async function start(canvas, { onStats, onAction, showOverlay = false, audio = true } = {}){
+export async function start(canvas, { onStats, onAction, onCursor, showOverlay = false, audio = true } = {}){
   stop();
   const myToken = {};
   starting = myToken;
@@ -135,7 +139,7 @@ export async function start(canvas, { onStats, onAction, showOverlay = false, au
       stream.getTracks().forEach((t) => t.stop());
       return;
     }
-    launch(canvas, video, stream, { onStats, onAction, showOverlay });
+    launch(canvas, video, stream, { onStats, onAction, onCursor, showOverlay });
   } catch (e){
     if (stream) stream.getTracks().forEach((t) => t.stop());  // release on any failure after the camera opened
     if (starting === myToken) starting = null;
@@ -145,7 +149,7 @@ export async function start(canvas, { onStats, onAction, showOverlay = false, au
 
 // Build the session and run the loop. Split out so start()'s try/catch only guards
 // the async setup, not the per-frame loop.
-function launch(canvas, video, stream, { onStats, onAction, showOverlay }){
+function launch(canvas, video, stream, { onStats, onAction, onCursor, showOverlay }){
   starting = null;
   canvas.width = 1280; canvas.height = 720;
   const ctx = canvas.getContext('2d');
@@ -210,7 +214,7 @@ function launch(canvas, video, stream, { onStats, onAction, showOverlay }){
     // Pose + hands + objects: detect on a throttle for the report data (posture,
     // fidget, integrity). Cache the raw results so the overlay (when shown) draws
     // smoothly; the candidate's live view runs overlay-off, so nothing is drawn.
-    if (now - session.lastBodyTs >= CONFIG.POSE_THROTTLE_MS){
+    if (now - session.lastBodyTs >= (session._bodyThrottle ?? CONFIG.POSE_THROTTLE_MS)){
       session.lastBodyTs = now;
       try {
         const pr = tasks.pose.detectForVideo(video, now);
@@ -258,6 +262,24 @@ function launch(canvas, video, stream, { onStats, onAction, showOverlay }){
       if (onAction) onAction(ev);
     }
 
+    // Air-touch cursor: emit index fingertip position every frame (cached from throttled hand detect).
+    // x is mirror-corrected (1 - landmark.x) to match the CSS-mirrored video the user sees.
+    // penDown: tip (landmark 8) above PIP joint (landmark 6) = finger extended = drawing.
+    if (onCursor) {
+      if (session.lastHand && session.lastHand.landmarks && session.lastHand.landmarks.length > 0) {
+        const lms = session.lastHand.landmarks[0];
+        const tip = lms[8], pip = lms[6], thumb = lms[4];  // index tip / PIP / thumb tip
+        const penRaw = pip.y - tip.y;
+        // pinchDist: normalized distance between thumb tip and index fingertip.
+        // Small value (<0.07) = pinching = pen down; large = open = pen up.
+        const pinchDist = Math.hypot(thumb.x - tip.x, thumb.y - tip.y);
+        // gestures: category names for all detected hands (e.g. 'Open_Palm', 'Thumb_Up').
+        onCursor({ x: 1 - tip.x, y: tip.y, penDown: penRaw > 0.03, penRaw, pinchDist, gestures: gestureNames });
+      } else {
+        onCursor(null);
+      }
+    }
+
     session._n++;
     if (now - session._t > 500){
       session.fps = Math.round(session._n * 1000 / (now - session._t));
@@ -270,7 +292,7 @@ function launch(canvas, video, stream, { onStats, onAction, showOverlay }){
       const detections = faceCount
         + (session.lastHand && session.lastHand.landmarks ? session.lastHand.landmarks.length : 0)
         + (session.lastObjects ? session.lastObjects.length : 0);
-      onStats({ elapsedMs: tRel, face: hasFace, faceCount, fps: session.fps, detections });
+      onStats({ elapsedMs: tRel, face: hasFace, faceCount, fps: session.fps, detections, bs });
     }
 
     session.rafId = requestAnimationFrame(loop);
