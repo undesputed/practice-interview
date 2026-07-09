@@ -7,8 +7,15 @@ import { startRecording } from '../audio-recorder.js';
 import { computeLiveMetrics } from '../live-metrics.js';
 import { emotionScores, dominantEmotion } from '../emotion.js';
 import { setPendingSession } from '../pending-session.js';
+import { setNotesCache } from './notes.js';
 
 let agent = null;          // active Deepgram voice agent, or null
+let cursorEl    = null;    // air-touch cursor dot
+let dwellTarget = null;    // button currently being dwelled on
+let dwellStart  = 0;       // when dwell on current target began
+let lastClickTs = 0;       // cooldown after a dwell click
+const DWELL_MS      = 1200;
+const CLICK_COOL_MS = 2000;
 let convoCount = 0;        // conversation lines seen this run
 let turn = -1;             // interview question index; advances on each interviewer line
 let segments = [];         // { speaker, text, t } transcript lines
@@ -22,6 +29,21 @@ let muted = false;         // mic muted?
 let camOn = true;          // camera on?
 let leaveHandler = null;   // active hashchange teardown listener, so re-entry can't stack them
 let metricsInterval = null;
+
+// ── Interactive Book (in-session notes) ──────────────────────────────────────
+let bookOpen        = false;
+let bookTitle       = 'Interview Notes';
+const BOOK_PAGES    = 10;
+let bookNotes       = Array.from({ length: BOOK_PAGES }, () => []);  // pages; each page = [{ts, text}]
+let bookCurrentPage = 0;
+// Swipe: compare the last two DISTINCT hand positions (throttled by engine).
+// Avoids the cached-position problem where many frames have identical x values.
+let lastSwipePos    = null;  // {x, t} of last unique cursor position
+let swipeCooldown   = false;
+let palmHeldStart   = 0;     // ms timestamp when Open_Palm gesture started
+let palmCooldown    = false;
+let bookDragging    = false;
+let bookDragOrigin  = { mx: 0, my: 0, bx: 0, by: 0 };
 
 const MIC_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"></rect><path d="M5 10v2a7 7 0 0 0 14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line><line x1="8" y1="22" x2="16" y2="22"></line></svg>';
 const CAM_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 7l-7 5 7 5V7z"></path><rect x="1" y="5" width="15" height="14" rx="2"></rect></svg>';
@@ -43,6 +65,274 @@ function overlay(text){ setOverlay(text, false); }   // text only (errors), or n
 function showStart(label){ const b = byId('lv-start'); if (b){ b.style.display = label ? '' : 'none'; if (label) b.textContent = label; } }
 
 function onStats(s){ setText('lv-time', fmtTime(s.elapsedMs)); }
+
+// Air-touch: move cursor dot, dwell over [data-gesture-btn] to click.
+// Also handles book swipe (when book is open) and Open_Palm to toggle book.
+function onCursor(cur) {
+  if (!cursorEl) cursorEl = byId('lv-cursor');
+  if (!cursorEl) return;
+  if (!cur) {
+    cursorEl.classList.remove('show');
+    resetDwell();
+    lastSwipePos = null;
+    if (!palmCooldown) palmHeldStart = 0;
+    return;
+  }
+  const canvas = byId('lv-canvas');
+  if (!canvas) return;
+  const r = canvas.getBoundingClientRect();
+  const cx = r.left + cur.x * r.width;
+  const cy = r.top  + cur.y * r.height - r.height * 0.04;
+  cursorEl.style.left = cx + 'px';
+  cursorEl.style.top  = cy + 'px';
+  cursorEl.classList.add('show');
+
+  const isOpenPalm = cur.gestures && cur.gestures.some(g => g === 'Open_Palm');
+  const bkEl = byId('lv-book');
+
+  // ── Open_Palm hold 0.8s → OPEN book (disabled while book is open) ────────
+  // When the book is open the same gesture is used for swiping, so the hold
+  // timer must stay off — otherwise a slow swipe triggers an accidental close.
+  if (!bookOpen) {
+    if (isOpenPalm) {
+      if (!palmHeldStart) palmHeldStart = Date.now();
+      if (!palmCooldown && Date.now() - palmHeldStart > 800) {
+        palmCooldown = true;
+        palmHeldStart = 0;
+        toggleBook();
+        setTimeout(() => { palmCooldown = false; }, 2000);
+      }
+    } else {
+      if (!palmCooldown) palmHeldStart = 0;
+    }
+  } else {
+    palmHeldStart = 0; // always clear while book is open
+  }
+
+  // ── Swipe detection for book page turns (Open_Palm only) ─────────────────
+  // During swipeCooldown we do NOT track at all — this prevents the return
+  // motion of the hand from accumulating dx and triggering the reverse page turn
+  // once the cooldown expires.
+  if (bookOpen) {
+    if (!isOpenPalm) {
+      lastSwipePos = null;
+      if (bkEl) bkEl.classList.remove('bk-swipe-ready');
+    } else if (swipeCooldown) {
+      // Cooldown active: freeze tracking so the return motion isn't counted
+      lastSwipePos = null;
+    } else {
+      if (bkEl) bkEl.classList.add('bk-swipe-ready');
+      const now = Date.now();
+      if (lastSwipePos === null) {
+        lastSwipePos = { x: cur.x, t: now, startX: cur.x, startT: now, dir: 0 };
+      } else if (cur.x !== lastSwipePos.x) {
+        if (now - lastSwipePos.t > 700) {
+          // Hand paused — restart from new anchor position
+          lastSwipePos = { x: cur.x, t: now, startX: cur.x, startT: now, dir: 0 };
+        } else {
+          const stepDx  = cur.x - lastSwipePos.x;
+          const thisDir = Math.abs(stepDx) > 0.01 ? Math.sign(stepDx) : 0;
+          if (thisDir !== 0 && lastSwipePos.dir !== 0 && thisDir !== lastSwipePos.dir) {
+            // Direction reversed mid-gesture — reset anchor so return motion can't
+            // accumulate against the old startX and fire the opposite page turn.
+            lastSwipePos = { x: cur.x, t: now, startX: cur.x, startT: now, dir: thisDir };
+          } else {
+            const totalDx = cur.x - lastSwipePos.startX;
+            const elapsed  = now - lastSwipePos.startT;
+            if (Math.abs(totalDx) > 0.09 && elapsed > 60 && elapsed < 1500) {
+              lastSwipePos = null;
+              if (bkEl) bkEl.classList.remove('bk-swipe-ready');
+              if (totalDx > 0) bookNextPage(); else bookPrevPage();
+            } else {
+              lastSwipePos = { ...lastSwipePos, x: cur.x, t: now,
+                dir: thisDir || lastSwipePos.dir };
+            }
+          }
+        }
+      }
+    }
+  } else {
+    lastSwipePos = null;
+    if (bkEl) bkEl.classList.remove('bk-swipe-ready');
+  }
+
+  // ── Pinch-to-drag the book overlay ────────────────────────────────────────
+  // Pinch (thumb + index tip < 0.07) over the drag handle grabs the book;
+  // releasing the pinch drops it. Shares bookDragging with the mouse drag path.
+  if (bookOpen) {
+    const isPinching = cur.pinchDist < 0.07;
+    if (isPinching && !bookDragging) {
+      const dragHit = document.elementFromPoint(cx, cy);
+      if (dragHit && dragHit.closest && dragHit.closest('#lv-book-drag')) {
+        const bk = byId('lv-book');
+        if (bk) {
+          const rect = bk.getBoundingClientRect();
+          bookDragging = true;
+          bookDragOrigin = { mx: cx, my: cy, bx: rect.left, by: rect.top };
+        }
+      }
+    } else if (!isPinching && bookDragging) {
+      bookDragging = false;
+      if (bkEl) bkEl.classList.remove('bk-finger-dragging');
+    }
+    if (bookDragging && isPinching) {
+      const bk = byId('lv-book');
+      if (bk) {
+        bk.classList.add('bk-finger-dragging');
+        bk.style.left   = (bookDragOrigin.bx + cx - bookDragOrigin.mx) + 'px';
+        bk.style.top    = (bookDragOrigin.by + cy - bookDragOrigin.my) + 'px';
+        bk.style.right  = 'auto';
+        bk.style.bottom = 'auto';
+      }
+    }
+  }
+
+  // ── Dwell hit-test for gesture buttons ───────────────────────────────────
+  // Skip while dragging the book so the close/stats buttons don't fire mid-drag.
+  if (!bookDragging) {
+    const hit = document.elementFromPoint(cx, cy);
+    const btn = hit && hit.closest('[data-gesture-btn]');
+    if (btn) {
+      if (btn !== dwellTarget) { dwellTarget = btn; dwellStart = performance.now(); }
+      const holdMs   = Number(btn.dataset.gestureDwell) || DWELL_MS;
+      const progress = Math.min(1, (performance.now() - dwellStart) / holdMs);
+      cursorEl.style.setProperty('--dwell', progress);
+      if (progress >= 1 && performance.now() - lastClickTs >= CLICK_COOL_MS) {
+        lastClickTs = performance.now();
+        resetDwell();
+        btn.click();
+      }
+    } else {
+      resetDwell();
+    }
+  } else {
+    resetDwell();
+  }
+}
+
+function resetDwell() {
+  dwellTarget = null;
+  dwellStart  = 0;
+  if (cursorEl) cursorEl.style.setProperty('--dwell', 0);
+}
+
+// ── Interactive Book ──────────────────────────────────────────────────────────
+// bookCurrentPage = spread index (0 – BOOK_PAGES/2-1).
+// Each spread shows two physical pages: left = spread*2, right = spread*2+1.
+const BOOK_SPREADS = BOOK_PAGES / 2;  // 5 spreads × 2 pages = 10 pages total
+
+function bookRender() {
+  const left = byId('bk-left');
+  const right = byId('bk-right');
+  const pn   = byId('bk-pagenum');
+  if (!left || !right) return;
+  const lPageNum = bookCurrentPage * 2 + 1;
+  if (pn) pn.textContent = 'Pages ' + lPageNum + '–' + (lPageNum + 1) + ' of ' + BOOK_PAGES;
+
+  const renderPanel = (el, notes, pageNum, isLeft) => {
+    const numStr = '<div class="bk-page-num">' + pageNum + '</div>';
+    if (!notes || !notes.length) {
+      el.innerHTML = numStr + '<div class="bk-empty">' +
+        (isLeft ? 'Say "please note…" to the interviewer.' : '') + '</div>';
+    } else {
+      el.innerHTML = numStr + notes.map(n =>
+        '<div class="bk-note"><span class="bk-note-time">' + n.ts + '</span>' + esc(n.text) + '</div>'
+      ).join('');
+      el.scrollTop = el.scrollHeight;
+    }
+  };
+
+  const lIdx = bookCurrentPage * 2;
+  renderPanel(left,  bookNotes[lIdx],     lIdx + 1, true);
+  renderPanel(right, bookNotes[lIdx + 1], lIdx + 2, false);
+}
+
+function toggleBook() {
+  bookOpen = !bookOpen;
+  const el = byId('lv-book');
+  if (el) {
+    el.style.display = bookOpen ? 'flex' : 'none';
+    if (!bookOpen) el.classList.remove('bk-finger-dragging', 'bk-swipe-ready');
+  }
+  bookRender();
+}
+
+function bookNextPage() {
+  if (swipeCooldown) return;
+  swipeCooldown = true;
+  setTimeout(() => { swipeCooldown = false; }, 1000);
+  if (bookCurrentPage < BOOK_SPREADS - 1) bookCurrentPage++;
+  bookRender();
+}
+
+function bookPrevPage() {
+  if (swipeCooldown) return;
+  swipeCooldown = true;
+  setTimeout(() => { swipeCooldown = false; }, 1000);
+  if (bookCurrentPage > 0) bookCurrentPage--;
+  bookRender();
+}
+
+// Called by the voice agent (via onNote callback) when it takes a note.
+// pageNum (1-10): if provided, note goes to that specific physical page and the
+// book navigates to the spread containing it. Without pageNum, notes fill the
+// left page of the current spread, overflowing to the right, then next spread.
+function addNote(text, pageNum) {
+  if (!text || !text.trim()) return;
+  const now = new Date();
+  const ts  = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+  let target;
+  if (pageNum && pageNum >= 1 && pageNum <= BOOK_PAGES) {
+    target = pageNum - 1;
+    bookCurrentPage = Math.floor(target / 2);
+  } else {
+    const lIdx = bookCurrentPage * 2;
+    target = lIdx;
+    if (bookNotes[lIdx].length >= 4 && lIdx + 1 < bookNotes.length) {
+      target = lIdx + 1;
+      if (bookNotes[lIdx + 1].length >= 4 && bookCurrentPage < BOOK_SPREADS - 1) {
+        bookCurrentPage++;
+        target = bookCurrentPage * 2;
+      }
+    }
+  }
+  bookNotes[target].push({ ts, text: text.trim() });
+  if (!bookOpen) {
+    bookOpen = true;
+    const el = byId('lv-book');
+    if (el) el.style.display = 'flex';
+  }
+  bookRender();
+}
+
+async function loadMasterNotebook() {
+  try {
+    const res = await fetch('/api/notes/master');
+    if (!res.ok) return;
+    const nb = await res.json();
+    const pages = nb.pages || [];
+    for (let i = 0; i < BOOK_PAGES; i++) bookNotes[i] = pages[i] || [];
+    if (nb.title) { bookTitle = nb.title; const bt = byId('bk-title'); if (bt) bt.textContent = bookTitle; }
+    // Open to the first empty spread so new notes land on a fresh page
+    const spreads = Math.ceil(BOOK_PAGES / 2);
+    for (let s = 0; s < spreads; s++) {
+      if (!bookNotes[s * 2].length && !(bookNotes[s * 2 + 1] || []).length) {
+        bookCurrentPage = s; break;
+      }
+    }
+    bookRender();
+  } catch (_) {}
+}
+
+function resetBook() {
+  bookOpen = false; bookNotes = Array.from({ length: BOOK_PAGES }, () => []); bookCurrentPage = 0;
+  bookTitle = 'My Notebook';
+  lastSwipePos = null; swipeCooldown = false;
+  palmHeldStart = 0; palmCooldown = false;
+  bookDragging = false;
+  const el = byId('lv-book');
+  if (el) el.style.display = 'none';
+}
 
 const SCORE_STEPS = ['Analyzing camera & presence', 'Analyzing your voice', 'Generating your report'];
 function showScoreSteps(activeIdx){
@@ -180,6 +470,7 @@ async function startAgent(){
       url: tok.url, token: tok.token, scheme: tok.scheme, config: tok.config,
       micStream: stream,
       onTranscript,
+      onNote: addNote,
       onSpeaking: onAiSpeaking,
       onError: (m) => setVoice('Voice error: ' + m),
       onClose: (e, info) => {
@@ -210,7 +501,11 @@ function toggleCamera(){
 
 function toggleTranscript(){ const p = byId('lv-transcript'); if (p) p.classList.toggle('open'); }
 
-function clearImmersive(){ document.body.classList.remove('live-immersive'); }
+function clearImmersive(){
+  document.body.classList.remove('live-immersive');
+  cursorEl = null; dwellTarget = null; dwellStart = 0; lastClickTs = 0;
+  resetBook();
+}
 
 // Leave WITHOUT scoring (confirm first). Tears down and returns to the dashboard.
 function exitInterview(){
@@ -247,6 +542,19 @@ async function finishInterview(){
   const full_text = segments
     .map((s) => (s.speaker === 'interviewer' ? 'INTERVIEWER: ' : 'CANDIDATE: ') + s.text)
     .join('\n');
+  // Persist master notebook and warm the notes page cache so /notes is instant.
+  const _nbSnapshot = {
+    title: bookTitle, pages: bookNotes.map(p => [...p]),
+    updated_at: new Date().toISOString(),
+    note_count: bookNotes.reduce((n, p) => n + p.length, 0),
+  };
+  setNotesCache(_nbSnapshot);
+  fetch('/api/notes/master', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: bookTitle, role, scenario, pages: bookNotes }),
+  }).catch(() => {});
+
   setPendingSession({
     scenario, role, frames,
     transcript: { full_text, segments },
@@ -299,6 +607,8 @@ async function startEngine(){
   role = getInterviewConfig().role;
   scenario = getInterviewConfig().scenario || 'job'; recorder = null;
   muted = false; camOn = true;
+  resetBook();
+  loadMasterNotebook();
   const imm = byId('live-imm'); if (imm) imm.classList.remove('cam-off');
   const mb = byId('lv-mute'); if (mb){ mb.classList.remove('off'); mb.disabled = false; }
   const cb = byId('lv-cam'); if (cb) cb.classList.remove('off');
@@ -309,10 +619,10 @@ async function startEngine(){
   // Try camera + mic; fall back to vision-only if the mic is blocked.
   let micOk = true;
   try {
-    await engine.start(canvas, { onStats, onAction, showOverlay: false, audio: true });
+    await engine.start(canvas, { onStats, onAction, onCursor, showOverlay: false, audio: true });
   } catch (e){
     micOk = false;
-    try { await engine.start(canvas, { onStats, onAction, showOverlay: false, audio: false }); }
+    try { await engine.start(canvas, { onStats, onAction, onCursor, showOverlay: false, audio: false }); }
     catch (e2){ cameraError(e2); return; }
   }
   if (!engine.isRunning()) return;   // superseded (navigated away or restarted mid-load)
@@ -358,6 +668,57 @@ export function live(){
     wire('lv-tx-close', toggleTranscript);
     wire('lv-stats-btn', toggleStats);
     wire('lv-stats-close', toggleStats);
+    wire('lv-book-close', toggleBook);
+
+    // Editable book title — click to rename
+    const titleSpan = byId('bk-title');
+    if (titleSpan) {
+      titleSpan.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const inp = document.createElement('input');
+        inp.className = 'bk-title-input';
+        inp.value = bookTitle;
+        inp.maxLength = 60;
+        titleSpan.replaceWith(inp);
+        inp.focus(); inp.select();
+        const commit = () => {
+          bookTitle = inp.value.trim() || bookTitle;
+          const sp = document.createElement('span');
+          sp.id = 'bk-title'; sp.className = 'bk-title'; sp.title = 'Click to rename';
+          sp.textContent = bookTitle;
+          inp.replaceWith(sp);
+        };
+        inp.addEventListener('blur', commit);
+        inp.addEventListener('keydown', (ev) => {
+          if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
+          if (ev.key === 'Escape') { inp.value = bookTitle; commit(); }
+        });
+      });
+    }
+
+    // Drag-to-move for the book overlay
+    const drag = byId('lv-book-drag');
+    if (drag) {
+      drag.addEventListener('mousedown', e => {
+        const bk = byId('lv-book');
+        if (!bk) return;
+        bookDragging = true;
+        const rect = bk.getBoundingClientRect();
+        bookDragOrigin = { mx: e.clientX, my: e.clientY, bx: rect.left, by: rect.top };
+        e.preventDefault();
+      });
+    }
+    document.addEventListener('mousemove', e => {
+      if (!bookDragging) return;
+      const bk = byId('lv-book');
+      if (!bk) return;
+      bk.style.left   = (bookDragOrigin.bx + e.clientX - bookDragOrigin.mx) + 'px';
+      bk.style.top    = (bookDragOrigin.by + e.clientY - bookDragOrigin.my) + 'px';
+      bk.style.right  = 'auto';
+      bk.style.bottom = 'auto';
+    });
+    document.addEventListener('mouseup', () => { bookDragging = false; });
+
     startEngine();   // auto-start: the user already pressed "Start session" on /practice-interview
   });
 
@@ -373,8 +734,9 @@ export function live(){
         '<span id="lv-state" style="display:none"></span>' +
       '</div>' +
       '<div class="li-right">' +
-        '<button class="li-pill ghost" id="lv-stats-btn" type="button">Stats</button>' +
-        '<button class="li-pill ghost" id="lv-tx-btn" type="button">Transcript</button>' +
+        '<button class="li-pill ghost" id="lv-stats-btn" type="button" data-gesture-btn>Stats</button>' +
+        '<button class="li-pill ghost" id="lv-tx-btn" type="button" data-gesture-btn>Transcript</button>' +
+        '<span class="li-book-hint" title="Hold Open Palm (✋) to open/close notebook">📒 ✋ hold</span>' +
       '</div>' +
     '</div>' +
     '<div class="li-ai" id="lv-ai">' +
@@ -383,14 +745,14 @@ export function live(){
     '</div>' +
     '<div class="li-cap" id="lv-cap"></div>' +
     '<div class="li-controls" id="lv-controls" style="display:none">' +
-      '<button class="li-ctrl" id="lv-mute" type="button" title="Mute" aria-label="Mute">' + MIC_SVG + '</button>' +
-      '<button class="li-ctrl" id="lv-cam" type="button" title="Turn camera off" aria-label="Camera">' + CAM_SVG + '</button>' +
-      '<button class="li-ctrl end" id="lv-end" type="button">End interview</button>' +
+      '<button class="li-ctrl" id="lv-mute" type="button" title="Mute" aria-label="Mute" data-gesture-btn>' + MIC_SVG + '</button>' +
+      '<button class="li-ctrl" id="lv-cam" type="button" title="Turn camera off" aria-label="Camera" data-gesture-btn>' + CAM_SVG + '</button>' +
+      '<button class="li-ctrl end" id="lv-end" type="button" data-gesture-btn data-gesture-dwell="2500">End interview</button>' +
     '</div>' +
     '<aside class="li-stats" id="lv-stats">' +
       '<div class="li-st-head">' +
         '<h3>Live stats</h3>' +
-        '<button class="li-tx-close" id="lv-stats-close" type="button" aria-label="Close">✕</button>' +
+        '<button class="li-tx-close" id="lv-stats-close" type="button" aria-label="Close" data-gesture-btn>✕</button>' +
       '</div>' +
       '<div class="lv-section">' +
         '<div class="lv-sec-lbl">Presence</div>' +
@@ -419,8 +781,29 @@ export function live(){
     '<div class="li-ph" id="lv-ph"><span class="li-spin" id="lv-spin"></span><span id="lv-ph-txt">Loading model…</span><div class="lv-steps" id="lv-steps" style="display:none"></div></div>' +
     '<button class="li-start" id="lv-start" type="button" style="display:none">Start</button>' +
     '<aside class="li-transcript" id="lv-transcript">' +
-      '<div class="li-tx-head"><h3>Conversation</h3><button class="li-tx-close" id="lv-tx-close" type="button" aria-label="Close">✕</button></div>' +
+      '<div class="li-tx-head"><h3>Conversation</h3><button class="li-tx-close" id="lv-tx-close" type="button" aria-label="Close" data-gesture-btn>✕</button></div>' +
       '<div class="convo" id="lv-convo"><div class="fa-note">The interviewer will greet you when the connection is ready…</div></div>' +
     '</aside>' +
-  '</div>';
+  '</div>' +
+  // ── Interactive Book overlay ────────────────────────────────────────────
+  '<div id="lv-book" class="lv-book" style="display:none">' +
+    '<div id="lv-book-drag" class="bk-drag">' +
+      '<span class="bk-drag-grip" aria-hidden="true">⠿</span>' +
+      '<span id="bk-title" class="bk-title" title="Click to rename">Interview Notes</span>' +
+    '</div>' +
+    '<div class="bk-head">' +
+      '<span id="bk-pagenum" class="bk-page-info">Pages 1–2 of 10</span>' +
+      '<button id="lv-book-close" class="bk-close-btn" type="button" data-gesture-btn>Close</button>' +
+    '</div>' +
+    '<div class="bk-spread">' +
+      '<div id="bk-left" class="bk-page"></div>' +
+      '<div class="bk-spine-divider"></div>' +
+      '<div id="bk-right" class="bk-page"></div>' +
+    '</div>' +
+    '<div class="bk-footer">' +
+      '<span>← prev</span>' +
+      '<span>next →</span>' +
+    '</div>' +
+  '</div>' +
+  '<div id="lv-cursor" class="lv-cursor"></div>';
 }
