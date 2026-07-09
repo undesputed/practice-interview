@@ -206,7 +206,11 @@ def build_interviewer_prompt(role: str, focus: str = "Mixed", difficulty: str = 
                 f"main answer, move directly to the next unanswered question. Never restart "
                 f"or re-ask a question. ")
     conduct = ("Keep your turns short (1-3 sentences). Do not give feedback or coaching during "
-               "the session. ")
+               "the session. "
+               "If the candidate says 'note this', 'write this down', 'remember this', or "
+               "asks you to take a note, call take_note with the key content before replying. "
+               "If the candidate specifies a page number (e.g. 'note this on page 2'), "
+               "include that number in the page field of take_note. ")
     # Make the ending rule a clearly labelled, mandatory instruction so Claude doesn't skip it.
     if reactive_mode:
         ending_rule = (
@@ -285,16 +289,40 @@ def build_agent_config(role: str, focus: str = "Mixed", difficulty: str = "Reali
                 # Client-side function (no server endpoint) the interviewer calls when the
                 # session is over. The browser ACKs it and closes the socket, which ends
                 # and scores the session. Without this the agent never stops on its own.
-                "functions": [{
-                    "name": "end_interview",
-                    "description": (
-                        "End the session. You MUST call this immediately after saying your "
-                        "goodbye, once the candidate has answered the final question. "
-                        "Do not call it before all questions are done. "
-                        "Do not continue speaking after calling it."
-                    ),
-                    "parameters": {"type": "object", "properties": {}},
-                }],
+                "functions": [
+                    {
+                        "name": "end_interview",
+                        "description": (
+                            "End the session. You MUST call this immediately after saying your "
+                            "goodbye, once the candidate has answered the final question. "
+                            "Do not call it before all questions are done. "
+                            "Do not continue speaking after calling it."
+                        ),
+                        "parameters": {"type": "object", "properties": {}},
+                    },
+                    {
+                        "name": "take_note",
+                        "description": (
+                            "Add a note to the candidate's in-session notebook. Call this when "
+                            "the candidate explicitly asks you to note, write down, or remember "
+                            "something. Extract only the key content they want recorded."
+                        ),
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "content": {
+                                    "type": "string",
+                                    "description": "The note content to add to the notebook.",
+                                },
+                                "page": {
+                                    "type": "integer",
+                                    "description": "Page number 1-10 to write the note on. Only set when the candidate explicitly says a page number.",
+                                },
+                            },
+                            "required": ["content"],
+                        },
+                    },
+                ],
             },
             "speak": {"provider": {"type": "deepgram", "model": speak_model}},
             "greeting": build_greeting(role, bool(questions), scenario, language),
