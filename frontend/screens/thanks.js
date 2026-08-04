@@ -297,13 +297,13 @@ async function runPendingSession() {
   } catch (e) {
     finishPhaseLog();
     if (location.hash !== "#/thanks/pending") return;
-    showError(pending, voice);
+    showError(pending, voice, e);
   }
 }
 
 // ── error state ───────────────────────────────────────────────────────────────
 
-function showError(pending, voice) {
+function showError(pending, voice, err) {
   const icon    = document.getElementById("th-icon");
   const title   = document.getElementById("th-title");
   const sub     = document.getElementById("th-sub");
@@ -313,7 +313,12 @@ function showError(pending, voice) {
 
   if (icon)  { icon.className = "thanks-check"; icon.style.cssText = "background:#c0392b;box-shadow:0 10px 24px -14px #c0392b"; icon.textContent = "✕"; }
   if (title) title.textContent = "Something went wrong";
-  if (sub)   sub.textContent = "We could not score your interview. You can retry or go to the dashboard.";
+  const detail = err && err.message ? String(err.message) : "";
+  if (sub) {
+    sub.textContent = detail
+      ? ("We could not score your interview (" + detail + "). You can retry or go to the dashboard.")
+      : "We could not score your interview. You can retry or go to the dashboard.";
+  }
   if (steps) steps.style.display = "none";
   if (log)   log.style.display = "none";
   if (!actions) return;
@@ -358,7 +363,7 @@ function showError(pending, voice) {
       }
     } catch (err) {
       finishPhaseLog();
-      showError(pending, voice);
+      showError(pending, voice, err);
     }
   });
 }

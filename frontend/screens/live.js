@@ -559,6 +559,25 @@ function exitInterview(){
   location.hash = '#/';
 }
 
+// Live capture can run at display refresh (~30–60fps). Scoring only needs a few
+// samples/sec — thinning keeps the POST under nginx/proxy body limits in production.
+function thinFrames(frames, targetFps){
+  if (!frames || frames.length < 2) return frames || [];
+  const minGap = 1000 / (targetFps || 5);
+  const out = [];
+  let lastT = -Infinity;
+  for (let i = 0; i < frames.length; i++){
+    const f = frames[i];
+    const isLast = i === frames.length - 1;
+    // Always keep frames that carry pose/hands (already throttled) plus a steady sample.
+    if (isLast || f.pose || f.hands || (f.t - lastT) >= minGap){
+      out.push(f);
+      lastT = f.t;
+    }
+  }
+  return out;
+}
+
 // End the interview: tear down immediately, hand everything to thanks.js for scoring.
 // The user should leave the camera screen as fast as possible — all async work
 // (voice analysis, Claude) happens on the thanks/pending page instead.
@@ -568,7 +587,7 @@ async function finishInterview(){
   stopMetrics();
   showControls(false);
 
-  const frames = engine.getFrames().slice();
+  const frames = thinFrames(engine.getFrames().slice(), 5);
   const rec = recorder; recorder = null;
   stopAgent();
   const audio = rec ? await rec.stop() : null;  // assemble blob (~0ms), no network

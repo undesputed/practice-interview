@@ -20,6 +20,9 @@ export function startVoiceAgent({ url, token, scheme, config, micStream, onTrans
   let silenceTimer = null;
   let endRequested = false;   // the agent called end_interview — close once the goodbye plays
   let closedForEnd = false;
+  let endSequenceStarted = false;
+  let endRequestedAt = 0;
+  let audioChunksAtEnd = 0;
   let fatalError = null;      // a Deepgram "Error" (e.g. FAILED_TO_THINK) — interview can't continue
 
   ws.onopen = () => {
@@ -92,22 +95,18 @@ export function startVoiceAgent({ url, token, scheme, config, micStream, onTrans
               if (content) onNote(String(content), page);
             } catch (_) {}
           }
-          if (f.name === "end_interview") endRequested = true;
+          if (f.name === "end_interview") {
+            endRequested = true;
+            endRequestedAt = Date.now();
+            audioChunksAtEnd = audioChunks;
+            beginEndSequence();
+          }
           try { ws.send(JSON.stringify({ type: "FunctionCallResponse", id: f.id, name: f.name, content: "ok" })); } catch (_) {}
         }
-        if (endRequested) {
-          // AgentAudioDone is the primary close signal — fires when goodbye TTS finishes.
-          // This fallback covers the edge case where FunctionCallRequest arrives *after*
-          // audio is already done (AgentAudioDone won't fire again). The 2500ms window
-          // gives any in-flight goodbye TTS time to arrive and start playing before we
-          // check; if audio is still playing we skip and let AgentAudioDone close instead.
-          setTimeout(() => {
-            if (!closedForEnd && nextStart <= outCtx.currentTime + 0.1) closeForEnd();
-          }, 2500);
-          setTimeout(closeForEnd, 8000); // absolute hard fallback
-        }
       } else if (msg.type === "AgentAudioDone") {
-        if (endRequested) closeForEnd();   // goodbye finished — end the interview
+        // Deepgram finished *sending* TTS — browser playback may still be queued.
+        // Drain the local audio queue before closing so the goodbye is not cut off.
+        if (endRequested) beginEndSequence();
       } else if (msg.type === "Error") {
         // Fatal: the agent cannot continue (e.g. FAILED_TO_THINK). Record it so onClose
         // can tell the screen this was a failure, not a normal end-of-interview.
@@ -136,6 +135,40 @@ export function startVoiceAgent({ url, token, scheme, config, micStream, onTrans
     clearTimeout(silenceTimer);
     const ms = Math.max(0, (nextStart - outCtx.currentTime) * 1000) + 150;
     silenceTimer = setTimeout(() => { speaking = false; if (onSpeaking) onSpeaking(false); }, ms);
+  }
+
+  function audioRemainingMs(){
+    try { return Math.max(0, (nextStart - outCtx.currentTime) * 1000); }
+    catch (_) { return 0; }
+  }
+
+  // Wait for goodbye TTS to arrive *and* finish playing, then close the socket.
+  // AgentAudioDone alone is not enough — it fires when Deepgram finishes sending,
+  // while the browser may still have several seconds of goodbye audio queued.
+  // finishInterview() tears down the AudioContext, so closing too early cuts goodbye off.
+  function beginEndSequence(){
+    if (endSequenceStarted) return;
+    endSequenceStarted = true;
+    // Absolute cap so a stuck audio context cannot hang the interview forever.
+    setTimeout(() => closeForEnd(), 20000);
+    drainAndClose();
+  }
+
+  function drainAndClose(){
+    if (closedForEnd) return;
+    const remaining = audioRemainingMs();
+    if (remaining > 80) {
+      setTimeout(drainAndClose, Math.min(remaining + 80, 1000));
+      return;
+    }
+    const sinceEnd = endRequestedAt ? (Date.now() - endRequestedAt) : 0;
+    // Tool call often arrives before goodbye TTS. Give late audio time to land.
+    if (sinceEnd < 4500 && audioChunks <= audioChunksAtEnd) {
+      setTimeout(drainAndClose, 250);
+      return;
+    }
+    // Short pad so the final scheduled chunk actually reaches the speakers.
+    setTimeout(closeForEnd, 400);
   }
 
   // Close the socket so the screen ends + scores the interview (via onClose). Guarded

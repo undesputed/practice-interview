@@ -7,7 +7,12 @@ async function request(method, url, body){
     opts.body = JSON.stringify(body);
   }
   const res = await fetch(url, opts);
-  if (!res.ok) throw new Error(method + ' ' + url + ' -> ' + res.status);
+  if (!res.ok){
+    let detail = '';
+    try { detail = (await res.text() || '').trim(); } catch (_) {}
+    if (detail.length > 240) detail = detail.slice(0, 240) + '…';
+    throw new Error(method + ' ' + url + ' -> ' + res.status + (detail ? ': ' + detail : ''));
+  }
   return res.status === 204 ? null : res.json();
 }
 

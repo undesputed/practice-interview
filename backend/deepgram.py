@@ -212,19 +212,30 @@ def build_interviewer_prompt(role: str, focus: str = "Mixed", difficulty: str = 
                "If the candidate specifies a page number (e.g. 'note this on page 2'), "
                "include that number in the page field of take_note. ")
     # Make the ending rule a clearly labelled, mandatory instruction so Claude doesn't skip it.
+    goodbye_example = (
+        "ありがとうございました。本日はこれで終了です。失礼いたします。"
+        if language == "ja"
+        else "Thanks for your time today — goodbye!"
+    )
     if reactive_mode:
         ending_rule = (
             f"ENDING THE SESSION — this is mandatory: once the candidate finishes their "
-            f"{ending_desc}, say one brief farewell sentence, "
-            f"then IMMEDIATELY call end_interview. You MUST call end_interview — the session "
+            f"{ending_desc}, do NOT evaluate, coach, or continue the conversation. "
+            f"Your ONLY spoken closing must be one brief warm goodbye "
+            f"(for example: '{goodbye_example}'), "
+            f"then IMMEDIATELY call end_interview. You MUST speak that goodbye out loud "
+            f"before calling end_interview. You MUST call end_interview — the session "
             f"cannot close without it. Do not ask another question after they finish. "
             f"Do not say anything after calling end_interview."
         )
     else:
         ending_rule = (
             f"ENDING THE SESSION — this is mandatory: after the candidate answers your {n}th and "
-            f"final question, say a brief goodbye in one sentence, then IMMEDIATELY call "
-            f"end_interview. You MUST call end_interview — the session cannot close without it. "
+            f"final question, do NOT evaluate, coach, acknowledge the answer in detail, or ask "
+            f"anything else. Your ONLY spoken closing must be one brief warm goodbye "
+            f"(for example: '{goodbye_example}'), then IMMEDIATELY call "
+            f"end_interview. You MUST speak that goodbye out loud before calling end_interview. "
+            f"You MUST call end_interview — the session cannot close without it. "
             f"Do not ask another question. Do not offer feedback. Do not say anything after "
             f"calling end_interview."
         )
@@ -293,8 +304,9 @@ def build_agent_config(role: str, focus: str = "Mixed", difficulty: str = "Reali
                     {
                         "name": "end_interview",
                         "description": (
-                            "End the session. You MUST call this immediately after saying your "
-                            "goodbye, once the candidate has answered the final question. "
+                            "End the session. Call this only AFTER you have spoken a brief "
+                            "goodbye out loud, once the candidate has answered the final "
+                            "question. Do not call it before the goodbye is spoken. "
                             "Do not call it before all questions are done. "
                             "Do not continue speaking after calling it."
                         ),

@@ -159,11 +159,23 @@ def save_session(session_id: str, frames: list[dict], transcript: dict,
         except Exception as exc:
             logging.warning("mediapipe emotion chart skipped: %s", exc)
 
-    # Upload all files in parallel.
+    # summary.json is required for the report page; charts/raw dumps are best-effort
+    # so a single large PNG/CSV failure does not wipe a successful scoring run.
+    required_suffixes = ("/summary.json", "/transcript.txt")
+    required = [(k, b, c) for k, b, c in uploads if any(k.endswith(s) for s in required_suffixes)]
+    required_keys = {k for k, _, _ in required}
+    optional = [(k, b, c) for k, b, c in uploads if k not in required_keys]
+
     with ThreadPoolExecutor(max_workers=6) as ex:
-        futs = [ex.submit(storage.put, key, body, ct) for key, body, ct in uploads]
-        for f in as_completed(futs):
-            f.result()  # re-raise any S3 error immediately
+        req_futs = [ex.submit(storage.put, key, body, ct) for key, body, ct in required]
+        for f in as_completed(req_futs):
+            f.result()  # required uploads must succeed
+        opt_futs = {ex.submit(storage.put, key, body, ct): key for key, body, ct in optional}
+        for f in as_completed(opt_futs):
+            try:
+                f.result()
+            except Exception as exc:
+                logging.warning("optional session upload failed (%s): %s", opt_futs[f], exc)
 
     # Update the session index so list_sessions stays fast.
     try:

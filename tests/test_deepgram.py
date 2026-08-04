@@ -54,6 +54,9 @@ def test_agent_config_defines_end_interview_function():
 def test_prompt_instructs_calling_end_interview():
     prompt = build_agent_config("Software Engineer")["agent"]["think"]["prompt"]
     assert "end_interview" in prompt
+    # Closing must be a spoken goodbye, not silent tool-call after a content reply.
+    assert "goodbye" in prompt.lower()
+    assert "speak that goodbye out loud" in prompt.lower()
 
 
 def test_prompt_requires_plain_spoken_text_no_markdown():
