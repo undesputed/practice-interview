@@ -38,3 +38,6 @@ export function start(){
   if (!location.hash) location.hash = '#/';
   else resolve();
 }
+
+/** Re-run the current route handler (e.g. after UI language change). */
+export function refresh(){ resolve(); }

@@ -2,6 +2,8 @@
 // Live audio analysis: Delivery metrics from microphone signal only.
 // Scores long pauses, pitch variation, and vocal energy — no transcript needed.
 
+import { t as i18n } from '../i18n.js';
+
 const N_BARS         = 64;
 const STATS_MS       = 200;
 const RMS_FLOOR      = 0.012;
@@ -520,7 +522,7 @@ export function audio() {
 
   return (
     "<div class=\"screen\">" +
-    "<div class=\"screen-head\"><h1>Audio Analysis</h1>" +
+    "<div class=\"screen-head\"><h1>" + i18n('audio.title') + "</h1>" +
     "<span class=\"muted\" style=\"font-size:12px\">live &middot; computed in your browser &middot; nothing sent to our server</span></div>" +
 
     "<div class=\"fa-grid\">" +

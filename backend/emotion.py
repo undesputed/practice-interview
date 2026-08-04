@@ -29,20 +29,41 @@ def aggregate_emotions(shots: list[dict], classes: list | None = None) -> dict:
     """Aggregate per-shot emotion records into the report's emotion summary.
 
     Each shot: {"t": float_ms, "turn": int, "dominant": str, "scores": {class: 0-100}}.
-    Distribution = percent of shots for which a class is the dominant emotion.
-    Returns {"available": False} when there are no shots.
+
+    overall_distribution is an intensity-weighted MEAN of each shot's soft scores
+    (then renormalized to 100). It is NOT "percent of frames where X was #1" —
+    winner-take-all collapses interviews to ~one emotion (usually neutral) because
+    resting-face frames dominate. Soft-mean keeps secondary expressions visible;
+    frames with stronger non-neutral activation weigh more than flat ones.
     """
     classes = classes or EMOTION_CLASSES
     if not shots:
         return {"available": False}
 
-    n = len(shots)
-    dom_counts = {c: 0 for c in classes}
-    for s in shots:
-        if s["dominant"] in dom_counts:
-            dom_counts[s["dominant"]] += 1
-    overall = {c: round(100.0 * dom_counts[c] / n, 1) for c in classes}
-    dominant = max(dom_counts, key=dom_counts.get)
+    def _weighted_distribution(group: list[dict]) -> dict:
+        accum = {c: 0.0 for c in classes}
+        wsum = 0.0
+        for s in group:
+            scores = s.get("scores") or {}
+            expressive = max(
+                (float(scores.get(c, 0) or 0) for c in classes if c != "neutral"),
+                default=0.0,
+            )
+            # Flat/resting frames still count a little; clear expressions count more.
+            w = 0.2 + expressive / 100.0
+            for c in classes:
+                accum[c] += w * float(scores.get(c, 0) or 0)
+            wsum += w
+        if wsum <= 0:
+            return {c: (100.0 if c == "neutral" else 0.0) for c in classes}
+        mean = {c: accum[c] / wsum for c in classes}
+        total = sum(mean.values())
+        if total <= 0:
+            return {c: (100.0 if c == "neutral" else 0.0) for c in classes}
+        return {c: round(100.0 * mean[c] / total, 1) for c in classes}
+
+    overall = _weighted_distribution(shots)
+    dominant = max(overall, key=overall.get)
 
     by_turn: dict[int, list[dict]] = {}
     for s in shots:
@@ -50,15 +71,11 @@ def aggregate_emotions(shots: list[dict], classes: list | None = None) -> dict:
     per_question = []
     for turn in sorted(t for t in by_turn if t >= 0):
         group = by_turn[turn]
-        c = {cl: 0 for cl in classes}
-        for s in group:
-            if s["dominant"] in c:
-                c[s["dominant"]] += 1
-        m = len(group)
+        dist = _weighted_distribution(group)
         per_question.append({
             "turn": turn,
-            "dominant": max(c, key=c.get),
-            "distribution": {cl: round(100.0 * c[cl] / m, 1) for cl in classes},
+            "dominant": max(dist, key=dist.get),
+            "distribution": dist,
         })
 
     timeline = [{"t": s["t"], "turn": s.get("turn", -1),

@@ -129,6 +129,22 @@ def set_label(_sessions_dir, session_id: str, label: str) -> dict | None:
     return summary
 
 
+def update_summary(_sessions_dir, session_id: str, patch: dict) -> dict | None:
+    """Merge `patch` into the saved summary.json and return the updated summary."""
+    if not _valid_id(session_id):
+        return None
+    summary = _read_summary(session_id)
+    if summary is None:
+        return None
+    summary.update(patch)
+    storage.put(
+        f"sessions/{session_id}/summary.json",
+        json.dumps(summary, indent=2, ensure_ascii=False).encode(),
+        "application/json",
+    )
+    return summary
+
+
 def add_to_index(session_id: str, summary: dict) -> None:
     """Prepend a new session to the index. Called by report.save_session."""
     entry = _compact(session_id, summary)

@@ -2,6 +2,68 @@ import { api } from '../api.js';
 import { esc } from '../util.js';
 import { fmtDate, fmtDuration, scoreClass } from '../format.js';
 import { svgLineChart } from '../charts.js';
+import { t, bandLabel, currentLang, localizeRole } from '../i18n.js';
+
+function looksJapanese(s){
+  return /[\u3040-\u30ff\u3400-\u9fff]/.test(String(s || ''));
+}
+
+/** True when LLM prose is already Japanese (or there is nothing to translate). */
+function feedbackLooksJapanese(vd){
+  if (!vd) return true;
+  const sample = [vd.headline, vd.next_action, vd.delivery_note, vd.presence_note, vd.content_note]
+    .concat(vd.improvements || [])
+    .concat(vd.strengths || [])
+    .filter(Boolean)
+    .join(' ');
+  if (!sample.trim()) return true;
+  return looksJapanese(sample);
+}
+
+function applyLocaleOverlay(s, lang){
+  if (lang !== 'ja') return s;
+  const out = Object.assign({}, s);
+  const vLoc = s.verdict_ja;
+  const cLoc = s.coaching_ja;
+  if (vLoc && s.verdict){
+    out.verdict = Object.assign({}, s.verdict, vLoc);
+  }
+  if (cLoc){
+    out.coaching = s.coaching ? Object.assign({}, s.coaching, cLoc) : cLoc;
+  }
+  return out;
+}
+
+async function loadSessionForDisplay(id, onStatus){
+  let s = await api.getSession(id);
+  if (currentLang() !== 'ja') return s;
+
+  // Prefer a cached Japanese translation when it actually looks Japanese.
+  if (s.verdict_ja && feedbackLooksJapanese(s.verdict_ja)){
+    return applyLocaleOverlay(s, 'ja');
+  }
+  // Already Japanese prose — no API call needed.
+  if (feedbackLooksJapanese(s.verdict)){
+    return s;
+  }
+
+  // English (or mixed) LLM prose — translate + cache, then overlay.
+  // Do NOT trust session.language === 'ja': Claude sometimes still wrote English.
+  if (onStatus) onStatus(t('report.translating'));
+  try {
+    s = await api.localizeSession(id, 'ja');
+    // Guard: if the API returned English again, surface a soft warning in console.
+    if (!feedbackLooksJapanese(s.verdict)){
+      console.warn('[report] localize returned non-Japanese prose');
+    }
+  } catch (err){
+    console.warn('[report] localize failed — showing English LLM prose', err);
+    if (onStatus) onStatus(t('report.translateFail'));
+    // Brief pause so the user can see the message before English content paints.
+    await new Promise((r) => setTimeout(r, 1200));
+  }
+  return s;
+}
 
 // ── Score cards ───────────────────────────────────────────────────────────────
 function scoreCard(label, hint, key, v){
@@ -19,18 +81,15 @@ function scoreCard(label, hint, key, v){
 // ── Engagement section ────────────────────────────────────────────────────────
 function engageLevel(eyePct, speakingPct, attention){
   const a = ((eyePct || 0) + (speakingPct || 0) + (attention || 0)) / 3;
-  if (a >= 72) return { label: 'Highly engaged', cls: 'good',
-    text: 'You showed strong signs of active participation — solid eye contact, speaking a healthy amount, and staying alert.' };
-  if (a >= 52) return { label: 'Moderately engaged', cls: 'mid',
-    text: 'Your engagement was decent. A bit more eye contact or speaking more actively could make you feel even more present.' };
-  return { label: 'Low engagement', cls: 'low',
-    text: 'Engagement seemed low during this session. Try to keep your eyes toward the camera and respond more actively to each question.' };
+  if (a >= 72) return { label: t('report.engage.high'), cls: 'good', text: t('report.engage.highText') };
+  if (a >= 52) return { label: t('report.engage.mid'), cls: 'mid', text: t('report.engage.midText') };
+  return { label: t('report.engage.low'), cls: 'low', text: t('report.engage.lowText') };
 }
 
-function engagementSection(o, t){
+function engagementSection(o, timing){
   const eyePct = o.gaze_eye_contact_pct;
-  const speakingPct = t.speaking_pct;
-  const response = t.mean_response_sec;
+  const speakingPct = timing.speaking_pct;
+  const response = timing.mean_response_sec;
   const facePct = o.face_presence_pct;
   const lvl = engageLevel(eyePct, speakingPct, o.attention);
   const stat = (val, lbl) =>
@@ -38,14 +97,14 @@ function engagementSection(o, t){
     '<div class="engage-lbl">' + esc(lbl) + '</div></div>';
   return '<div class="engage-card">' +
     '<div class="engage-head">' +
-      '<div><h3>Engagement</h3><p class="engage-sub">How present and active you were during the session</p></div>' +
+      '<div><h3>' + esc(t('report.engagement')) + '</h3><p class="engage-sub">' + esc(t('report.engageSub')) + '</p></div>' +
       '<span class="engage-badge ' + lvl.cls + '">' + esc(lvl.label) + '</span>' +
     '</div>' +
     '<div class="engage-grid">' +
-      stat(eyePct != null ? eyePct + '%' : null, 'eye contact with camera') +
-      stat(speakingPct != null ? speakingPct + '%' : null, 'of session you spoke') +
-      stat(response != null ? response + 's' : null, 'avg time to respond') +
-      stat(facePct != null ? facePct + '%' : null, 'face visible in frame') +
+      stat(eyePct != null ? eyePct + '%' : null, t('report.eyeContact')) +
+      stat(speakingPct != null ? speakingPct + '%' : null, t('report.spokePct')) +
+      stat(response != null ? response + 's' : null, t('report.avgRespond')) +
+      stat(facePct != null ? facePct + '%' : null, t('report.faceVisible')) +
     '</div>' +
     '<p class="engage-desc">' + esc(lvl.text) + '</p>' +
     '</div>';
@@ -69,37 +128,40 @@ function howYouCameAcross(o, s){
   const dominant   = emoMp && emoMp.dominant;
   const compound   = s.emotion_compound && s.emotion_compound.label;
 
-  const eyeText = eyePct >= 80 ? 'Strong — you kept your eyes toward the camera ' + eyePct + '% of the time. This reads as confident and engaged.' :
-                  eyePct >= 60 ? 'Decent at ' + eyePct + '%. Try to look at your camera lens more directly — it signals confidence.' :
-                  eyePct != null ? 'Low at ' + eyePct + '%. Practice looking at the camera rather than the screen to appear more engaged.' :
-                  'No eye-contact data captured for this session.';
+  const eyeText = eyePct >= 80 ? t('report.impr.eyeHigh', { pct: eyePct }) :
+                  eyePct >= 60 ? t('report.impr.eyeMid', { pct: eyePct }) :
+                  eyePct != null ? t('report.impr.eyeLow', { pct: eyePct }) :
+                  t('report.impr.eyeNone');
 
-  const bodyText = composure >= 75 ? 'Calm and controlled — your posture and head stayed mostly still, which projects confidence.' :
-                   composure >= 50 ? 'Mostly steady. Some movement was detected — try to relax and avoid fidgeting.' :
-                   composure != null ? 'Some restlessness was picked up. Try sitting upright, keeping your hands still, and breathing slowly.' :
-                   'Posture data not available.';
-  const bodyDetail = upright != null ? 'Sat upright ' + upright + '% of the time' : null;
+  const bodyText = composure >= 75 ? t('report.impr.bodyHigh') :
+                   composure >= 50 ? t('report.impr.bodyMid') :
+                   composure != null ? t('report.impr.bodyLow') :
+                   t('report.impr.bodyNone');
+  const bodyDetail = upright != null ? t('report.impr.upright', { pct: upright }) : null;
 
-  const smileText = smilePct >= 30 ? 'Warm and expressive — you smiled ' + smilePct + '% of the session, which makes you seem friendly and enthusiastic.' :
-                    smilePct >= 10 ? 'Mostly neutral (' + smilePct + '% smiling). A little more natural smiling — especially when listening — would help you seem more approachable.' :
-                    smilePct != null ? 'Very little smiling detected (' + smilePct + '%). Occasional smiling makes a big difference in how likeable you come across.' :
-                    'Smile data not available.';
+  const smileText = smilePct >= 30 ? t('report.impr.smileHigh', { pct: smilePct }) :
+                    smilePct >= 10 ? t('report.impr.smileMid', { pct: smilePct }) :
+                    smilePct != null ? t('report.impr.smileLow', { pct: smilePct }) :
+                    t('report.impr.smileNone');
 
   const emoText = dominant
-    ? 'Your face mostly expressed ' + dominant + (compound ? ' — overall you came across as ' + compound + '.' : '.') + ' This is an approximate reading based on facial muscle movement.'
-    : 'Emotional tone data not available for this session.';
+    ? t('report.impr.emoHas', {
+        dom: dominant,
+        compound: compound ? t('report.impr.emoCompound', { c: compound }) : '',
+      })
+    : t('report.impr.emoNone');
 
   return '<div class="impr-grid">' +
-    impression('Eye contact', eyeText) +
-    impression('Body language & posture', bodyText, bodyDetail) +
-    impression('Facial expression', smileText) +
-    impression('Emotional tone', emoText) +
+    impression(t('report.impr.eye'), eyeText) +
+    impression(t('report.impr.body'), bodyText, bodyDetail) +
+    impression(t('report.impr.face'), smileText) +
+    impression(t('report.impr.emo'), emoText) +
     '</div>';
 }
 
-// ── Voice card (plain-English labels) ────────────────────────────────────────
+// ── Voice card ────────────────────────────────────────────────────────────────
 function voiceCard(v){
-  if (!v || !v.available) return '<p class="muted" style="font-size:12px">Voice analysis was not available for this session.</p>';
+  if (!v || !v.available) return '<p class="muted" style="font-size:12px">' + esc(t('report.voice.na')) + '</p>';
   const m = v.metrics || {};
   const wpm    = m.wpm;
   const fillers = m.filler_rate_per100;
@@ -114,38 +176,37 @@ function voiceCard(v){
     '</div>';
 
   return '<div class="vc-grid">' +
-    row('Speaking speed',
+    row(t('report.voice.speed'),
       wpm != null ? wpm + ' wpm' : null,
-      wpm == null ? '' : wpm < 110 ? 'a bit slow — try speaking more naturally' : wpm > 160 ? 'a bit fast — try slowing down slightly' : 'good pace',
+      wpm == null ? '' : wpm < 110 ? t('report.voice.slow') : wpm > 160 ? t('report.voice.fast') : t('report.voice.paceOk'),
       wpm == null ? '' : (wpm < 110 || wpm > 160) ? 'warn' : 'good') +
-    row('Filler words (um, uh, like…)',
-      fillers != null ? fillers + ' per 100 words' : null,
-      fillers == null ? '' : fillers <= 3 ? 'excellent' : fillers <= 6 ? 'decent' : 'try to reduce these',
+    row(t('report.voice.fillers'),
+      fillers != null ? t('report.voice.per100', { n: fillers }) : null,
+      fillers == null ? '' : fillers <= 3 ? t('report.voice.fillOk') : fillers <= 6 ? t('report.voice.fillMid') : t('report.voice.fillBad'),
       fillers == null ? '' : fillers <= 3 ? 'good' : fillers > 6 ? 'warn' : '') +
-    row('Long silences (over 2 sec)',
+    row(t('report.voice.pauses'),
       pauses != null ? String(pauses) : null,
-      pauses == null ? '' : pauses === 0 ? 'none — great!' : pauses <= 2 ? 'fine' : 'aim for 2 or fewer',
+      pauses == null ? '' : pauses === 0 ? t('report.voice.pauseNone') : pauses <= 2 ? t('report.voice.pauseOk') : t('report.voice.pauseBad'),
       pauses == null ? '' : pauses === 0 ? 'good' : pauses > 2 ? 'warn' : '') +
-    row('Vocal variety',
-      pitch != null ? pitch + ' Hz variation' : null,
-      pitch == null ? '' : pitch >= 25 ? 'expressive' : 'a bit flat — try varying your tone more',
+    row(t('report.voice.variety'),
+      pitch != null ? t('report.voice.hzVar', { n: pitch }) : null,
+      pitch == null ? '' : pitch >= 25 ? t('report.voice.pitchOk') : t('report.voice.pitchFlat'),
       pitch == null ? '' : pitch >= 25 ? 'good' : 'warn') +
     '</div>' +
-    '<p class="muted" style="font-size:11px;margin-top:10px">Your audio was analyzed and then deleted — it is never stored.</p>';
+    '<p class="muted" style="font-size:11px;margin-top:10px">' + esc(t('report.voice.privacy')) + '</p>';
 }
 
 // ── Facial signals (replaces raw FACS / Action Units) ────────────────────────
-const FACS_LEVEL = { A: 'barely noticeable', B: 'slight', C: 'noticeable', D: 'strong', E: 'very strong' };
-
 function facialSignals(aus){
-  if (!aus || !aus.length) return '<p class="muted" style="font-size:12px">No facial-signal data for this session.</p>';
+  if (!aus || !aus.length) return '<p class="muted" style="font-size:12px">' + esc(t('report.facs.na')) + '</p>';
   const top = aus.slice().sort((a, b) => (b.peak || 0) - (a.peak || 0)).slice(0, 6);
   return '<div class="facs-list">' +
     top.map((a) => {
       const lk = (a.level || 'A').toLowerCase();
+      const lvlKey = 'report.facs.' + (a.level || 'A');
       return '<div class="facs-item">' +
         '<span class="facs-name">' + esc(a.name) + '</span>' +
-        '<span class="facs-lvl lv-' + lk + '">' + esc(FACS_LEVEL[a.level] || a.level) + '</span>' +
+        '<span class="facs-lvl lv-' + lk + '">' + esc(t(lvlKey)) + '</span>' +
         '</div>';
     }).join('') +
     '</div>';
@@ -153,18 +214,43 @@ function facialSignals(aus){
 
 // ── Emotion bars ──────────────────────────────────────────────────────────────
 function emotionBars(emo){
-  if (!emo || !emo.available) return '<p class="muted" style="font-size:12px">Emotional tone data not available.</p>';
+  if (!emo || !emo.available) return '<p class="muted" style="font-size:12px">' + esc(t('report.emo.na')) + '</p>';
   const dist = emo.overall_distribution || {};
   const items = Object.keys(dist).map((k) => [k, dist[k]]).sort((a, b) => b[1] - a[1]);
-  return '<p style="font-size:12px;margin-bottom:10px">Overall tone: <b>' + esc(emo.dominant || '—') + '</b></p>' +
+  return '<p style="font-size:12px;margin-bottom:10px">' + esc(t('report.emo.overall')) + ' <b>' + esc(emo.dominant || '—') + '</b></p>' +
     items.map((it) => '<div class="emrow"><span>' + esc(it[0]) + '</span>' +
       '<span class="track"><span class="fill" style="width:' + Math.max(0, Math.min(100, it[1])) + '%"></span></span>' +
       '<span class="val">' + Math.round(it[1]) + '%</span></div>').join('');
 }
 
-// ── Readiness verdict ─────────────────────────────────────────────────────────
-const BAND_LABEL = { ready: 'Interview ready', almost: 'Almost there', needs_work: 'Needs more practice' };
+// ── CEO-scannable executive brief (added above full verdict) ──────────────────
+function execBrief(vd){
+  if (!vd || vd.readiness_score == null) return '';
+  const band = vd.band || 'needs_work';
+  const focus = (vd.improvements || []).slice(0, 3)
+    .map((x) => '<li>' + esc(x) + '</li>').join('');
+  return '<div class="exec-brief verdict-' + band + '">' +
+    '<div class="exec-kicker">' + esc(t('report.execTitle')) +
+      '<span class="exec-kicker-sub">' + esc(t('report.execSub')) + '</span></div>' +
+    '<div class="exec-row">' +
+      '<div class="exec-score">' + Math.round(vd.readiness_score) + '<span>/100</span></div>' +
+      '<div class="exec-copy">' +
+        '<div class="exec-band">' + esc(bandLabel(band)) + '</div>' +
+        (vd.headline ? '<div class="exec-hl">' + esc(vd.headline) + '</div>' : '') +
+      '</div>' +
+    '</div>' +
+    (focus
+      ? '<div class="exec-focus"><div class="exec-focus-label">' + esc(t('report.focus')) + '</div>' +
+        '<ul>' + focus + '</ul></div>'
+      : '') +
+    (vd.next_action
+      ? '<div class="exec-next"><span>' + esc(t('report.tryNext')) + '</span> ' +
+        esc(vd.next_action) + '</div>'
+      : '') +
+    '</div>';
+}
 
+// ── Readiness verdict (full detail — kept for context) ────────────────────────
 function verdictHeader(vd){
   if (!vd || vd.readiness_score == null) return '';
   const band = vd.band || 'needs_work';
@@ -176,29 +262,31 @@ function verdictHeader(vd){
   const str  = (vd.strengths    || []).map((x) => '<li>' + esc(x) + '</li>').join('');
   const imp  = (vd.improvements || []).map((x) => '<li>' + esc(x) + '</li>').join('');
   return '<div class="verdict verdict-' + band + '">' +
+    '<div class="v-detail-label">' + esc(t('report.detailTitle')) + '</div>' +
     '<div class="vhead"><div class="vscore">' + Math.round(vd.readiness_score) + '<span>/100</span></div>' +
-      '<div class="vband"><div class="vlabel">' + esc(BAND_LABEL[band] || band) + '</div>' +
+      '<div class="vband"><div class="vlabel">' + esc(bandLabel(band)) + '</div>' +
       '<div class="vhl">' + esc(vd.headline || '') + '</div></div></div>' +
     '<div class="vsubs">' +
-      sub('Voice & delivery', comp.delivery) +
-      sub('On-camera presence', comp.presence) +
-      sub('Answer quality', comp.content) +
+      sub(t('report.voice'), comp.delivery) +
+      sub(t('report.presence'), comp.presence) +
+      sub(t('report.content'), comp.content) +
     '</div>' +
     (notes ? '<ul class="vnotes">' + notes + '</ul>' : '') +
-    (str   ? '<h5>What you did well</h5><ul>' + str + '</ul>' : '') +
-    (imp   ? '<h5>What to work on</h5><ul>' + imp + '</ul>' : '') +
-    (vd.next_action ? '<p class="vnext"><b>Try this next:</b> ' + esc(vd.next_action) + '</p>' : '') +
-    '<p class="muted" style="font-size:11px;margin-top:10px">This is practice feedback to help you improve — not a hiring decision.</p>' +
+    (str   ? '<h5>' + esc(t('report.didWell')) + '</h5><ul>' + str + '</ul>' : '') +
+    (imp   ? '<h5>' + esc(t('report.workOn')) + '</h5><ul>' + imp + '</ul>' : '') +
+    (vd.next_action ? '<p class="vnext"><b>' + esc(t('report.nextAction')) + '</b> ' + esc(vd.next_action) + '</p>' : '') +
+    '<p class="muted" style="font-size:11px;margin-top:10px">' + esc(t('report.disclaimer')) + '</p>' +
     '</div>';
 }
 
 // ── Scoring breakdown (plain-English pillar labels) ───────────────────────────
-const RLABEL = { good: 'Good', mid: 'OK', low: 'Low' };
+function rateLabels(){ return { good: t('report.good'), mid: t('report.ok'), low: t('report.low') }; }
 function rate01(s){ return s >= 0.70 ? 'good' : s >= 0.50 ? 'mid' : 'low'; }
 
 function sbkRow(label, score01, valueText, targetText){
   const r   = rate01(score01);
   const pct = Math.round(Math.max(0, Math.min(1, score01)) * 100);
+  const RLABEL = rateLabels();
   return '<div class="sbk-row"><span class="sbk-name">' + esc(label) + '</span>' +
     '<span class="sbk-bar"><i class="' + (r === 'good' ? '' : r) + '" style="width:' + pct + '%"></i></span>' +
     '<span class="sbk-rrate ' + r + '">' + RLABEL[r] + '</span>' +
@@ -255,120 +343,119 @@ function scoringBreakdown(vd, o, v){
     const score = comp[key];
     const has   = typeof score === 'number';
     const r     = has ? rate01(score / 100) : null;
+    const RLABEL = rateLabels();
     return '<div class="sbk-pillar"><div class="sbk-head">' +
       '<span class="sbk-pname">' + esc(name) + '</span>' +
-      '<span class="sbk-weight">' + wPct(key) + ' of score</span>' +
+      '<span class="sbk-weight">' + wPct(key) + ' ' + esc(t('report.ofScore')) + '</span>' +
       '<span class="sbk-score">' + (has ? Math.round(score) : '—') + '<small>/100</small></span>' +
       (has ? '<span class="sbk-rate ' + r + '">' + RLABEL[r] + '</span>'
-           : '<span class="sbk-rate muted">not captured</span>') +
+           : '<span class="sbk-rate muted">' + esc(t('report.notCaptured')) + '</span>') +
       '</div>' + (rows || '') + '</div>';
   };
-  return '<div class="chart-card sbk"><div class="ct">How your score is calculated</div>' +
-    '<div class="cs">Your readiness score combines three things: <b>how you sounded</b> (' + wPct('delivery') + '), ' +
-      '<b>how you looked on camera</b> (' + wPct('presence') + '), and ' +
-      '<b>what you actually said</b> (' + wPct('content') + '). ' +
-      'If one signal wasn\'t captured, the others carry more weight. ' +
-      'Scores: 70+ = interview ready · 50–69 = almost there · under 50 = needs more practice.</div>' +
-    pillar('How you sounded — voice & delivery',   'delivery', deliveryRows(v)) +
-    pillar('How you looked — on-camera presence',  'presence', presenceRows(o)) +
-    pillar('What you said — answer quality',        'content',  contentRows(vd)) +
+  return '<div class="chart-card sbk"><div class="ct">' + esc(t('report.scoreHow')) + '</div>' +
+    '<div class="cs">' + esc(t('report.scoreHowBody', { d: wPct('delivery'), p: wPct('presence'), c: wPct('content') })) + '</div>' +
+    pillar(t('report.pillar.delivery'), 'delivery', deliveryRows(v)) +
+    pillar(t('report.pillar.presence'),  'presence', presenceRows(o)) +
+    pillar(t('report.pillar.content'),   'content',  contentRows(vd)) +
     '</div>';
 }
 
 // ── Per-question table (simplified columns) ───────────────────────────────────
-function perQuestionTable(perQ, t){
+function perQuestionTable(perQ, timing){
   if (!perQ || !perQ.length) return '';
   const rows = perQ.map((q) => {
     const m  = q.metrics || {};
-    const rt = (t.per_question_response_sec || [])[q.turn];
+    const rt = (timing.per_question_response_sec || [])[q.turn];
     return '<tr><td>' + esc(q.question || ('Q' + (q.turn + 1))) + '</td>' +
       '<td>' + (m.gaze_eye_contact_pct != null ? m.gaze_eye_contact_pct + '%' : '—') + '</td>' +
       '<td>' + (m.composure != null ? m.composure + '/100' : '—') + '</td>' +
       '<td>' + (rt != null ? rt + 's' : '—') + '</td></tr>';
   }).join('');
-  return '<div class="chart-card"><div class="ct">Question by question</div>' +
-    '<div class="cs">A snapshot of how you performed on each question.</div>' +
+  return '<div class="chart-card"><div class="ct">' + esc(t('report.perQ')) + '</div>' +
+    '<div class="cs">' + esc(t('report.perQSub')) + '</div>' +
     '<table class="data"><thead><tr>' +
-      '<th>Question</th><th>Eye contact</th><th>Composure</th><th>Response time</th>' +
+      '<th>' + esc(t('report.qCol')) + '</th><th>' + esc(t('report.eyeCol')) + '</th>' +
+      '<th>' + esc(t('report.compCol')) + '</th><th>' + esc(t('report.respCol')) + '</th>' +
     '</tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
 
 // ── AI coaching ───────────────────────────────────────────────────────────────
 function coachSection(c){
-  if (!c) return '<div class="coach"><p class="muted">AI coaching was not generated for this session.</p></div>';
+  if (!c) return '<div class="coach"><p class="muted">' + esc(t('report.coach.na')) + '</p></div>';
   return '<div class="coach">' +
     '<span class="badge">★ AI Coach · ' + (c.score == null ? '—' : esc(String(c.score))) + '/10</span>' +
     '<p>' + esc(c.summary || '') + '</p>' +
-    (c.strengths    && c.strengths.length    ? '<h5>What you did well</h5><ul>'    + c.strengths.map((x)    => '<li>' + esc(x) + '</li>').join('') + '</ul>' : '') +
-    (c.improvements && c.improvements.length ? '<h5>What to work on</h5><ul>' + c.improvements.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul>' : '') +
+    (c.strengths    && c.strengths.length    ? '<h5>' + esc(t('report.didWell')) + '</h5><ul>'    + c.strengths.map((x)    => '<li>' + esc(x) + '</li>').join('') + '</ul>' : '') +
+    (c.improvements && c.improvements.length ? '<h5>' + esc(t('report.workOn')) + '</h5><ul>' + c.improvements.map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul>' : '') +
     '</div>';
 }
 
 // ── Main view ─────────────────────────────────────────────────────────────────
 function view(s){
   const o   = s.overall || {};
-  const t   = s.timing  || {};
+  const timing = s.timing  || {};
   const v   = s.voice   || { available: false };
   const aus = s.action_units || [];
   const vd  = s.verdict  || null;
   const c   = s.coaching || null;
-  const title = esc(s.label || s.role || 'Session');
+  const title = esc(localizeRole(s.label || s.role || null));
   const perQ  = s.per_question || [];
   const composureSeries = perQ.map((q) => (q.metrics || {}).composure);
   const calm = o.nervousness != null ? Math.round(100 - o.nervousness) : null;
 
-  return '<a class="backlink" href="#/history">← History</a>' +
+  return '<a class="backlink" href="#/history">' + esc(t('common.backHistory')) + '</a>' +
     '<div class="screen-head"><div><h1>' + title + '</h1>' +
       '<div class="muted" style="font-size:12.5px">' + esc(fmtDate(s.created_at)) +
-        ' · ' + perQ.length + ' questions · ' + esc(fmtDuration(s.duration_sec)) + '</div></div>' +
-      '<button class="btn btn-ghost" onclick="window.print()">Export PDF</button></div>' +
+        ' · ' + perQ.length + ' ' + esc(t('common.questions')) + ' · ' + esc(fmtDuration(s.duration_sec)) + '</div></div>' +
+      '<button class="btn btn-ghost" onclick="window.print()">' + esc(t('common.exportPdf')) + '</button></div>' +
 
     // ① Score summary cards
     '<div class="score-cards">' +
-      scoreCard('Attention',  'Were you focused?',       'attention',  o.attention)  +
-      scoreCard('Confidence', 'Did you project assurance?', 'confidence', o.confidence) +
-      scoreCard('Composure',  'Did you stay steady?',    'composure',  o.composure)  +
-      scoreCard('Calm',       'How relaxed were you?',   'composure',  calm)         +
+      scoreCard(t('report.attention'),  t('report.attentionHint'),  'attention',  o.attention)  +
+      scoreCard(t('report.confidence'), t('report.confidenceHint'), 'confidence', o.confidence) +
+      scoreCard(t('report.composure'),  t('report.composureHint'),  'composure',  o.composure)  +
+      scoreCard(t('report.calm'),       t('report.calmHint'),       'composure',  calm)         +
     '</div>' +
 
-    // ② Readiness verdict (Claude prose)
+    // ② CEO glance card (score + headline + focus) — then full verdict detail
+    execBrief(vd) +
     verdictHeader(vd) +
 
-    // ③ Engagement (NEW — plain-English participation overview)
-    engagementSection(o, t) +
+    // ③ Engagement
+    engagementSection(o, timing) +
 
     // ④ Score breakdown
     scoringBreakdown(vd, o, v) +
 
-    // ⑤ How you came across (plain-English impressions)
-    '<div class="chart-card"><div class="ct">How you came across</div>' +
-      '<div class="cs">A plain-English summary of your on-camera presence.</div>' +
+    // ⑤ How you came across
+    '<div class="chart-card"><div class="ct">' + esc(t('report.howCame')) + '</div>' +
+      '<div class="cs">' + esc(t('report.howCameSub')) + '</div>' +
       howYouCameAcross(o, s) + '</div>' +
 
     // ⑥ AI coaching (shown when verdict is absent)
     (vd && vd.readiness_score != null ? '' : coachSection(c)) +
 
     // ⑦ Composure trend
-    '<div class="chart-card"><div class="ct">Composure across questions</div>' +
-      '<div class="cs">How calm and steady you looked as each question progressed.</div>' +
+    '<div class="chart-card"><div class="ct">' + esc(t('report.composureTrend')) + '</div>' +
+      '<div class="cs">' + esc(t('report.composureTrendSub')) + '</div>' +
       svgLineChart(composureSeries) + '</div>' +
 
     // ⑧ Per-question table
-    perQuestionTable(perQ, t) +
+    perQuestionTable(perQ, timing) +
 
     // ⑨ Voice details
-    '<div class="chart-card"><div class="ct">Voice & delivery</div>' +
-      '<div class="cs">Based on your recorded audio — how fast you spoke, filler words, silences, and vocal variety.</div>' +
+    '<div class="chart-card"><div class="ct">' + esc(t('report.voiceTitle')) + '</div>' +
+      '<div class="cs">' + esc(t('report.voiceSub')) + '</div>' +
       voiceCard(v) + '</div>' +
 
     // ⑩ Emotional tone
-    '<div class="chart-card"><div class="ct">Emotional tone</div>' +
-      '<div class="cs">Estimated from your facial movements during the session. Use this as a rough guide, not a clinical reading.</div>' +
+    '<div class="chart-card"><div class="ct">' + esc(t('report.emoTitle')) + '</div>' +
+      '<div class="cs">' + esc(t('report.emoSub')) + '</div>' +
       emotionBars(s.emotion_mediapipe) + '</div>' +
 
-    // ⑪ Facial signals (plain FACS)
-    '<div class="chart-card"><div class="ct">Facial signals</div>' +
-      '<div class="cs">Which facial muscles were active and how strongly — gives a rough picture of what your face was expressing.</div>' +
+    // ⑪ Facial signals
+    '<div class="chart-card"><div class="ct">' + esc(t('report.facsTitle')) + '</div>' +
+      '<div class="cs">' + esc(t('report.facsSub')) + '</div>' +
       facialSignals(aus) + '</div>' +
 
     // ⑫ Deep emotion model (optional)
@@ -383,16 +470,18 @@ export function report(params){
     const root = document.getElementById('report-body');
     if (!root) return;
     try {
-      const s = await api.getSession(id);
+      const s = await loadSessionForDisplay(id, (msg) => {
+        if (document.body.contains(root)) root.innerHTML = '<p class="muted">' + esc(msg) + '</p>';
+      });
       if (!document.body.contains(root)) return;
       root.innerHTML = view(s);
     } catch (e){
       const msg = String(e.message || e);
-      root.innerHTML = '<a class="backlink" href="#/history">← History</a>' +
+      root.innerHTML = '<a class="backlink" href="#/history">' + esc(t('common.backHistory')) + '</a>' +
         '<div class="placeholder-card"><p>' +
-        (msg.indexOf('404') >= 0 ? 'Session not found.' : 'Could not load this session.') +
+        esc(msg.indexOf('404') >= 0 ? t('common.sessionMissing') : t('common.loadFailed')) +
         '</p><p class="muted">' + esc(msg) + '</p></div>';
     }
   });
-  return '<div class="screen" id="report-body"><p class="muted">Loading…</p></div>';
+  return '<div class="screen" id="report-body"><p class="muted">' + esc(t('common.loading')) + '</p></div>';
 }

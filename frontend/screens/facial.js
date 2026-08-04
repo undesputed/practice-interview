@@ -3,6 +3,7 @@ import { dominantEmotion, EMOTION_CLASSES } from '../emotion.js';
 import { esc } from '../util.js';
 import { api } from '../api.js';
 import { CONFIG } from '../config.js';
+import { t } from '../i18n.js';
 import { createFaceEffects } from '../face-effects.js';
 
 // Curated blendshapes shown as bars, with friendly labels.
@@ -206,7 +207,7 @@ export function facial(){
     document.getElementById('fa-stop').addEventListener('click', stopCamera);
   });
 
-  return '<div class="screen"><div class="screen-head"><h1>Facial Analysis</h1>' +
+  return '<div class="screen"><div class="screen-head"><h1>' + esc(t('facial.title')) + '</h1>' +
     '<span class="muted" style="font-size:12px">live · nothing is saved</span></div>' +
     '<div id="facial-body"><div class="fa-grid">' +
       '<div class="fa-rail">' +

@@ -413,20 +413,19 @@ def test_emotion_blendshapes_disgust():
     assert out["dominant"] == "disgust"
 
 def test_emotion_blendshapes_neutral_when_flat():
-    out = emotion_from_blendshapes([_ef(mouthSmileLeft=0.0, browDownLeft=0.0)])
+    # Tiny non-zero so the frame isn't dropped as "empty capture".
+    out = emotion_from_blendshapes([_ef(mouthSmileLeft=0.03, browDownLeft=0.03)])
     assert out["dominant"] == "neutral"
+
 
 def test_emotion_blendshapes_empty_or_no_face_is_unavailable():
     assert emotion_from_blendshapes([]) == {"available": False}
     assert emotion_from_blendshapes([{"t": 0.0, "turn": 0, "face": False}]) == {"available": False}
 
-def test_emotion_blendshapes_tolerates_missing_keys():
-    out = emotion_from_blendshapes([_ef()])  # empty bs dict
-    assert out["available"] is True
-    assert out["dominant"] == "neutral"
-    dist = out["overall_distribution"]
-    # The MediaPipe track now emits 8 classes (the basics + Contempt).
-    assert set(dist) == set(_MP_CLASSES)
+
+def test_emotion_blendshapes_skips_all_zero_bs():
+    # Face present but coefficients all zero → ignore (don't invent 100% neutral).
+    assert emotion_from_blendshapes([_ef()]) == {"available": False}
 
 def test_emotion_blendshapes_one_sided_value_not_halved():
     # A blendshape present on only one side must count at full strength. Here a

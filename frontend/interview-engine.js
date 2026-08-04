@@ -30,7 +30,7 @@ function ensureTasks(){
     const [face, pose, gesture, objects] = await Promise.all([
       FaceLandmarker.createFromOptions(fileset, {
         baseOptions: { modelAssetPath: CONFIG.MODEL_URL, delegate: 'GPU' },
-        runningMode: 'VIDEO', numFaces: 2,
+        runningMode: 'VIDEO', numFaces: 1,   // one candidate — halves the every-frame face cost
         outputFaceBlendshapes: true, outputFacialTransformationMatrixes: true,
       }),
       PoseLandmarker.createFromOptions(fileset, {
@@ -87,9 +87,13 @@ export function setCameraOn(on){
 // advances this as the AI interviewer asks each question (was hard-pinned to -1).
 export function setTurn(n){ if (session) session.turn = n; }
 
-// Override the body-detection throttle for screens that need finer hand tracking
-// (e.g. the Quick Draw canvas). Pass null to restore CONFIG.POSE_THROTTLE_MS.
+// Override the pose+object detection throttle (report data). Pass null to restore
+// CONFIG.POSE_THROTTLE_MS. Note: hands are now decoupled — see setHandThrottle.
 export function setBodyThrottle(ms){ if (session) session._bodyThrottle = ms ?? null; }
+
+// Override the hand/gesture detection throttle — the rate the air-touch cursor updates.
+// Pass null to restore CONFIG.HAND_THROTTLE_MS. Lower = smoother cursor, more GPU cost.
+export function setHandThrottle(ms){ if (session) session._handThrottle = ms ?? null; }
 
 // Identifies the most recent start() in flight. A newer start() (or any stop())
 // supersedes older in-flight attempts so they release their camera and bail —
@@ -158,7 +162,7 @@ function launch(canvas, video, stream, { onStats, onAction, onCursor, showOverla
   session = {
     stream, video, running: true, rafId: 0, showOverlay: !!showOverlay, turn: -1,
     startTs: performance.now(), fps: 0, _t: performance.now(), _n: 0,
-    lastBodyTs: 0, lastStatsTs: 0, lastVideoTime: -1, frames: [], paused: false,
+    lastBodyTs: 0, lastHandTs: 0, lastStatsTs: 0, lastVideoTime: -1, frames: [], paused: false,
     lastPose: null, lastHand: null, lastObjects: null,
   };
 
@@ -211,18 +215,30 @@ function launch(canvas, video, stream, { onStats, onAction, onCursor, showOverla
     const tRel = now - session.startTs;
     const frame = { t: tRel, turn: session.turn, face: hasFace, face_count: faceCount, bs, m };
 
-    // Pose + hands + objects: detect on a throttle for the report data (posture,
-    // fidget, integrity). Cache the raw results so the overlay (when shown) draws
-    // smoothly; the candidate's live view runs overlay-off, so nothing is drawn.
+    // Hands/gesture: detect on a FAST throttle (~30fps). This drives the air-touch
+    // cursor and the gesture-action onsets, so it must stay responsive — kept separate
+    // from the heavy pose+object detectors below so the cursor isn't stuck at their rate.
+    if (now - session.lastHandTs >= (session._handThrottle ?? CONFIG.HAND_THROTTLE_MS ?? 33)){
+      session.lastHandTs = now;
+      try {
+        const hr = tasks.gesture.recognizeForVideo(video, now);
+        session.lastHand = (hr && hr.landmarks && hr.landmarks.length) ? hr : null;
+      } catch (e){ /* skip hand detect on a bad frame */
+        if (!session._handWarned){ session._handWarned = true; console.warn('[air-touch] hand detect threw:', e && e.message); }
+      }
+    }
+
+    // Pose + objects: detect on a SLOWER throttle — report data only (posture, fidget,
+    // integrity); no live view depends on these at high rate. Cache the raw results so
+    // the overlay (when shown) draws smoothly. The freshest cached hand result is
+    // attached here too, so the report payload keeps its ~8fps cadence (not the hand rate).
     if (now - session.lastBodyTs >= (session._bodyThrottle ?? CONFIG.POSE_THROTTLE_MS)){
       session.lastBodyTs = now;
       try {
         const pr = tasks.pose.detectForVideo(video, now);
         session.lastPose = pr.landmarks || null;
         frame.pose = pickPose(pr);
-        const hr = tasks.gesture.recognizeForVideo(video, now);
-        session.lastHand = (hr && hr.landmarks && hr.landmarks.length) ? hr : null;
-        frame.hands = pickHands(hr);
+        frame.hands = pickHands(session.lastHand);
         const orr = tasks.objects.detectForVideo(video, now);
         session.lastObjects = (orr && orr.detections && orr.detections.length) ? orr.detections : null;
         frame.objects = pickObjects(orr);
@@ -284,6 +300,14 @@ function launch(canvas, video, stream, { onStats, onAction, onCursor, showOverla
     if (now - session._t > 500){
       session.fps = Math.round(session._n * 1000 / (now - session._t));
       session._n = 0; session._t = now;
+    }
+
+    // TEMP diagnostic (air-touch cursor): once/sec, report loop fps + whether a hand is
+    // currently detected. Remove once the cursor lag issue is confirmed fixed.
+    if (now - (session._dbgTs || 0) > 1000){
+      session._dbgTs = now;
+      const nh = session.lastHand && session.lastHand.landmarks ? session.lastHand.landmarks.length : 0;
+      console.log(`[air-touch] fps=${session.fps} hands=${nh}`);
     }
 
     // Status is throttled to ~4/s so we don't rewrite the rail every frame.

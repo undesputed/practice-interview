@@ -8,6 +8,7 @@ import { computeLiveMetrics } from '../live-metrics.js';
 import { emotionScores, dominantEmotion } from '../emotion.js';
 import { setPendingSession } from '../pending-session.js';
 import { setNotesCache } from './notes.js';
+import { currentLang } from '../i18n.js';
 
 let agent = null;          // active Deepgram voice agent, or null
 let cursorEl    = null;    // air-touch cursor dot
@@ -16,6 +17,35 @@ let dwellStart  = 0;       // when dwell on current target began
 let lastClickTs = 0;       // cooldown after a dwell click
 const DWELL_MS      = 1200;
 const CLICK_COOL_MS = 2000;
+
+// One Euro filter: low-lag smoothing for the noisy fingertip cursor. When the hand
+// holds still it cuts jitter hard; when it moves fast it lets the motion through with
+// little lag. Tuned for normalized (0..1) coords at ~30fps. See gery.casiez.net/1euro
+function makeOneEuro(minCutoff, beta) {
+  let xPrev = null, dxPrev = 0, tPrev = 0;
+  const alpha = (cutoff, dt) => { const tau = 1 / (2 * Math.PI * cutoff); return 1 / (1 + tau / dt); };
+  return {
+    reset() { xPrev = null; dxPrev = 0; tPrev = 0; },
+    filter(x, t) {
+      if (xPrev === null) { xPrev = x; tPrev = t; return x; }
+      const dt = Math.max(1e-3, (t - tPrev) / 1000);
+      tPrev = t;
+      const dx = (x - xPrev) / dt;
+      const aD = alpha(1.0, dt);           // derivative low-pass (dcutoff = 1.0)
+      dxPrev = aD * dx + (1 - aD) * dxPrev;
+      const cutoff = minCutoff + beta * Math.abs(dxPrev);
+      const a = alpha(cutoff, dt);
+      xPrev = a * x + (1 - a) * xPrev;
+      return xPrev;
+    },
+  };
+}
+// minCutoff = smoothing when the hand is still (higher = less lag, more jitter).
+// beta = how much fast motion cuts the smoothing (higher = pointer keeps up on quick
+// moves instead of trailing behind). Tune these two if it feels laggy or jittery.
+const euroX = makeOneEuro(1.7, 2.0);
+const euroY = makeOneEuro(1.7, 2.0);
+function resetCursorSmoothing(){ euroX.reset(); euroY.reset(); }
 let convoCount = 0;        // conversation lines seen this run
 let turn = -1;             // interview question index; advances on each interviewer line
 let segments = [];         // { speaker, text, t } transcript lines
@@ -74,6 +104,7 @@ function onCursor(cur) {
   if (!cur) {
     cursorEl.classList.remove('show');
     resetDwell();
+    resetCursorSmoothing();   // clear filter state so the next hand-raise starts clean
     lastSwipePos = null;
     if (!palmCooldown) palmHeldStart = 0;
     return;
@@ -81,8 +112,11 @@ function onCursor(cur) {
   const canvas = byId('lv-canvas');
   if (!canvas) return;
   const r = canvas.getBoundingClientRect();
-  const cx = r.left + cur.x * r.width;
-  const cy = r.top  + cur.y * r.height - r.height * 0.04;
+  // Smooth the dot's screen position + dwell hit-test (below). Swipe/pinch logic keeps
+  // using the raw cur.x/pinchDist so their tuned thresholds are unaffected.
+  const now = performance.now();
+  const cx = r.left + euroX.filter(cur.x, now) * r.width;
+  const cy = r.top  + euroY.filter(cur.y, now) * r.height - r.height * 0.04;
   cursorEl.style.left = cx + 'px';
   cursorEl.style.top  = cy + 'px';
   cursorEl.classList.add('show');
@@ -131,7 +165,10 @@ function onCursor(cur) {
           lastSwipePos = { x: cur.x, t: now, startX: cur.x, startT: now, dir: 0 };
         } else {
           const stepDx  = cur.x - lastSwipePos.x;
-          const thisDir = Math.abs(stepDx) > 0.01 ? Math.sign(stepDx) : 0;
+          // Only count a decisive step (>0.035 of frame width) as a direction. Small
+          // hand wobble stays dir=0 so it can't false-trigger the reversal reset below
+          // and cancel a legitimate swipe — that was the main "swipe not accurate" cause.
+          const thisDir = Math.abs(stepDx) > 0.035 ? Math.sign(stepDx) : 0;
           if (thisDir !== 0 && lastSwipePos.dir !== 0 && thisDir !== lastSwipePos.dir) {
             // Direction reversed mid-gesture — reset anchor so return motion can't
             // accumulate against the old startX and fire the opposite page turn.
@@ -157,10 +194,12 @@ function onCursor(cur) {
   }
 
   // ── Pinch-to-drag the book overlay ────────────────────────────────────────
-  // Pinch (thumb + index tip < 0.07) over the drag handle grabs the book;
-  // releasing the pinch drops it. Shares bookDragging with the mouse drag path.
+  // Pinch (thumb + index tip close) over the drag handle grabs the book; releasing
+  // drops it. Hysteresis: grab needs a firm pinch (<0.07), but once grabbed we hold
+  // until the fingers clearly separate (>0.11) so small wobble can't drop it mid-drag.
+  // Shares bookDragging with the mouse drag path.
   if (bookOpen) {
-    const isPinching = cur.pinchDist < 0.07;
+    const isPinching = cur.pinchDist < (bookDragging ? 0.11 : 0.07);
     if (isPinching && !bookDragging) {
       const dragHit = document.elementFromPoint(cx, cy);
       if (dragHit && dragHit.closest && dragHit.closest('#lv-book-drag')) {
@@ -504,6 +543,7 @@ function toggleTranscript(){ const p = byId('lv-transcript'); if (p) p.classList
 function clearImmersive(){
   document.body.classList.remove('live-immersive');
   cursorEl = null; dwellTarget = null; dwellStart = 0; lastClickTs = 0;
+  resetCursorSmoothing();
   resetBook();
 }
 
@@ -560,6 +600,7 @@ async function finishInterview(){
     transcript: { full_text, segments },
     events, emotion: null,
     audioBlob: audio ? audio.blob : null,
+    language: (getInterviewConfig().language === 'ja' || currentLang() === 'ja') ? 'ja' : 'en',
   });
   location.hash = '#/thanks/pending';
 }

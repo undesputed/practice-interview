@@ -433,12 +433,19 @@ def emotion_from_blendshapes(frames: list[dict]) -> dict:
 
     Emits the same shape as the DeepFace track (via aggregate_emotions) so the two
     render side by side. Returns {"available": False} when no usable face frames exist.
+
+    Frames with a detected face but no meaningful blendshape activation (all ~0) are
+    skipped so they don't flood the aggregate with artificial 100% neutral.
     """
     shots = []
     for f in frames:
         if not f.get("face", False) or "bs" not in f:
             continue
-        scores = _frame_emotion_scores(f["bs"])
+        bs = f["bs"] or {}
+        # Skip empty/flat captures (face box present but coefficients unavailable).
+        if not any((bs.get(k) or 0) > 0.02 for k in bs):
+            continue
+        scores = _frame_emotion_scores(bs)
         shots.append({"t": f.get("t", 0.0), "turn": f.get("turn", -1),
                       "dominant": max(scores, key=scores.get), "scores": scores})
     return aggregate_emotions(shots, classes=_MP_CLASSES)

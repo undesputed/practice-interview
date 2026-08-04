@@ -18,9 +18,10 @@ def test_aggregate_overall_and_per_question():
     ]
     out = aggregate_emotions(shots)
     assert out["available"] is True
-    assert out["dominant"] == "neutral"                      # 3 of 4 shots
-    assert out["overall_distribution"]["neutral"] == 75.0
-    assert out["overall_distribution"]["happy"] == 25.0
+    # Intensity-weighted soft-mean: a strong happy shot outweighs flat one-hot
+    # "neutral" shots (resting-face flood is what we intentionally reduce).
+    assert out["dominant"] == "happy"
+    assert out["overall_distribution"]["happy"] > out["overall_distribution"]["neutral"]
     assert [q["turn"] for q in out["per_question"]] == [0, 1]
     assert out["per_question"][1]["dominant"] == "neutral"   # both turn-1 shots neutral
     assert out["per_question"][1]["distribution"]["neutral"] == 100.0
@@ -37,7 +38,47 @@ def test_aggregate_ignores_unknown_dominant_class():
     out = aggregate_emotions(shots)
     assert out["available"] is True
     assert "contempt" not in out["overall_distribution"]
-    assert out["overall_distribution"]["neutral"] == 50.0  # 1 of 2 shots; unknown still counts in denominator
+    # Soft-score mean: both shots carry neutral soft scores → ~100% neutral
+    # (unknown dominant label is ignored; scores dictate the bars).
+    assert out["overall_distribution"]["neutral"] == 100.0
+    assert out["dominant"] == "neutral"
+
+
+def test_aggregate_soft_scores_keep_secondary_emotions():
+    """Winner-take-all would report 100% neutral here; soft-mean must surface happy."""
+    def mixed(t, turn, neutral, happy):
+        s = {c: 0.0 for c in EMOTION_CLASSES}
+        s["neutral"] = neutral
+        s["happy"] = happy
+        return {"t": t, "turn": turn, "dominant": "neutral", "scores": s}
+
+    shots = [
+        mixed(0.0, 0, 55.0, 45.0),
+        mixed(100.0, 0, 60.0, 40.0),
+        mixed(200.0, 0, 50.0, 50.0),
+    ]
+    out = aggregate_emotions(shots)
+    assert out["available"] is True
+    # Neutral still leads, but happy must remain clearly visible (not wiped to 0).
+    assert out["overall_distribution"]["happy"] >= 35.0
+    assert out["overall_distribution"]["neutral"] >= 40.0
+    assert out["overall_distribution"]["happy"] + out["overall_distribution"]["neutral"] >= 95.0
+
+
+def test_aggregate_expressive_frames_outweigh_resting_face():
+    """A few strong happy frames should not be drowned by many flat neutral ones."""
+    def one(t, scores, dominant):
+        return {"t": t, "turn": 0, "dominant": dominant, "scores": scores}
+
+    flat = {c: 0.0 for c in EMOTION_CLASSES}
+    flat["neutral"] = 100.0
+    smile = {c: 0.0 for c in EMOTION_CLASSES}
+    smile["happy"] = 80.0
+    smile["neutral"] = 20.0
+    shots = [one(float(i), flat, "neutral") for i in range(20)]
+    shots += [one(1000.0 + i, smile, "happy") for i in range(3)]
+    out = aggregate_emotions(shots)
+    assert out["overall_distribution"]["happy"] >= 25.0  # would be ~13% under uniform mean / ~13% under WTA
 
 from backend import emotion as emotion_mod
 

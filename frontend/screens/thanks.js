@@ -264,7 +264,7 @@ async function runPendingSession() {
     return;
   }
 
-  const { scenario, role, frames, transcript, events, emotion, audioBlob } = pending;
+  const { scenario, role, frames, transcript, events, emotion, audioBlob, language } = pending;
 
   // Step 1: voice analysis (Deepgram, 2-5s)
   let voice = null;
@@ -286,7 +286,10 @@ async function runPendingSession() {
   startPhaseLog(SESSION_LOG, 1400);
 
   try {
-    const resp = await api.createSession({ scenario, role, frames, transcript, events, emotion, voice });
+    const resp = await api.createSession({
+      scenario, role, frames, transcript, events, emotion, voice,
+      language: language === 'ja' ? 'ja' : 'en',
+    });
     finishPhaseLog();
     if (location.hash === "#/thanks/pending") {
       location.replace(location.pathname + location.search + "#/thanks/" + resp.session_id);
@@ -347,6 +350,7 @@ function showError(pending, voice) {
         scenario: pending.scenario, role: pending.role, frames: pending.frames,
         transcript: pending.transcript, events: pending.events,
         emotion: pending.emotion, voice: voice,
+        language: pending.language === 'ja' ? 'ja' : 'en',
       });
       finishPhaseLog();
       if (location.hash === "#/thanks/pending") {

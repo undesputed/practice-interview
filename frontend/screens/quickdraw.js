@@ -693,7 +693,7 @@ async function startCamera() {
   try {
     const canvas = byId('qd-canvas');
     await engine.start(canvas, { onStats, onCursor, showOverlay: false, audio: false });
-    engine.setBodyThrottle(33);  // 30fps hand tracking for smooth strokes
+    engine.setHandThrottle(33);  // 30fps hand tracking for smooth strokes
     initDrawCanvas();
     if (ph) ph.style.display = 'none';
     if (startBtn) { startBtn.disabled = false; startBtn.textContent = 'Start Game'; }
@@ -709,7 +709,7 @@ function stopCamera() {
   stopGuessLoop();
   stopAudio();
   if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
-  engine.setBodyThrottle(null);
+  engine.setHandThrottle(null);
   engine.stop();
   drawCtx = null;
   lastPos = null; lastMid = null; smoothPos = null;

@@ -2,6 +2,7 @@ import { esc } from '../util.js';
 import { setInterviewConfig } from '../interview-config.js';
 import { api } from '../api.js';
 import { preload } from '../interview-engine.js';
+import { setLang, currentLang } from '../i18n.js';
 
 // Scenarios: what the user is practicing for.
 // The "job" scenario reveals the optional role picker; all others hide it.
@@ -188,6 +189,8 @@ function saveSettings(root) {
   const langBtn       = root.querySelector('[data-group="language"] button.on');
   const language      = langBtn ? langBtn.dataset.lang : 'en';
   setInterviewConfig({ scenario, role, focus, difficulty, tone, questionCount, questions: generatedQuestions, language });
+  // Keep the studio UI language in sync with the interview language.
+  setLang(language === 'ja' ? 'ja' : 'en');
 }
 
 export function newInterview() {
@@ -231,12 +234,15 @@ export function newInterview() {
       });
     }
 
-    // Segmented controls (focus / difficulty / tone)
+    // Segmented controls (focus / difficulty / tone / language)
     root.querySelectorAll('[data-group]').forEach((group) => {
       group.addEventListener('click', (e) => {
         const btn = e.target.closest('button');
         if (!btn || !group.contains(btn)) return;
         group.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b === btn));
+        if (group.dataset.group === 'language') {
+          setLang(btn.dataset.lang === 'ja' ? 'ja' : 'en');
+        }
         clearQuestions();
       });
     });
@@ -297,7 +303,8 @@ export function newInterview() {
           '<div><span class="ql">Tone</span><div class="ni-seg" data-group="tone">' +
             '<button>Friendly</button><button class="on">Professional</button><button>Stern</button><button>Intimidating</button></div></div>' +
           '<div><span class="ql">Language</span><div class="ni-seg" data-group="language">' +
-            '<button class="on" data-lang="en">English</button><button data-lang="ja">日本語</button></div></div>' +
+            '<button' + (currentLang() === 'en' ? ' class="on"' : '') + ' data-lang="en">English</button>' +
+            '<button' + (currentLang() === 'ja' ? ' class="on"' : '') + ' data-lang="ja">日本語</button></div></div>' +
           '<div><span class="ql">Questions</span><div class="stepper">' +
             '<button data-step="-1">−</button><span class="val" id="ni-qval">6</span><button data-step="1">+</button></div></div>' +
         '</div>' +

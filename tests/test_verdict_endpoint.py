@@ -21,15 +21,16 @@ def _payload(voice=None):
 
 def test_session_builds_verdict_with_claude(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-    def _fake_verdict(api_key, text, role, delivery_score=None, presence_score=None):
+    def _fake_verdict(api_key, text, role, delivery_score=None, presence_score=None,
+                      scenario="job", language="en"):
         assert delivery_score == 80
         return {"content_score": 60, "headline": "Almost there", "delivery_note": "",
                 "presence_note": "", "content_note": "", "strengths": ["a"],
                 "improvements": ["b"], "next_action": "c"}
     monkeypatch.setattr(main, "generate_verdict", _fake_verdict)
     monkeypatch.setattr(main, "generate_coaching",
-                        lambda key, text, role: {"summary": "", "strengths": [],
-                                                 "improvements": [], "score": None, "rationale": ""})
+                        lambda *a, **k: {"summary": "", "strengths": [],
+                                         "improvements": [], "score": None, "rationale": ""})
     res = client.post("/api/session", json=_payload())
     assert res.status_code == 200, res.text
     sid = res.json()["session_id"]
@@ -46,8 +47,9 @@ def test_session_builds_verdict_with_claude(monkeypatch):
 
 def test_session_verdict_degrades_when_claude_raises(monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-    monkeypatch.setattr(main, "generate_coaching", lambda key, text, role: None)
-    def _boom(api_key, text, role, delivery_score=None, presence_score=None):
+    monkeypatch.setattr(main, "generate_coaching", lambda *a, **k: None)
+    def _boom(api_key, text, role, delivery_score=None, presence_score=None,
+              scenario="job", language="en"):
         raise RuntimeError("anthropic 401")
     monkeypatch.setattr(main, "generate_verdict", _boom)
     res = client.post("/api/session", json=_payload())

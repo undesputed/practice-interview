@@ -5,7 +5,8 @@ export const CONFIG = {
   POSE_MODEL_URL: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task",
   GESTURE_MODEL_URL: "https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task",
   OBJECT_MODEL_URL: "https://storage.googleapis.com/mediapipe-models/object_detector/efficientdet_lite0/float16/1/efficientdet_lite0.tflite",
-  POSE_THROTTLE_MS: 120,  // run pose + hands ~8x/sec
+  POSE_THROTTLE_MS: 250,  // run pose + objects ~4x/sec (report data only — no live view needs them fast)
+  HAND_THROTTLE_MS: 50,   // run hand/gesture ~20x/sec — the cursor filter interpolates between for smoothness
   EMOTION_THROTTLE_MS: 3000,  // capture ~1 face crop per 3s for the interview emotion track
   EMOTION_CROP_PX: 112,       // square crop size sent to the backend (interview batch path)
   EMOTION_MAX_SHOTS: 200,     // hard cap on buffered crops per interview

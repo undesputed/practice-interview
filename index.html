@@ -188,20 +188,6 @@
   .privacy svg{ flex:none; color:var(--ready); }
   .privacy .mono{ color:rgba(255,255,255,.6); }
 
-  /* ---- architecture flow ---- */
-  .arch{ display:grid; grid-template-columns:auto auto 1fr; gap:20px; align-items:stretch; }
-  .arch .node{ border:1px solid var(--line); border-radius:14px; padding:20px; background:var(--surface);
-    display:flex; flex-direction:column; justify-content:center; min-width:150px; }
-  .arch .node .t{ font-family:var(--f-mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase;
-    color:var(--ink-soft); margin-bottom:10px; }
-  .arch .node .b{ font-weight:600; font-size:1.02rem; line-height:1.35; }
-  .arch .node small{ display:block; color:var(--ink-soft); font-weight:400; font-size:.85rem; margin-top:6px; line-height:1.4; }
-  .arch .arrow{ align-self:center; color:var(--presence); font-family:var(--f-mono); font-weight:600; }
-  .arch .backend{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  .arch .proc{ border:1px solid var(--line); border-radius:12px; padding:14px 16px; background:var(--surface);
-    border-left:3px solid var(--hue); }
-  .arch .proc .f{ font-family:var(--f-mono); font-size:12px; color:var(--ink); }
-  .arch .proc .d{ font-size:.86rem; color:var(--ink-soft); margin-top:3px; }
   .caption{ margin-top:22px; font-family:var(--f-mono); font-size:12.5px; color:var(--ink-soft); letter-spacing:.02em; }
   .is-panel .caption{ color:rgba(255,255,255,.5); }
 
@@ -318,9 +304,7 @@
     .cards,.pillars{ grid-template-columns:1fr; }
     .flow{ grid-template-columns:1fr; }
     .step{ padding:18px 0; border-right:0 !important; border-bottom:1px dashed var(--line); }
-    .streams,.rlist,.ready-grid,.math-grid,.eng,.arch,.facs,.facs-foot{ grid-template-columns:1fr; }
-    .arch .arrow{ transform:rotate(90deg); text-align:center; }
-    .arch .backend{ grid-template-columns:1fr; }
+    .streams,.rlist,.ready-grid,.math-grid,.eng,.facs,.facs-foot{ grid-template-columns:1fr; }
     .nav{ display:none; }
     .topbar,.botbar{ padding:18px; }
     .section-label{ display:none; }
@@ -513,36 +497,10 @@
       </div>
     </section>
 
-    <!-- ============ 7 · ARCHITECTURE ============ -->
-    <section class="slide" data-section-en="ARCHITECTURE" data-section-ja="構成">
-      <div class="wrap">
-        <div class="eyebrow"><span class="num">05</span><span data-en="ARCHITECTURE" data-ja="アーキテクチャ">ARCHITECTURE</span><span class="rule"></span></div>
-        <h2 class="title display" data-en="From camera to score" data-ja="カメラからスコアまで">From camera to score</h2>
-        <div class="arch">
-          <div class="node">
-            <div class="t" data-en="BROWSER" data-ja="ブラウザ">BROWSER</div>
-            <div class="b" data-en="Capture<small>MediaPipe vision · Deepgram voice · acoustic features</small>" data-ja="取得<small>MediaPipe 映像 · Deepgram 音声 · 音響特徴</small>">Capture<small>MediaPipe vision · Deepgram voice · acoustic features</small></div>
-          </div>
-          <div class="arrow">POST&nbsp;→<br><span class="mono" style="font-size:11px">/api/session</span></div>
-          <div>
-            <div class="backend">
-              <div class="proc" style="--hue:var(--presence)"><div class="f">analysis.py</div><div class="d" data-en="→ Presence metrics" data-ja="→ 存在感の指標">→ Presence metrics</div></div>
-              <div class="proc" style="--hue:var(--voice)"><div class="f">voice.py</div><div class="d" data-en="→ Delivery score" data-ja="→ デリバリースコア">→ Delivery score</div></div>
-              <div class="proc" style="--hue:var(--content)"><div class="f">anthropic_coach.py</div><div class="d" data-en="→ Content score" data-ja="→ 内容スコア">→ Content score</div></div>
-              <div class="proc" style="--hue:var(--ready)"><div class="f">verdict.py</div><div class="d" data-en="→ Readiness + coaching" data-ja="→ 準備度 + コーチング">→ Readiness + coaching</div></div>
-            </div>
-          </div>
-        </div>
-        <div class="caption" data-en="Vanilla JavaScript front end (no build step) · FastAPI back end · matplotlib charts · results rendered by report.js"
-             data-ja="フロントは素の JavaScript(ビルド不要) · バックは FastAPI · グラフは matplotlib · 結果は report.js が描画">
-             Vanilla JavaScript front end (no build step) · FastAPI back end · matplotlib charts · results rendered by report.js</div>
-      </div>
-    </section>
-
-    <!-- ============ 8 · RESULTS PAGE (panel) ============ -->
+    <!-- ============ 7 · RESULTS PAGE (panel) ============ -->
     <section class="slide is-panel" data-section-en="THE RESULTS PAGE" data-section-ja="結果ページ">
       <div class="wrap">
-        <div class="eyebrow"><span class="num">06</span><span data-en="THE RESULTS PAGE" data-ja="結果ページ">THE RESULTS PAGE</span><span class="rule"></span></div>
+        <div class="eyebrow"><span class="num">05</span><span data-en="THE RESULTS PAGE" data-ja="結果ページ">THE RESULTS PAGE</span><span class="rule"></span></div>
         <h2 class="title display" data-en="Everything the session measured, in one screen" data-ja="測ったすべてを、1画面に">Everything the session measured, in one screen</h2>
         <div class="rlist">
           <div class="ritem"><span class="tag" style="background:rgba(36,192,138,.16);color:var(--ready)">VERDICT</span><div><h4 data-en="Readiness card" data-ja="準備度カード">Readiness card</h4><p data-en="The 0–100 score, its band, and a one-line headline." data-ja="0〜100 のスコア、判定バンド、一行の総評。">The 0–100 score, its band, and a one-line headline.</p></div></div>
@@ -559,7 +517,7 @@
     <!-- ============ 9 · READINESS SCORE (panel) ============ -->
     <section class="slide is-panel" data-section-en="READINESS" data-section-ja="準備度">
       <div class="wrap">
-        <div class="eyebrow"><span class="num">07</span><span data-en="THE READINESS SCORE" data-ja="準備度スコア">THE READINESS SCORE</span><span class="rule"></span></div>
+        <div class="eyebrow"><span class="num">06</span><span data-en="THE READINESS SCORE" data-ja="準備度スコア">THE READINESS SCORE</span><span class="rule"></span></div>
         <h2 class="title display" data-en="One number: are you ready?" data-ja="ひとつの数字で、準備完了か?">One number: are you ready?</h2>
         <div class="ready-grid">
           <div class="donut-wrap">
@@ -594,7 +552,7 @@
     <!-- ============ 10 · PILLARS ============ -->
     <section class="slide" data-section-en="THE PILLARS" data-section-ja="3つの柱">
       <div class="wrap">
-        <div class="eyebrow"><span class="num">08</span><span data-en="INSIDE THE THREE PILLARS" data-ja="3つの柱の中身">INSIDE THE THREE PILLARS</span><span class="rule"></span></div>
+        <div class="eyebrow"><span class="num">07</span><span data-en="INSIDE THE THREE PILLARS" data-ja="3つの柱の中身">INSIDE THE THREE PILLARS</span><span class="rule"></span></div>
         <h2 class="title display" data-en="What each pillar measures" data-ja="各項目が測るもの">What each pillar measures</h2>
         <div class="pillars">
           <div class="pillar" style="--hue:var(--voice)">
@@ -638,7 +596,7 @@
     <!-- ============ 11 · THE MATH (panel) ============ -->
     <section class="slide is-panel" data-section-en="THE MEASUREMENTS" data-section-ja="計測式">
       <div class="wrap">
-        <div class="eyebrow"><span class="num">09</span><span data-en="NOT A BLACK BOX" data-ja="ブラックボックスではない">NOT A BLACK BOX</span><span class="rule"></span></div>
+        <div class="eyebrow"><span class="num">08</span><span data-en="NOT A BLACK BOX" data-ja="ブラックボックスではない">NOT A BLACK BOX</span><span class="rule"></span></div>
         <h2 class="title display" data-en="Every presence score is an explicit formula" data-ja="存在感のスコアは、すべて明示的な式">Every presence score is an explicit formula</h2>
         <p class="lede" style="margin-bottom:26px" data-en="These run over signals derived from face and pose landmarks — transparent, testable, and covered by the test suite." data-ja="いずれも顔と姿勢のランドマークから得た信号で計算します。透明で、検証可能で、テストで担保されています。">These run over signals derived from face and pose landmarks — transparent, testable, and covered by the test suite.</p>
         <div class="math-grid">
@@ -656,7 +614,7 @@
     <!-- ============ 12 · FACS (panel) ============ -->
     <section class="slide is-panel" data-section-en="FACS" data-section-ja="表情動作解析">
       <div class="wrap">
-        <div class="eyebrow"><span class="num">10</span><span data-en="FACS · ACTION UNITS" data-ja="FACS · アクションユニット">FACS · ACTION UNITS</span><span class="rule"></span></div>
+        <div class="eyebrow"><span class="num">09</span><span data-en="FACS · ACTION UNITS" data-ja="FACS · アクションユニット">FACS · ACTION UNITS</span><span class="rule"></span></div>
         <h2 class="title display" data-en="The face, read muscle by muscle" data-ja="顔を、筋肉単位で読み取る">The face, read muscle by muscle</h2>
         <p class="lede" style="margin-bottom:24px" data-en="FACS — the <b>Facial Action Coding System</b> — is the standard way to break any expression into individual muscle movements called <b>Action Units</b>. MediaPipe's blendshapes act as ARKit-style proxies for these units, and the app maps them to <b>17 Action Units</b>."
            data-ja="FACS(<b>表情動作符号化システム</b>)は、あらゆる表情を「<b>アクションユニット</b>」と呼ぶ個々の筋肉の動きに分解する標準的な手法です。MediaPipe のブレンドシェイプはその近似値として働き、本アプリは <b>17 個のアクションユニット</b>に対応づけます。">
@@ -716,7 +674,7 @@
     <!-- ============ 13 · ENGINEERING ============ -->
     <section class="slide" data-section-en="ENGINEERING" data-section-ja="設計判断">
       <div class="wrap">
-        <div class="eyebrow"><span class="num">11</span><span data-en="ENGINEERING CHOICES" data-ja="エンジニアリングの選択">ENGINEERING CHOICES</span><span class="rule"></span></div>
+        <div class="eyebrow"><span class="num">10</span><span data-en="ENGINEERING CHOICES" data-ja="エンジニアリングの選択">ENGINEERING CHOICES</span><span class="rule"></span></div>
         <h2 class="title display" data-en="Choices that respect the user" data-ja="利用者を尊重した設計">Choices that respect the user</h2>
         <div class="eng">
           <div class="eng-item"><span class="n">01</span><div><h4 data-en="In-browser vision" data-ja="ブラウザ内で映像解析">In-browser vision</h4><p data-en="MediaPipe runs on-device; video stays with the user." data-ja="MediaPipe は端末上で動作し、映像は利用者の手元に残ります。">MediaPipe runs on-device; video stays with the user.</p></div></div>
@@ -741,6 +699,47 @@
             <span><i style="background:var(--content)"></i><span data-en="Content · 25%" data-ja="内容 · 25%">Content · 25%</span></span>
           </div>
           <div class="thanks" data-en="Thank you." data-ja="ありがとうございました。">Thank you.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 15 · MISSION ============ -->
+    <section class="slide" data-section-en="MISSION" data-section-ja="ミッション">
+      <div class="wrap">
+        <div class="eyebrow"><span class="num">11</span><span data-en="MISSION" data-ja="ミッション">MISSION</span><span class="rule"></span></div>
+        <h2 class="title display" data-en="Make interview readiness measurable, private, and actionable." data-ja="面接の準備度を、測定可能で、プライバシーを守り、すぐに行動に移せる形に。">Make interview readiness measurable, private, and actionable.</h2>
+        <div class="cards" style="margin-top:24px">
+          <div class="card">
+            <span class="k" data-en="WHAT MATTERS" data-ja="重要なこと">WHAT MATTERS</span>
+            <h3 data-en="Measure the signals that shape first impressions" data-ja="第一印象を作る要素を測る">Measure the signals that shape first impressions</h3>
+            <p data-en="From voice steadiness to posture and clarity, the system turns interview behavior into useful feedback." data-ja="声の安定感、姿勢、明瞭さまで、面接の振る舞いを有益なフィードバックに変えます。">From voice steadiness to posture and clarity, the system turns interview behavior into useful feedback.</p>
+          </div>
+          <div class="card">
+            <span class="k" data-en="PRIVATE BY DESIGN" data-ja="設計上のプライバシー">PRIVATE BY DESIGN</span>
+            <h3 data-en="Respect the person in front of the camera" data-ja="カメラの前の人を尊重する">Respect the person in front of the camera</h3>
+            <p data-en="Analysis stays on-device and only derived metrics are shared, keeping the experience calm and trustworthy." data-ja="解析は端末内で行い、導き出された数値だけを共有することで、安心して使える体験を保ちます。">Analysis stays on-device and only derived metrics are shared, keeping the experience calm and trustworthy.</p>
+          </div>
+          <div class="card">
+            <span class="k" data-en="ACTIONABLE COACHING" data-ja="実行可能なコーチング">ACTIONABLE COACHING</span>
+            <h3 data-en="Turn insight into a next step" data-ja="気づきを次の一手に変える">Turn insight into a next step</h3>
+            <p data-en="The goal is not just a score, but a clearer path to improve before the real interview." data-ja="目的は点数を出すことだけではなく、本番前に改善するための明確な道筋を示すことです。">The goal is not just a score, but a clearer path to improve before the real interview.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 16 · VISION ============ -->
+    <section class="slide" data-section-en="VISION" data-section-ja="ビジョン">
+      <div class="wrap">
+        <div class="eyebrow"><span class="num">12</span><span data-en="VISION" data-ja="ビジョン">VISION</span><span class="rule"></span></div>
+        <h2 class="title display" data-en="A world where every candidate can rehearse with honest feedback." data-ja="すべての候補者が、正直なフィードバックを得ながら練習できる世界。">A world where every candidate can rehearse with honest feedback.</h2>
+        <div class="close-hero" style="margin-top:16px">
+          <div class="close-pillars" style="margin-bottom:24px">
+            <span><i style="background:var(--voice)"></i><span data-en="More confidence" data-ja="より自信を持って">More confidence</span></span>
+            <span><i style="background:var(--presence)"></i><span data-en="Less guesswork" data-ja="勘違いを減らして">Less guesswork</span></span>
+            <span><i style="background:var(--content)"></i><span data-en="Fairer preparation" data-ja="より公平な準備">Fairer preparation</span></span>
+          </div>
+          <div class="thanks" data-en="The future of prep is clear, calm, and measurable." data-ja="これからの準備は、明確で冷静で、測定可能なものになる。">The future of prep is clear, calm, and measurable.</div>
         </div>
       </div>
     </section>

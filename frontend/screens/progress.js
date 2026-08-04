@@ -2,6 +2,7 @@ import { api } from '../api.js';
 import { esc } from '../util.js';
 import { round, fmtDate } from '../format.js';
 import { svgLineChart } from '../charts.js';
+import { t } from '../i18n.js';
 
 // Nervousness is the one "lower is better" metric; the rest score higher-is-better.
 const METRICS = [
@@ -127,6 +128,6 @@ export function progress(){
         '<p class="muted">' + esc(String(e.message || e)) + '</p></div>';
     }
   });
-  return '<div class="screen"><div class="screen-head"><h1>Progress</h1></div>' +
+  return '<div class="screen"><div class="screen-head"><h1>' + esc(t('progress.title')) + '</h1></div>' +
     '<div id="progress-body"><p class="muted">Loading…</p></div></div>';
 }

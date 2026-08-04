@@ -39,6 +39,9 @@ export const api = {
   // POST a finished interview (frames + transcript + events) and get back the
   // session id + scored summary. Phase 1 is JSON; audio is added in a later plan.
   createSession: (payload) => request('POST', '/api/session', payload),
+  // Translate saved LLM feedback into another language (cached on the session).
+  localizeSession: (id, language) =>
+    request('POST', '/api/sessions/' + encodeURIComponent(id) + '/localize', { language }),
   // Generate a tailored question set for the Practice Interview page. Never throws;
   // resolves to {questions:[]} when the server can't generate.
   generateQuestions: (s) => request('POST', '/api/questions', s).catch(() => ({ questions: [] })),

@@ -17,18 +17,30 @@ from backend.analysis import compute_metrics, questions_from_transcript, transcr
 from backend.report import save_session
 from backend import storage
 from backend.deepgram import build_agent_config, grant_ephemeral_token, DEEPGRAM_AGENT_URL
-from backend.anthropic_coach import generate_coaching, generate_verdict
+from backend.anthropic_coach import generate_coaching, generate_verdict, translate_feedback
 from backend.questions import generate_questions
 from backend.emotion import score_emotions, aggregate_emotions
 from backend import sessions_store, voice, verdict as verdict_mod
 from backend.quickdraw import guess_drawing
 from backend import notes_store
 
-load_dotenv()
-logging.basicConfig(level=logging.INFO)  # ensure our INFO/WARNING logs reach the console
-
+# Resolve paths first so we always load backend/.env even when uvicorn is started
+# from the repo root (bare load_dotenv() only looks for ./.env in cwd).
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_DIR = os.path.join(ROOT, "frontend")
+_ENV_PATH = os.path.join(ROOT, "backend", ".env")
+# override=True: an empty ANTHROPIC_API_KEY= in the parent shell would otherwise
+# block dotenv from filling the real key from backend/.env.
+load_dotenv(_ENV_PATH, override=True)
+load_dotenv()  # optional repo-root .env
+# Cursor/shell often injects OpenRouter proxy vars (ANTHROPIC_BASE_URL /
+# ANTHROPIC_AUTH_TOKEN). Those break the project's real sk-ant- key — clear them
+# when we have a native Anthropic key loaded from backend/.env.
+_key = os.getenv("ANTHROPIC_API_KEY") or ""
+if _key.startswith("sk-ant-"):
+    os.environ.pop("ANTHROPIC_BASE_URL", None)
+    os.environ.pop("ANTHROPIC_AUTH_TOKEN", None)
+logging.basicConfig(level=logging.INFO)  # ensure our INFO/WARNING logs reach the console
 
 _SESSION_ID_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{6}\Z")
 _SAFE_ASSET = re.compile(r"^[a-z_]+\.(?:png|json|txt|csv)$")
@@ -64,10 +76,15 @@ class SessionRequest(BaseModel):
     events: list = []
     emotion: Optional[dict] = None
     voice: Optional[dict] = None
+    language: str = "en"
 
 
 class LabelRequest(BaseModel):
     label: str
+
+
+class LocalizeRequest(BaseModel):
+    language: str = "ja"
 
 
 @app.post("/api/interview/token")
@@ -313,12 +330,13 @@ async def session(req: SessionRequest):
             _CLAUDE_TIMEOUT = 45.0
             raw = await asyncio.gather(
                 asyncio.wait_for(
-                    asyncio.to_thread(generate_coaching, anthropic_key, full_text, req.role, req.scenario),
+                    asyncio.to_thread(generate_coaching, anthropic_key, full_text, req.role,
+                                      req.scenario, req.language),
                     timeout=_CLAUDE_TIMEOUT,
                 ),
                 asyncio.wait_for(
                     asyncio.to_thread(generate_verdict, anthropic_key, full_text, req.role, delivery,
-                                      presence, req.scenario),
+                                      presence, req.scenario, req.language),
                     timeout=_CLAUDE_TIMEOUT,
                 ),
                 return_exceptions=True,
@@ -354,6 +372,7 @@ async def session(req: SessionRequest):
         session_id = datetime.now().strftime("%Y-%m-%dT%H%M%S")
         summary["scenario"] = req.scenario
         summary["role"] = req.role
+        summary["language"] = req.language if req.language in ("en", "ja") else "en"
         summary["created_at"] = datetime.strptime(session_id, "%Y-%m-%dT%H%M%S").isoformat()
         await asyncio.to_thread(save_session, session_id, req.frames, req.transcript, summary, coaching)
 
@@ -399,6 +418,107 @@ def rename_session_endpoint(session_id: str, req: LabelRequest):
     if data is None:
         raise HTTPException(404, "session not found")
     return data
+
+
+@app.post("/api/sessions/{session_id}/localize")
+async def localize_session_endpoint(session_id: str, req: LocalizeRequest):
+    """Translate saved LLM feedback into `language` and cache it on the session.
+
+    Used when the UI is Japanese but the session was scored in English. Returns the
+    full session with verdict/coaching text fields overlaid in the target language.
+    """
+    lang = req.language if req.language in ("en", "ja") else "ja"
+    data = sessions_store.load_session(None, session_id)
+    if data is None:
+        raise HTTPException(404, "session not found")
+
+    # Already Japanese (or already cached) — just return an overlaid view.
+    # IMPORTANT: do NOT trust summary["language"] alone. Claude sometimes wrote
+    # English even when language=ja was requested; detect from the actual text.
+    cache_key = f"verdict_{lang}"
+    coach_key = f"coaching_{lang}"
+    if lang == "en":
+        return data
+    cached = data.get(cache_key)
+    if cached and _feedback_looks_japanese(cached):
+        return _overlay_locale(data, lang)
+    if _feedback_looks_japanese(data.get("verdict") or {}):
+        return data
+
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+    if not anthropic_key:
+        raise HTTPException(503, "ANTHROPIC_API_KEY is not set — cannot translate feedback")
+
+    try:
+        translated = await asyncio.to_thread(
+            translate_feedback, anthropic_key, data.get("verdict"), data.get("coaching"), lang
+        )
+    except Exception as exc:
+        logging.warning("localize failed for %s: %s", session_id, exc)
+        raise HTTPException(502, f"Translation failed: {type(exc).__name__}: {exc}")
+
+    patch = {}
+    if translated.get("verdict"):
+        patch[cache_key] = translated["verdict"]
+    if translated.get("coaching"):
+        patch[coach_key] = translated["coaching"]
+    if patch:
+        updated = sessions_store.update_summary(None, session_id, patch)
+        if updated is not None:
+            data = updated
+        else:
+            logging.warning("localize: could not persist cache for %s", session_id)
+            # Still return an overlaid view for this request even if save failed.
+            data = dict(data)
+            data.update(patch)
+    elif not patch:
+        logging.warning("localize: empty translation for %s", session_id)
+    return _overlay_locale(data, lang)
+
+
+def _looks_japanese(text: str) -> bool:
+    return bool(re.search(r"[\u3040-\u30ff\u3400-\u9fff]", text or ""))
+
+
+def _feedback_looks_japanese(block: dict) -> bool:
+    """True when the LLM prose block is already Japanese (or empty)."""
+    if not block:
+        return True
+    parts = [
+        block.get("headline") or "",
+        block.get("next_action") or "",
+        block.get("delivery_note") or "",
+        block.get("presence_note") or "",
+        block.get("content_note") or "",
+        block.get("summary") or "",
+    ]
+    for key in ("improvements", "strengths"):
+        vals = block.get(key) or []
+        if isinstance(vals, list):
+            parts.extend(str(x) for x in vals)
+    sample = " ".join(p for p in parts if p).strip()
+    if not sample:
+        return True
+    return _looks_japanese(sample)
+
+
+def _overlay_locale(data: dict, lang: str) -> dict:
+    """Return a shallow-copied session with verdict/coaching text overlaid for `lang`."""
+    out = dict(data)
+    v_loc = data.get(f"verdict_{lang}")
+    c_loc = data.get(f"coaching_{lang}")
+    if v_loc and isinstance(data.get("verdict"), dict):
+        merged = dict(data["verdict"])
+        merged.update({k: v for k, v in v_loc.items() if v is not None})
+        out["verdict"] = merged
+    if c_loc and isinstance(data.get("coaching"), dict):
+        merged = dict(data["coaching"])
+        merged.update({k: v for k, v in c_loc.items() if v is not None})
+        out["coaching"] = merged
+    elif c_loc:
+        out["coaching"] = c_loc
+    out["display_language"] = lang
+    return out
 
 
 _ASSET_CTYPE = {"png": "image/png", "json": "application/json",
