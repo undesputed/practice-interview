@@ -1,35 +1,47 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createReactionTrigger, confusedScore } from './reaction-trigger.js';
+import { emotionScores, emotionRawMax } from './emotion.js';
 
 // Inject scores directly: the sample's bs IS the score object; confused comes from bs.confused.
-const opts = { scores: (bs) => bs, confusedScore: (bs) => bs.confused || 0 };
+// Bypass raw-strength with a high default so state-machine tests stay score-driven.
+const opts = {
+  scores: (bs) => bs,
+  confusedScore: (bs) => bs.confused || 0,
+  rawStrength: (bs) => (bs._raw == null ? 1 : bs._raw),
+};
 const S = (o) => ({ happy: 0, sad: 0, surprise: 0, angry: 0, disgust: 0, fear: 0, confused: 0, ...o });
+const SUSTAIN = 9;
+
+function feedSustain(t, bs, t0 = 0) {
+  let r;
+  for (let i = 0; i < SUSTAIN; i++) r = t.feed({ bs, t: t0 + i * 10 });
+  return r;
+}
 
 // ── emotion state machine ──
 test('emotion activates only after SUSTAIN_FRAMES >= enter', () => {
   const t = createReactionTrigger(opts);
-  assert.equal(t.feed({ bs: S({ sad: 80 }), t: 0 }).activeEmotion, null);
-  assert.equal(t.feed({ bs: S({ sad: 80 }), t: 10 }).activeEmotion, 'sad');
+  for (let i = 0; i < SUSTAIN - 1; i++)
+    assert.equal(t.feed({ bs: S({ sad: 80 }), t: i * 10 }).activeEmotion, null);
+  assert.equal(t.feed({ bs: S({ sad: 80 }), t: (SUSTAIN - 1) * 10 }).activeEmotion, 'sad');
 });
 
 test('emotion holds through hysteresis, exits below exit', () => {
   const t = createReactionTrigger(opts);
-  for (const ts of [0, 10]) t.feed({ bs: S({ sad: 80 }), t: ts });
-  assert.equal(t.feed({ bs: S({ sad: 25 }), t: 20 }).activeEmotion, 'sad');
-  assert.equal(t.feed({ bs: S({ sad: 15 }), t: 30 }).activeEmotion, null);
+  feedSustain(t, S({ sad: 80 }));
+  assert.equal(t.feed({ bs: S({ sad: 40 }), t: 200 }).activeEmotion, 'sad');
+  assert.equal(t.feed({ bs: S({ sad: 30 }), t: 210 }).activeEmotion, null);
 });
 
 test('confused is selected when strongest and no rival classifier', () => {
   const t = createReactionTrigger(opts);
-  assert.equal(t.feed({ bs: S({ confused: 70 }), t: 0 }).activeEmotion, null);
-  assert.equal(t.feed({ bs: S({ confused: 70 }), t: 10 }).activeEmotion, 'confused');
+  assert.equal(feedSustain(t, S({ confused: 70 })).activeEmotion, 'confused');
 });
 
 test('confused is suppressed when angry is clearly present', () => {
   const t = createReactionTrigger(opts);
-  for (const ts of [0, 10]) t.feed({ bs: S({ angry: 74, confused: 99 }), t: ts });
-  assert.equal(t.feed({ bs: S({ angry: 74, confused: 99 }), t: 20 }).activeEmotion, 'angry');
+  assert.equal(feedSustain(t, S({ angry: 74, confused: 99 })).activeEmotion, 'angry');
 });
 
 test('confusedScore ignores brow-only anger-like faces', () => {
@@ -45,6 +57,27 @@ test('confusedScore ignores brow-only anger-like faces', () => {
     mouthPressLeft: 0.25, mouthPressRight: 0.2,
     eyeSquintLeft: 0.05, eyeSquintRight: 0.05,
   }) >= 35);
+});
+
+test('low raw strength blocks activation even with high normalized score', () => {
+  const t = createReactionTrigger(opts);
+  assert.equal(feedSustain(t, S({ happy: 95, _raw: 0.12 })).activeEmotion, null);
+});
+
+test('small lead over runner-up blocks activation', () => {
+  const t = createReactionTrigger(opts);
+  // happy 60 vs sad 55 — lead only 5 < LEAD_MARGIN 12
+  assert.equal(feedSustain(t, S({ happy: 60, sad: 55 })).activeEmotion, null);
+});
+
+test('re-arm cooldown blocks immediate re-acquire after exit', () => {
+  const t = createReactionTrigger(opts);
+  feedSustain(t, S({ sad: 80 }), 0);
+  assert.equal(t.feed({ bs: S({ sad: 20 }), t: 200 }).activeEmotion, null); // exit
+  // Strong again immediately — still within re-arm window
+  assert.equal(feedSustain(t, S({ sad: 80 }), 210).activeEmotion, null);
+  // After re-arm cooldown (900ms)
+  assert.equal(feedSustain(t, S({ sad: 80 }), 1200).activeEmotion, 'sad');
 });
 
 // ── individual (per-hand) gesture onsets ──
@@ -112,21 +145,53 @@ test('the mixed combo (up + down) suppresses individuals', () => {
 
 test('emotion and gesture fire together', () => {
   const t = createReactionTrigger(opts);
-  t.feed({ bs: S({ sad: 80 }), t: 0 });
-  const r = t.feed({ bs: S({ sad: 80 }), gestures: ['Thumb_Up'], t: 10 });
+  feedSustain(t, S({ sad: 80 }), 0);
+  const r = t.feed({ bs: S({ sad: 80 }), gestures: ['Thumb_Up'], t: 200 });
   assert.equal(r.activeEmotion, 'sad');
   assert.deepEqual(r.gestureOnsets, [{ gesture: 'Thumb_Up', hand: 0 }]);
 });
 
 test('switches to a stronger different emotion after SUSTAIN_FRAMES', () => {
   const t = createReactionTrigger(opts);
-  for (const ts of [0, 10]) t.feed({ bs: S({ sad: 80 }), t: ts }); // active = sad
-  assert.equal(t.feed({ bs: S({ sad: 30, angry: 80 }), t: 20 }).activeEmotion, 'sad');
-  assert.equal(t.feed({ bs: S({ sad: 30, angry: 80 }), t: 30 }).activeEmotion, 'angry');
+  feedSustain(t, S({ sad: 80 }), 0); // active = sad
+  // sad still above exit (35); angry clearly leads
+  for (let i = 0; i < SUSTAIN - 1; i++)
+    assert.equal(t.feed({ bs: S({ sad: 40, angry: 80 }), t: 200 + i * 10 }).activeEmotion, 'sad');
+  assert.equal(t.feed({ bs: S({ sad: 40, angry: 80 }), t: 200 + (SUSTAIN - 1) * 10 }).activeEmotion, 'angry');
 });
 
 test('neutral / below-enter never activates', () => {
   const t = createReactionTrigger(opts);
-  for (let i = 0; i < 5; i++)
-    assert.equal(t.feed({ bs: S({ happy: 25 }), t: i * 10 }).activeEmotion, null);
+  for (let i = 0; i < SUSTAIN + 2; i++)
+    assert.equal(t.feed({ bs: S({ happy: 40 }), t: i * 10 }).activeEmotion, null);
+});
+
+// ── real blendshapes: mild vs clear expressions ──
+test('mild smile does not fire effects despite high normalized happy %', () => {
+  const mild = {
+    mouthSmileLeft: 0.28, mouthSmileRight: 0.28,
+    cheekSquintLeft: 0.12, cheekSquintRight: 0.12,
+  };
+  assert.ok(emotionScores(mild).happy >= 58, 'normalized happy is high');
+  assert.ok(emotionRawMax(mild) < 0.30, 'raw strength stays low');
+  const t = createReactionTrigger(); // real scorer + raw gate
+  for (let i = 0; i < SUSTAIN + 2; i++)
+    assert.equal(t.feed({ bs: mild, t: i * 16 }).activeEmotion, null);
+});
+
+test('clear smile can activate happy after sustain', () => {
+  const smile = {
+    mouthSmileLeft: 0.72, mouthSmileRight: 0.72,
+    cheekSquintLeft: 0.55, cheekSquintRight: 0.55,
+    browDownLeft: 0, browDownRight: 0, mouthFrownLeft: 0, mouthFrownRight: 0,
+    jawOpen: 0.05, browInnerUp: 0, eyeWideLeft: 0, eyeWideRight: 0,
+    browOuterUpLeft: 0, browOuterUpRight: 0, eyeSquintLeft: 0.15, eyeSquintRight: 0.15,
+    mouthPressLeft: 0, mouthPressRight: 0, noseSneerLeft: 0, noseSneerRight: 0,
+    mouthUpperUpLeft: 0, mouthUpperUpRight: 0, mouthLowerDownLeft: 0, mouthLowerDownRight: 0,
+    mouthShrugUpper: 0, mouthShrugLower: 0, mouthStretchLeft: 0, mouthStretchRight: 0,
+    mouthClose: 0, mouthDimpleLeft: 0, mouthDimpleRight: 0,
+  };
+  assert.ok(emotionRawMax(smile) >= 0.30);
+  const t = createReactionTrigger();
+  assert.equal(feedSustain(t, smile, 0).activeEmotion, 'happy');
 });

@@ -2,12 +2,18 @@
 // Pure decision core for the Face Analysis reaction effects. Tracks the single
 // active emotion with enter/exit hysteresis (so effects don't flicker) and reports
 // gesture onsets (debounced by a cooldown). No DOM — unit-tested.
-import { emotionScores } from './emotion.js';
+import { emotionScores, emotionRawMax } from './emotion.js';
 import { detectCombo } from './fx/combos.js';
 
-const EMOTION_ENTER_SCORE = 35;
-const EMOTION_EXIT_SCORE = 20;
-const SUSTAIN_FRAMES = 2;
+// Tuned deliberately insensitive: normalized emotion % alone is not enough (a mild
+// smile can still score happy≈100). Effects also need raw AU strength, a lead over
+// the runner-up, sustained frames, and a short re-arm pause after an effect ends.
+const EMOTION_ENTER_SCORE = 58;
+const EMOTION_EXIT_SCORE = 35;
+const SUSTAIN_FRAMES = 9;
+const MIN_RAW_STRENGTH = 0.30;
+const LEAD_MARGIN = 12;
+const REARM_COOLDOWN_MS = 900;
 const GESTURE_COOLDOWN_MS = 1500;
 const GESTURE_COMBO_COOLDOWN_MS = 1500;
 const CONFUSED_BROW_MIN = 0.4;
@@ -42,14 +48,19 @@ export function confusedScore(bs) {
 export function createReactionTrigger(opts = {}) {
   const scoresFn = opts.scores || emotionScores;
   const confusedFn = opts.confusedScore || confusedScore;
+  const rawFn = opts.rawStrength || emotionRawMax;
   const enter = opts.enterScore ?? EMOTION_ENTER_SCORE;
   const exit = opts.exitScore ?? EMOTION_EXIT_SCORE;
   const sustain = opts.sustainFrames ?? SUSTAIN_FRAMES;
+  const minRaw = opts.minRawStrength ?? MIN_RAW_STRENGTH;
+  const leadMargin = opts.leadMargin ?? LEAD_MARGIN;
+  const rearmMs = opts.rearmCooldownMs ?? REARM_COOLDOWN_MS;
   const gestCooldown = opts.gestureCooldownMs ?? GESTURE_COOLDOWN_MS;
   const comboCooldown = opts.comboCooldownMs ?? GESTURE_COMBO_COOLDOWN_MS;
 
   let active = null;            // currently-active emotion, or null
   let candidate = null, streak = 0;   // building toward acquire/switch
+  let endedAt = null;           // timestamp when the last emotion effect cleared
   let activeGestures = new Set();
   const lastGestureAt = {};
   let activeCombo = null;
@@ -76,16 +87,40 @@ export function createReactionTrigger(opts = {}) {
     for (const e of EFFECT_EMOTIONS) { if (scores[e] > val) { val = scores[e]; best = e; } }
     return { emotion: best, value: val };
   }
+  function runnerUp(scores, winner) {
+    let val = 0;
+    for (const e of EFFECT_EMOTIONS) {
+      if (e === winner) continue;
+      if (scores[e] > val) val = scores[e];
+    }
+    return val;
+  }
+  // Raw AU strength (0..1). Confused is synthetic — treat its 0..100 score as strength.
+  function strengthOk(bs, scores, emotion) {
+    if (emotion === 'confused') return (scores.confused || 0) / 100 >= minRaw;
+    return rawFn(bs) >= minRaw;
+  }
+  function clearActive(t) {
+    active = null;
+    candidate = null;
+    streak = 0;
+    endedAt = t;
+  }
 
   return {
     feed({ bs, gestures, t } = {}) {
       if (bs) {
         const scores = combined(bs);
         // Phase A: fade the active emotion out first (hysteresis: exit < enter).
-        if (active && scores[active] < exit) { active = null; candidate = null; streak = 0; }
+        if (active && scores[active] < exit) clearActive(t);
         // Phase B: acquire (from null) or switch (to a clearly stronger different emotion).
         const tp = top(scores);
-        const strong = tp.value >= enter;
+        const lead = tp.value - runnerUp(scores, tp.emotion);
+        const rearmed = endedAt == null || t == null || (t - endedAt) >= rearmMs;
+        const strong = tp.value >= enter
+          && lead >= leadMargin
+          && strengthOk(bs, scores, tp.emotion)
+          && (active || rearmed);
         if (active) {
           if (strong && tp.emotion !== active) {
             if (candidate === tp.emotion) streak++; else { candidate = tp.emotion; streak = 1; }
@@ -94,7 +129,7 @@ export function createReactionTrigger(opts = {}) {
         } else {
           if (strong) {
             if (candidate === tp.emotion) streak++; else { candidate = tp.emotion; streak = 1; }
-            if (streak >= sustain) { active = tp.emotion; candidate = null; streak = 0; }
+            if (streak >= sustain) { active = tp.emotion; candidate = null; streak = 0; endedAt = null; }
           } else { candidate = null; streak = 0; }
         }
       }

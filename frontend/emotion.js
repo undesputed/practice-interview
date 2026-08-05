@@ -47,8 +47,10 @@ function auValue(bs, keys){
   return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
 }
 
-// 7-class 0-100 distribution for one frame's blendshapes, via FACS-AU prototypes.
-export function emotionScores(bs){
+// Shared FACS scoring: normalized 0-100 distribution + pre-normalization peak strength.
+// rawMax is the peak prototype match (≈0..1) before scores are forced to sum to 100 —
+// used by reaction effects so a mild smile that becomes happy:100% still won't fire.
+function computeEmotion(bs){
   bs = bs || {};
   const au = {};
   for (const k in AU) au[k] = auValue(bs, AU[k]);
@@ -69,10 +71,20 @@ export function emotionScores(bs){
   const out = {};
   if (total <= 0){
     for (const c of EMOTION_CLASSES) out[c] = c === 'neutral' ? 100 : 0;
-    return out;
+    return { scores: out, rawMax: 0 };
   }
   for (const c of EMOTION_CLASSES) out[c] = Math.round(1000 * (raw[c] || 0) / total) / 10;
-  return out;
+  return { scores: out, rawMax: maxExpressive };
+}
+
+// 7-class 0-100 distribution for one frame's blendshapes, via FACS-AU prototypes.
+export function emotionScores(bs){
+  return computeEmotion(bs).scores;
+}
+
+// Peak pre-normalization emotion match (≈0..1). Higher = clearer, stronger expression.
+export function emotionRawMax(bs){
+  return computeEmotion(bs).rawMax;
 }
 
 // { emotion, value, scores } for the highest-scoring class.
