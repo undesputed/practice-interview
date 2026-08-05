@@ -99,14 +99,9 @@
   .counter{ font-family:var(--f-mono); font-size:11px; letter-spacing:.08em; color:var(--ink-dim); }
   body.on-paper .counter{ color:var(--ink-on-paper-dim); }
 
-  /* bottom: scope spine */
   .botbar{ position:fixed; bottom:0; left:0; right:0; z-index:41; height:52px;
     display:flex; align-items:center; padding:0 44px; gap:22px; }
   .botbar .meta{ display:flex; align-items:center; gap:16px; flex:none; }
-  .scope{ flex:1; height:28px; position:relative; overflow:hidden; }
-  .scope svg{ width:100%; height:100%; display:block; }
-  .scope path{ fill:none; stroke:var(--signal); stroke-width:1.3; opacity:.55; vector-effect:non-scaling-stroke; }
-  body.on-paper .scope path{ stroke:var(--signal-dim); opacity:.7; }
 
   .nav{ position:fixed; bottom:14px; z-index:42; width:34px; height:34px;
     border-radius:50%; border:1px solid var(--line); background:transparent;
@@ -129,6 +124,38 @@
     transform:translateY(10px); transition:opacity .5s ease, transform .5s ease; }
   .slide.is-active{ opacity:1; visibility:visible; pointer-events:auto; transform:none; }
   .slide.on-paper{ background:var(--paper); color:var(--ink-on-paper); }
+  .slide.title-bg{ background:var(--void); }
+  .title-bg-video{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center 62%;
+    z-index:0; transition:opacity .5s ease; }
+  .title-bg .wrap{ position:relative; z-index:1; }
+
+  /* ---- outcome slide: three-panel image infographic ---- */
+  .outcome-title{ margin-bottom:40px; }
+  .outcome-panels{ display:flex; align-items:center; gap:18px; }
+  .outcome-panel{ flex:1; display:flex; flex-direction:column; align-items:center; gap:16px; }
+  .outcome-panel-img{ position:relative; width:100%; aspect-ratio:1/1; border-radius:14px; overflow:hidden;
+    border:1px solid var(--line); background:var(--panel); display:flex; align-items:center; justify-content:center; }
+  .outcome-panel-img img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .outcome-panel-icon{ display:none; color:var(--signal); opacity:.55; }
+  .outcome-panel-fallback .outcome-panel-icon{ display:block; }
+  .outcome-panel-label{ font-family:var(--f-display); font-size:1.1rem; font-weight:600; color:var(--ink); }
+  .outcome-panel-sub{ font-size:.8rem; color:var(--ink-dim); margin-top:-8px; text-align:center; }
+  .outcome-arrow{ font-family:var(--f-display); font-size:1.8rem; color:var(--ink-faint); flex:none; padding-bottom:38px; }
+  @media (max-width:900px){
+    .outcome-panels{ flex-direction:column; }
+    .outcome-panel{ width:100%; max-width:280px; }
+    .outcome-arrow{ transform:rotate(90deg); padding-bottom:0; }
+  }
+
+  /* ---- icon-led 3-up panels: no photo, for problem/flow/next-steps slides ---- */
+  .gap-panels{ display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); border:1px solid var(--line); }
+  .gap-panel{ display:flex; flex-direction:column; align-items:center; gap:12px; padding:36px 24px; background:var(--panel); text-align:center; }
+  .gap-panel svg{ color:var(--signal); }
+  .gap-panel .outcome-panel-sub{ margin-top:-4px; }
+  @media (max-width:900px){
+    .gap-panels{ grid-template-columns:1fr; }
+  }
+
   .wrap{ grid-row:2; width:100%; max-width:1180px; margin:34px auto; }
 
   .eyebrow{ display:flex; align-items:center; gap:14px; font-family:var(--f-mono);
@@ -151,8 +178,8 @@
     color:var(--ink-dim); margin-bottom:26px; }
   .hero h1{ font-size:clamp(3.4rem,10vw,7.2rem); font-weight:600; margin:0; letter-spacing:-.03em; }
   .hero h1 .dot{ color:var(--signal); }
-  .hero .tag{ font-size:clamp(1.05rem,1.7vw,1.3rem); line-height:1.55; color:var(--ink-dim);
-    max-width:38ch; margin:20px auto 0; font-family:var(--f-body); }
+  .hero .tag{ font-size:clamp(1.05rem,1.7vw,1.3rem); line-height:1.55; color:rgba(255,255,255,.92);
+    max-width:38ch; margin:20px auto 0; font-family:var(--f-body); text-shadow:0 2px 16px rgba(0,0,0,.5); }
   .hero .wave{ margin:44px auto 0; max-width:640px; width:100%; height:64px; overflow:visible; }
   .hero .wave svg{ width:100%; height:100%; display:block; overflow:visible; }
   .hero .wave path{ fill:none; stroke:var(--signal); stroke-width:1.4; vector-effect:non-scaling-stroke; }
@@ -210,9 +237,69 @@
   .stream .facts{ display:flex; flex-wrap:wrap; gap:8px; }
   .stream .facts span{ font-family:var(--f-mono); font-size:11px; padding:6px 10px; border-radius:5px;
     background:rgba(237,239,244,.05); color:var(--ink-dim); border:1px solid var(--line); }
-  .privacy{ display:flex; align-items:flex-start; gap:14px; padding:16px 22px; border-radius:4px;
-    border:1px solid var(--line); font-size:.95rem; line-height:1.5; color:var(--ink-dim); }
-  .privacy svg{ flex:none; color:var(--signal); margin-top:2px; }
+  /* ---- security banner: slogan + three hard claims ---- */
+  .security-banner{ border:1px solid var(--signal); border-radius:8px; padding:22px 26px;
+    background:linear-gradient(180deg, rgba(94,234,212,.07), rgba(94,234,212,0)); }
+  .security-slogan{ font-family:var(--f-display); font-weight:600; font-size:clamp(1.05rem,2vw,1.4rem);
+    color:var(--ink); text-align:center; margin-bottom:20px; letter-spacing:-.01em; }
+  .on-paper .security-slogan{ color:var(--ink-on-paper); }
+  .security-claims{ display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
+  .security-claim{ display:flex; gap:12px; align-items:flex-start; }
+  .security-claim svg{ flex:none; color:var(--signal); margin-top:2px; }
+  .security-claim h4{ margin:0 0 4px; font-size:.94rem; font-weight:600; color:var(--ink); }
+  .security-claim p{ margin:0; font-size:.82rem; line-height:1.45; color:var(--ink-dim); }
+  @media (max-width:900px){
+    .security-claims{ grid-template-columns:1fr; }
+  }
+
+  /* ---- FACS: GIF-first showcase ---- */
+  .facs-showcase{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .facs-tile{ position:relative; border-radius:10px; overflow:hidden; border:1px solid var(--line);
+    height:min(24vh,220px); background:#000; }
+  .facs-tile img{ width:100%; height:100%; object-fit:cover; object-position:50% 35%; display:block; }
+  .facs-tag{ position:absolute; bottom:10px; left:10px; font-family:var(--f-mono); font-size:12px; font-weight:600;
+    color:var(--void); background:var(--signal); border-radius:999px; padding:4px 11px; }
+  @media (max-width:900px){
+    .facs-showcase{ grid-template-columns:repeat(2,1fr); }
+    .facs-tile{ height:min(18vh,160px); }
+  }
+
+  /* ---- FACS: AU combinations, stacked vertically into one face -> named emotion ---- */
+  .facs-combos{ display:flex; justify-content:center; gap:56px; flex-wrap:wrap; }
+  .facs-combo-col{ display:flex; flex-direction:column; align-items:center; gap:14px; flex:none; }
+  .facs-combo-stack{ display:flex; flex-direction:column; width:180px; border-radius:12px;
+    overflow:hidden; border:1px solid var(--line); }
+  .facs-combo-au{ position:relative; width:100%; height:min(15vh,120px); background:#000; }
+  .facs-combo-au + .facs-combo-au{ border-top:1px solid var(--line); }
+  .facs-combo-au img{ width:100%; height:100%; object-fit:cover; object-position:50% 35%; display:block; }
+  .facs-combo-au .facs-tag{ font-size:10px; padding:3px 8px; bottom:6px; left:6px; }
+  .facs-emotion{ font-family:var(--f-display); font-size:1.2rem; font-weight:600; color:var(--ink); text-align:center; }
+  @media (max-width:900px){
+    .facs-combos{ gap:28px; }
+    .facs-combo-stack{ width:150px; }
+  }
+
+  /* ---- FACS: extra AU examples strip along the bottom ---- */
+  .facs-strip{ display:flex; gap:8px; margin-top:26px; overflow-x:auto; padding-bottom:4px; }
+  .facs-strip-tile{ position:relative; flex:1 1 0; min-width:80px; aspect-ratio:1/1; border-radius:8px;
+    overflow:hidden; border:1px solid var(--line); background:#000; }
+  .facs-strip-tile img{ width:100%; height:100%; object-fit:cover; object-position:50% 35%; display:block; }
+  .facs-strip-tile .facs-tag{ font-size:9px; padding:2px 6px; bottom:5px; left:5px; }
+  @media (max-width:900px){
+    .facs-strip{ justify-content:flex-start; }
+    .facs-strip-tile{ flex:0 0 90px; min-width:90px; }
+  }
+
+  /* ---- security: dedicated full page ---- */
+  .security-page{ display:flex; flex-direction:column; align-items:center; justify-content:center; gap:44px; }
+  .security-slogan-big{ font-family:var(--f-display); font-weight:700; font-size:clamp(1.8rem,4.4vw,3rem);
+    color:var(--ink); text-align:center; letter-spacing:-.01em; max-width:20ch; line-height:1.15; }
+  .security-claims-big{ display:grid; grid-template-columns:repeat(3,1fr); gap:32px; width:100%; max-width:1000px; }
+  .security-claims-big .security-claim h4{ font-size:1.02rem; }
+  .security-claims-big .security-claim p{ font-size:.88rem; }
+  @media (max-width:900px){
+    .security-claims-big{ grid-template-columns:1fr; }
+  }
 
   /* ---- readiness slide ---- */
   .ready-grid{ display:grid; grid-template-columns:.85fr 1.15fr; gap:56px; align-items:center; }
@@ -248,19 +335,31 @@
   .pillar li:first-child{ border-top:0; }
   .pillar li b{ color:var(--ink); }
 
-  /* ---- name / wordmark slide ---- */
-  .word-hero{ text-align:center; }
-  .word-hero .molave{ font-family:var(--f-display); font-weight:600; font-size:clamp(3.4rem,11vw,8rem);
+  /* ---- why-molave slide: full-bleed tree photo + copy ---- */
+  .slide-bleed{ padding:0 !important; display:block !important; overflow:hidden; }
+  .name-split{ position:absolute; inset:0; display:grid; grid-template-columns:1.05fr 1fr; align-items:stretch; }
+  .name-photo{ position:relative; overflow:hidden; background:var(--panel); }
+  .name-photo img{ width:100%; height:100%; object-fit:cover; object-position:center 40%; display:block; }
+  .name-photo-fade{ position:absolute; inset:0; pointer-events:none;
+    background:linear-gradient(90deg, rgba(11,13,18,0) 60%, var(--void) 100%); }
+  .name-img-fallback{ position:absolute; inset:0; display:none; align-items:center; justify-content:center; color:var(--signal); opacity:.5; }
+  .name-copy{ display:flex; flex-direction:column; justify-content:center;
+    padding:0 clamp(32px,5vw,80px) 0 clamp(28px,4vw,56px); }
+  .name-copy .eyebrow{ margin-bottom:20px; }
+  .molave-word{ font-family:var(--f-display); font-weight:600; font-size:clamp(3rem,6vw,4.6rem);
     letter-spacing:-.02em; color:var(--ink); line-height:1; }
-  .word-hero .gloss{ font-family:var(--f-mono); font-size:13px; letter-spacing:.12em; text-transform:uppercase;
-    color:var(--signal); margin-top:18px; }
-  .word-hero .def{ font-size:clamp(1rem,1.6vw,1.2rem); color:var(--ink-dim); max-width:56ch; margin:20px auto 0; line-height:1.6; }
-  .on-paper .molave{ color:var(--ink-on-paper); }
-  .on-paper .word-hero .gloss{ color:var(--signal-dim); }
-  .on-paper .word-hero .def{ color:var(--ink-on-paper-dim); }
-
-  .trait-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); border:1px solid var(--line); margin-top:8px; }
-  .on-paper .trait-grid{ background:var(--line-paper); border-color:var(--line-paper); }
+  .gloss{ font-family:var(--f-mono); font-size:13px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--signal); margin-top:14px; }
+  .name-copy .def{ font-size:clamp(1rem,1.4vw,1.15rem); color:var(--ink-dim); max-width:46ch; margin-top:18px; line-height:1.6; }
+  .name-traits{ display:flex; gap:24px; margin-top:24px; flex-wrap:wrap; }
+  .name-trait{ display:flex; align-items:center; gap:9px; font-family:var(--f-mono); font-size:13px;
+    letter-spacing:.03em; color:var(--ink); }
+  .name-trait-dot{ width:9px; height:9px; border-radius:50%; flex:none; }
+  @media (max-width:900px){
+    .name-split{ grid-template-columns:1fr; grid-template-rows:38vh 1fr; }
+    .name-photo-fade{ background:linear-gradient(0deg, var(--void) 0%, rgba(11,13,18,0) 40%); }
+    .name-copy{ padding:28px clamp(24px,6vw,48px); }
+  }
   .trait{ padding:24px; background:var(--panel); text-align:left; }
   .on-paper .trait{ background:var(--paper); }
   .trait .glyph{ width:30px; height:30px; margin-bottom:16px; color:var(--signal); }
@@ -307,10 +406,22 @@
     .combo-result{ justify-self:center; flex-direction:column; }
   }
 
-  /* ---- engagement score infographic (image asset) ---- */
-  .score-img-frame{ border-radius:8px; overflow:hidden; border:1px solid var(--line); line-height:0;
-    display:flex; justify-content:center; background:#0B0D12; max-height:56vh; }
-  .score-img-frame img{ display:block; width:auto; height:auto; max-width:100%; max-height:56vh; object-fit:contain; }
+  /* ---- the report: four panels (3 inputs + result), same language as outcome panels ---- */
+  .score-panels{ display:flex; align-items:flex-end; gap:16px; }
+  .score-panel{ flex:1; display:flex; flex-direction:column; align-items:center; gap:14px; }
+  .score-panel-img{ position:relative; width:100%; aspect-ratio:1/1; border-radius:14px; overflow:hidden;
+    border:1px solid var(--line); border-top:3px solid var(--hue); background:var(--panel);
+    display:flex; align-items:center; justify-content:center; }
+  .score-panel-img img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .score-panel-pct{ position:absolute; top:12px; right:12px; font-family:var(--f-mono); font-weight:600; font-size:.95rem;
+    color:var(--void); background:var(--hue); border-radius:999px; padding:4px 11px; z-index:2; }
+  .score-panel-result .score-result-img{ border-top:3px solid var(--ready); }
+  .score-panel-pct-result{ background:var(--ready); font-size:1.2rem; top:auto; bottom:12px; right:12px;
+    padding:6px 14px; }
+  @media (max-width:900px){
+    .score-panels{ flex-wrap:wrap; }
+    .score-panel{ flex:1 1 40%; min-width:140px; }
+  }
 
   /* ---- why-built list ---- */
   .eng{ display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line); border:1px solid var(--line); }
@@ -373,13 +484,12 @@
         <button data-lang="en" class="active">EN</button>
         <button data-lang="ja">日本語</button>
       </div>
-      <div class="counter"><span id="counter">01 / 15</span></div>
+      <div class="counter"><span id="counter">01 / 11</span></div>
     </div>
   </div>
 
   <div class="botbar">
     <div class="meta"><span class="section-label" id="sectionLabel">INTRO</span></div>
-    <div class="scope"><svg id="scopeSvg" viewBox="0 0 1000 28" preserveAspectRatio="none" aria-hidden="true"></svg></div>
   </div>
 
   <button class="nav prev" id="prevBtn" aria-label="Previous slide">
@@ -392,7 +502,10 @@
   <div class="deck" id="deck">
 
     <!-- ============ 1 · TITLE ============ -->
-    <section class="slide is-active" data-section="INTRO">
+    <section class="slide is-active title-bg" data-section="INTRO">
+      <video id="titleBgVideo" class="title-bg-video" autoplay muted loop playsinline poster="assets/title-bg.png">
+        <source src="assets/title-bg.mp4" type="video/mp4">
+      </video>
       <div class="wrap">
         <div class="hero">
           <div class="hero-eyebrow rise" data-en="A PRODUCT WE BUILT WITH CARE" data-ja="心を込めて作ったプロダクト">A PRODUCT WE BUILT WITH CARE</div>
@@ -408,234 +521,107 @@
       </div>
     </section>
 
-    <!-- ============ 1b · AGENDA / TIMEFRAME ============ -->
-    <section class="slide" data-section="AGENDA">
-      <div class="wrap">
-        <div class="eyebrow"><span class="rule" style="max-width:40px"></span><span data-en="PRESENTATION OVERVIEW" data-ja="発表の概要">PRESENTATION OVERVIEW</span><span class="rule" style="max-width:40px"></span></div>
-        <h2 class="title display" style="text-align:center;margin-left:auto;margin-right:auto" data-en="What we'll cover today." data-ja="本日お話しする内容。">What we'll cover today.</h2>
-        <div class="agenda-list">
-          <div class="agenda-row">
-            <span class="agenda-time" data-en="4 min" data-ja="4分">4 min</span>
-            <span class="agenda-name" data-en="What molave.ai is — product vision" data-ja="molave.aiとは — プロダクトビジョン">What molave.ai is — product vision</span>
+    <!-- ============ 2 · WHY MOLAVE (name + tree) ============ -->
+    <section class="slide slide-bleed" data-section="THE NAME">
+      <div class="name-split">
+        <div class="name-photo" id="treeFrame">
+          <img src="assets/molave-tree.jpg" alt="A Molave tree, one of the strongest hardwoods in the Philippines"
+               onerror="this.remove(); document.getElementById('treeFallback').style.display='flex';" />
+          <div id="treeFallback" class="name-img-fallback" style="display:none">
+            <svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M12 22V9M12 9C12 9 5 9 5 4c0 0 7 0 7 5zM12 9c0 0 7 0 7-5 0 0-7 0-7 5z"/><path d="M8 22h8"/></svg>
           </div>
-          <div class="agenda-row">
-            <span class="agenda-time" data-en="6 min" data-ja="6分">6 min</span>
-            <span class="agenda-name" data-en="Architecture: face + voice + gesture → Engagement Score" data-ja="アーキテクチャ:表情+音声+ジェスチャー → エンゲージメントスコア">Architecture: face + voice + gesture → Engagement Score</span>
-          </div>
-          <div class="agenda-row">
-            <span class="agenda-time" data-en="5 min" data-ja="5分">5 min</span>
-            <span class="agenda-name" data-en="Key results and current status" data-ja="主な成果と現在の状況">Key results and current status</span>
-          </div>
-          <div class="agenda-row">
-            <span class="agenda-time" data-en="5 min" data-ja="5分">5 min</span>
-            <span class="agenda-name" data-en="Next steps and what we need" data-ja="次のステップと必要な支援">Next steps and what we need</span>
-          </div>
+          <div class="name-photo-fade"></div>
         </div>
-        <div class="agenda-total">
-          <span data-en="Total" data-ja="合計">Total</span>
-          <span class="agenda-total-val" data-en="20 minutes" data-ja="20分">20 minutes</span>
+        <div class="name-copy">
+          <div class="eyebrow"><span class="rule" style="max-width:40px"></span><span data-en="WHY THIS NAME" data-ja="名前の由来">WHY THIS NAME</span></div>
+          <div class="molave-word" data-en="Molave" data-ja="モラベ">Molave</div>
+          <div class="gloss" data-en="said &quot;moh LAH veh&quot;" data-ja="「モラベ」と発音します">pronounced "moh LAH veh"</div>
+          <p class="def" data-en="One of the strongest hardwoods in the Philippines. Decades in the ground, in storms, without cracking or bending." data-ja="フィリピンで最も丈夫な木材の一つ。嵐にも何十年も耐え、割れることも曲がることもありません。">One of the strongest hardwoods in the Philippines. Decades in the ground, in storms, without cracking or bending.</p>
+          <div class="name-traits">
+            <div class="name-trait"><span class="name-trait-dot" style="background:var(--voice)"></span><span data-en="Strong" data-ja="強い">Strong</span></div>
+            <div class="name-trait"><span class="name-trait-dot" style="background:var(--signal)"></span><span data-en="Dependable" data-ja="頼りになる">Dependable</span></div>
+            <div class="name-trait"><span class="name-trait-dot" style="background:var(--content)"></span><span data-en="Built to last" data-ja="長く使える">Built to last</span></div>
+          </div>
+          <p class="def" style="margin-top:20px" data-en="That's exactly what we want molave.ai to be for you." data-ja="molave.aiも、あなたにとってそのような存在でありたいと考えています。">That's exactly what we want molave.ai to be for you.</p>
         </div>
       </div>
     </section>
 
-    <!-- ============ 2 · WHY THE NAME ============ -->
-    <section class="slide" data-section="THE NAME">
+    <!-- ============ 3 · OUTCOME: PRACTICE, THEN KNOW ============ -->
+    <section class="slide" data-section="THE OUTCOME">
       <div class="wrap">
-        <div class="word-hero">
-          <div class="eyebrow" style="justify-content:center"><span class="rule" style="max-width:40px"></span><span data-en="WHY THIS NAME" data-ja="名前の由来">WHY THIS NAME</span><span class="rule" style="max-width:40px"></span></div>
-          <div class="molave rise">Molave</div>
-          <div class="gloss rise" style="animation-delay:.08s" data-en="said &quot;moh LAH veh&quot;" data-ja="「モラベ」と発音します">said "moh LAH veh"</div>
-          <p class="def rise" style="animation-delay:.16s" data-en="Molave is one of the strongest hardwoods in the Philippines, known for lasting a long time without cracking or bending. We picked the name because we want the product to have that same reputation: strong, reliable, and built to last." data-ja="モラベは、フィリピンで最も丈夫な木材の一つで、割れたり曲がったりせず長く使えることで知られています。私たちはこの製品にも同じ評判、つまり「強く、信頼でき、長く使える」を持たせたいと考え、この名前を選びました。">Molave is one of the strongest hardwoods in the Philippines, known for lasting a long time without cracking or bending. We picked the name because we want the product to have that same reputation: strong, reliable, and built to last.</p>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============ 3 · WHAT WE STAND FOR ============ -->
-    <section class="slide" data-section="OUR PRINCIPLES">
-      <div class="wrap">
-        <div class="eyebrow"><span>01</span><span data-en="WHAT WE STAND FOR" data-ja="私たちの原則">WHAT WE STAND FOR</span><span class="rule"></span></div>
-        <h2 class="title display" data-en="Three principles behind every decision." data-ja="すべての判断の土台となる3つの原則。">Three principles behind every decision.</h2>
-        <p class="lede" data-en="These guide how we designed the product." data-ja="これらの原則が、製品の設計方針を導いています。">These guide how we designed the product.</p>
-        <div class="trait-grid">
-          <div class="trait">
-            <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 22V9M12 9C12 9 5 9 5 4c0 0 7 0 7 5zM12 9c0 0 7 0 7-5 0 0-7 0-7 5z"/><path d="M8 22h8"/></svg>
-            <h4 data-en="Built to be used often" data-ja="何度でも使える設計">Built to be used often</h4>
-            <p data-en="People can practice as many times as they need, with no limit and no judgment, until they feel ready." data-ja="回数の制限なく、評価される不安もなく、準備ができたと感じるまで何度でも練習できます。">People can practice as many times as they need, with no limit and no judgment, until they feel ready.</p>
+        <h2 class="title display outcome-title" style="text-align:center;max-width:22ch;margin-left:auto;margin-right:auto" data-en="Practice. Get a report. Get better." data-ja="練習する。レポートを受け取る。成長する。">Practice. Get a report. Get better.</h2>
+        <div class="outcome-panels">
+          <div class="outcome-panel">
+            <div class="outcome-panel-img">
+              <img src="assets/outcome-practice.png" alt="Practicing a mock interview" onerror="this.remove(); this.parentElement.classList.add('outcome-panel-fallback');" />
+              <svg class="outcome-panel-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3"/></svg>
+            </div>
+            <span class="outcome-panel-label" data-en="Practice" data-ja="練習する">Practice</span>
           </div>
-          <div class="trait">
-            <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2l9 4.5v9L12 20l-9-4.5v-9z"/><path d="M12 11v9M3 6.5l9 4.5 9-4.5"/></svg>
-            <h4 data-en="One score you can trust" data-ja="信頼できる、一つのスコア">One score you can trust</h4>
-            <p data-en="Voice, face, and answers are combined into a single, consistent score, calculated the same way every time." data-ja="声、表情、回答内容を組み合わせ、毎回同じ方法で算出される一貫したスコアにまとめます。">Voice, face, and answers are combined into a single, consistent score, calculated the same way every time.</p>
+          <div class="outcome-arrow">→</div>
+          <div class="outcome-panel">
+            <div class="outcome-panel-img">
+              <img src="assets/outcome-report.png" alt="Getting an interview report" onerror="this.remove(); this.parentElement.classList.add('outcome-panel-fallback');" />
+              <svg class="outcome-panel-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+            </div>
+            <span class="outcome-panel-label" data-en="Get a report" data-ja="レポートを受け取る">Get a report</span>
           </div>
-          <div class="trait">
-            <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M8 12l2.5 2.5L16 9"/></svg>
-            <h4 data-en="Plain, honest feedback" data-ja="分かりやすく正直なフィードバック">Plain, honest feedback</h4>
-            <p data-en="Coaching is written in plain language, with no exaggeration and no false praise." data-ja="コーチングは平易な言葉で書かれ、誇張も過度な称賛もありません。">Coaching is written in plain language, with no exaggeration and no false praise.</p>
+          <div class="outcome-arrow">→</div>
+          <div class="outcome-panel">
+            <div class="outcome-panel-img">
+              <img src="assets/outcome-improve.png" alt="Improving after feedback" onerror="this.remove(); this.parentElement.classList.add('outcome-panel-fallback');" />
+              <svg class="outcome-panel-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            </div>
+            <span class="outcome-panel-label" data-en="Get better" data-ja="成長する">Get better</span>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ============ 4 · THE PROBLEM ============ -->
-    <section class="slide" data-section="THE PROBLEM">
+    <!-- ============ 4 · THE REPORT ============ -->
+    <section class="slide" data-section="THE REPORT">
       <div class="wrap">
-        <div class="eyebrow" style="justify-content:center"><span class="rule" style="max-width:40px"></span><span data-en="THE PROBLEM" data-ja="課題">THE PROBLEM</span><span class="rule" style="max-width:40px"></span></div>
-        <h2 class="title display" style="text-align:center;max-width:26ch;margin-left:auto;margin-right:auto" data-en="Practicing alone leaves three gaps." data-ja="一人で練習すると、3つの見落としが生まれます。">Practicing alone leaves three gaps.</h2>
-        <div class="cards" style="margin-top:32px">
-          <div class="card" style="text-align:center">
-            <span class="idx" data-en="SPEAKING PACE" data-ja="話す速さ">SPEAKING PACE</span>
-            <h3 data-en="No one is timing you" data-ja="誰も時間を計ってくれない">No one is timing you</h3>
-            <p data-en="Speaking too fast, too slow, or with too many filler words is hard to notice on your own." data-ja="話すのが速すぎたり遅すぎたり、口ぐせが多すぎたりしても、自分では気づきにくいものです。">Speaking too fast, too slow, or with too many filler words is hard to notice on your own.</p>
+        <h2 class="title display outcome-title" style="text-align:center;max-width:24ch;margin-left:auto;margin-right:auto" data-en="Three signals. One report." data-ja="3つのシグナルから、1つのレポートへ。">Three signals. One report.</h2>
+        <div class="score-panels">
+          <div class="score-panel" style="--hue:var(--voice)">
+            <div class="score-panel-img">
+              <img src="assets/score-delivery.png" alt="Delivery: how you speak" onerror="this.remove(); this.parentElement.classList.add('outcome-panel-fallback');" />
+              <svg class="outcome-panel-icon" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 1a4 4 0 00-4 4v6a4 4 0 008 0V5a4 4 0 00-4-4z"/><path d="M19 10v1a7 7 0 01-14 0v-1M12 18v4M8 22h8"/></svg>
+              <span class="score-panel-pct">40%</span>
+            </div>
+            <span class="outcome-panel-label" data-en="Delivery" data-ja="話し方">Delivery</span>
+            <span class="outcome-panel-sub" data-en="How you speak" data-ja="話し方の特徴">How you speak</span>
           </div>
-          <div class="card" style="text-align:center">
-            <span class="idx" data-en="EYE CONTACT" data-ja="視線">EYE CONTACT</span>
-            <h3 data-en="No one is watching you" data-ja="誰も見てくれていない">No one is watching you</h3>
-            <p data-en="Eye contact and body language are difficult to judge from the inside." data-ja="視線の合わせ方や体の動きは、自分自身では判断しづらいものです。">Eye contact and body language are difficult to judge from the inside.</p>
+          <div class="score-panel" style="--hue:var(--signal)">
+            <div class="score-panel-img">
+              <img src="assets/score-presence.png" alt="Presence: how you present yourself" onerror="this.remove(); this.parentElement.classList.add('outcome-panel-fallback');" />
+              <svg class="outcome-panel-icon" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="18" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+              <span class="score-panel-pct">35%</span>
+            </div>
+            <span class="outcome-panel-label" data-en="Presence" data-ja="振る舞い">Presence</span>
+            <span class="outcome-panel-sub" data-en="How you present yourself" data-ja="立ち居振る舞い">How you present yourself</span>
           </div>
-          <div class="card" style="text-align:center">
-            <span class="idx" data-en="VISIBLE STRESS" data-ja="緊張のサイン">VISIBLE STRESS</span>
-            <h3 data-en="No one is reading you" data-ja="誰も読み取ってくれない">No one is reading you</h3>
-            <p data-en="Small signs of stress, like a tense jaw or a lowered brow, often go unnoticed." data-ja="こわばった顎や下がった眉など、小さな緊張のサインは見過ごされがちです。">Small signs of stress, like a tense jaw or a lowered brow, often go unnoticed.</p>
+          <div class="score-panel" style="--hue:var(--content)">
+            <div class="score-panel-img">
+              <img src="assets/score-content.png" alt="Content: what you say" onerror="this.remove(); this.parentElement.classList.add('outcome-panel-fallback');" />
+              <svg class="outcome-panel-icon" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+              <span class="score-panel-pct">25%</span>
+            </div>
+            <span class="outcome-panel-label" data-en="Content" data-ja="内容">Content</span>
+            <span class="outcome-panel-sub" data-en="What you say" data-ja="話す内容">What you say</span>
           </div>
-        </div>
-        <p class="lede" style="text-align:center;margin:26px auto 0;max-width:56ch;color:var(--ink)" data-en="<b>molave.ai measures all three</b> and turns them into one clear score." data-ja="<b>molave.aiはこの3つすべてを測定し、</b>わかりやすい一つのスコアにまとめます。"><b>molave.ai measures all three</b> and turns them into one clear score.</p>
-      </div>
-    </section>
-
-    <!-- ============ 5 · WHAT IT IS ============ -->
-    <section class="slide" data-section="WHAT IT IS">
-      <div class="wrap">
-        <div class="eyebrow"><span>02</span><span data-en="PRODUCT VISION" data-ja="プロダクトビジョン">PRODUCT VISION</span><span class="rule"></span></div>
-        <h2 class="title display" data-en="One conversation, three things measured." data-ja="1回の会話で、3つの要素を測定。">One conversation, three things measured.</h2>
-        <p class="lede" style="margin-bottom:26px" data-en="molave.ai runs a live, spoken interview and measures three areas at the same time." data-ja="molave.aiはリアルタイムの音声面接を行い、同時に3つの領域を測定します。">molave.ai runs a live, spoken interview and measures three areas at the same time.</p>
-        <div class="cards">
-          <div class="card"><span class="idx" data-en="YOUR VOICE" data-ja="あなたの声">YOUR VOICE</span><h3 data-en="Delivery" data-ja="話し方">Delivery</h3><p data-en="Speaking pace, pauses, and filler words like &quot;um&quot; and &quot;uh.&quot;" data-ja="話す速さ、間の取り方、「えーと」などの口ぐせを測定します。">Speaking pace, pauses, and filler words like "um" and "uh."</p></div>
-          <div class="card"><span class="idx" data-en="YOUR CAMERA" data-ja="あなたの映像">YOUR CAMERA</span><h3 data-en="Presence" data-ja="振る舞い">Presence</h3><p data-en="Face and posture, read live in the browser during the conversation." data-ja="会話中、表情と姿勢をブラウザ上でリアルタイムに読み取ります。">Face and posture, read live in the browser during the conversation.</p></div>
-          <div class="card"><span class="idx" data-en="YOUR WORDS" data-ja="あなたの言葉">YOUR WORDS</span><h3 data-en="Content" data-ja="内容">Content</h3><p data-en="What was actually said, checked for clarity and relevance to the question." data-ja="実際に話した内容を、明確さと質問との関連性の観点で確認します。">What was actually said, checked for clarity and relevance to the question.</p></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============ 6 · HOW: FLOW ============ -->
-    <section class="slide" data-section="HOW IT WORKS">
-      <div class="wrap">
-        <div class="eyebrow"><span>03</span><span data-en="ARCHITECTURE" data-ja="アーキテクチャ">ARCHITECTURE</span><span class="rule"></span></div>
-        <h2 class="title display" data-en="Three easy steps, start to finish." data-ja="始めから終わりまで、3つの簡単なステップ。">Three easy steps, start to finish.</h2>
-        <div class="flow">
-          <div class="step"><div class="no">01</div><h3 data-en="Choose your setup" data-ja="設定を選ぶ">Choose your setup</h3><p data-en="Pick the role you're practicing for, how hard the questions should be, and how tough the interviewer sounds." data-ja="練習したい職種、質問の難易度、面接官の厳しさを選びます。">Pick the role you're practicing for, how hard the questions should be, and how tough the interviewer sounds.</p></div>
-          <div class="step"><div class="no">02</div><h3 data-en="Have the conversation" data-ja="会話をする">Have the conversation</h3><p data-en="An AI interviewer talks with you out loud, like a real person would. Your camera quietly watches while you answer." data-ja="AI面接官が実際の人のように声で話しかけます。回答している間、カメラが静かに様子を見守ります。">An AI interviewer talks with you out loud, like a real person would. Your camera quietly watches while you answer.</p></div>
-          <div class="step"><div class="no">03</div><h3 data-en="See how you did" data-ja="結果を確認する">See how you did</h3><p data-en="The moment you finish, you get your score and warm, practical coaching to help you improve." data-ja="終了した瞬間に、スコアと改善に役立つ温かく実践的なコーチングが届きます。">The moment you finish, you get your score and warm, practical coaching to help you improve.</p></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============ 7 · HOW: TWO STREAMS ============ -->
-    <section class="slide" data-section="HOW IT WORKS">
-      <div class="wrap">
-        <div class="eyebrow"><span>04</span><span data-en="ARCHITECTURE · SENSING" data-ja="アーキテクチャ・センシング">ARCHITECTURE · SENSING</span><span class="rule"></span></div>
-        <h2 class="title display" data-en="It watches, listens, and notices, all at once." data-ja="見て、聞いて、同時に気づく。">It watches, listens, and notices, all at once.</h2>
-        <div class="streams">
-          <div class="stream" style="--hue:var(--signal)">
-            <div class="lbl" data-en="FACE + GESTURE" data-ja="表情+ジェスチャー">FACE + GESTURE</div>
-            <h3 data-en="Your camera, right in the browser" data-ja="ブラウザ内で動作するカメラ">Your camera, right in the browser</h3>
-            <p data-en="It gently notices where you look, how you sit, your expressions, and the small movements of your hands. Nothing is recorded. Only the numbers ever leave your device." data-ja="視線の先、座り方、表情、手のわずかな動きをそっと感知します。録画は一切行わず、数値データのみが端末の外に送られます。">It gently notices where you look, how you sit, your expressions, and the small movements of your hands. Nothing is recorded. Only the numbers ever leave your device.</p>
-            <div class="facts"><span data-en="eye contact" data-ja="視線">eye contact</span><span data-en="posture" data-ja="姿勢">posture</span><span data-en="hand movement" data-ja="手の動き">hand movement</span><span data-en="expression" data-ja="表情">expression</span></div>
-          </div>
-          <div class="stream" style="--hue:var(--voice)">
-            <div class="lbl" data-en="VOICE" data-ja="音声">VOICE</div>
-            <h3 data-en="Your voice, as you speak" data-ja="話している間の声">Your voice, as you speak</h3>
-            <p data-en="It hears your words, and also how you say them: your pace, your tone, and the warmth or nerves that come through." data-ja="言葉の内容だけでなく、話す速さやトーン、そこに表れる温かさや緊張も聞き取ります。">It hears your words, and also how you say them: your pace, your tone, and the warmth or nerves that come through.</p>
-            <div class="facts"><span data-en="speaking speed" data-ja="話す速さ">speaking speed</span><span data-en="filler words" data-ja="口ぐせ">filler words</span><span data-en="tone" data-ja="トーン">tone</span><span data-en="volume" data-ja="声の大きさ">volume</span></div>
+          <div class="score-panel score-panel-result">
+            <div class="score-panel-img score-result-img">
+              <img src="assets/score-result.png" alt="Your Engagement Score" onerror="this.remove(); this.parentElement.classList.add('outcome-panel-fallback');" />
+              <svg class="outcome-panel-icon" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
+              <span class="score-panel-pct score-panel-pct-result">87</span>
+            </div>
+            <span class="outcome-panel-label" data-en="Your Score" data-ja="あなたのスコア">Your Score</span>
+            <span class="outcome-panel-sub" data-en="Your overall engagement score" data-ja="あなたの全体的なエンゲージメントスコア">Your overall engagement score</span>
           </div>
         </div>
-        <div class="privacy">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
-          <span data-en="Your video and audio are never saved. They become numbers, then are deleted right away. We built it this way because your trust matters more than our data." data-ja="映像と音声は一切保存されません。数値データに変換された後、すぐに削除されます。あなたの信頼は、データよりも大切だと考えているからです。">Your video and audio are never saved. They become numbers, then are deleted right away. We built it this way because your trust matters more than our data.</span>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============ 9 · FACS INTRO ============ -->
-    <section class="slide" data-section="READING THE FACE">
-      <div class="wrap">
-        <div class="eyebrow"><span>05</span><span data-en="READING YOUR FACE" data-ja="表情の読み取り">READING YOUR FACE</span><span class="rule"></span></div>
-        <h2 class="title display" data-en="A standard method for reading expressions." data-ja="表情を読み取るための標準的な手法。">A standard method for reading expressions.</h2>
-        <p class="lede" data-en="We use <b>FACS</b> (Facial Action Coding System), a method used in research for over 40 years to measure facial movement. It works from a normal camera, with no extra hardware, and turns expressions into consistent, repeatable measurements instead of opinions." data-ja="私たちは<b>FACS</b>(表情動作記号化システム)を使用しています。これは40年以上にわたり研究で使われてきた、表情の動きを測定する手法です。特別な機器は不要で、通常のカメラだけで動作し、表情を主観ではなく一貫性のある再現可能な測定値に変換します。">We use <b>FACS</b> (Facial Action Coding System), a method used in research for over 40 years to measure facial movement. It works from a normal camera, with no extra hardware, and turns expressions into consistent, repeatable measurements instead of opinions.</p>
-        <div class="pillars" style="margin-top:30px">
-          <div class="pillar" style="--hue:var(--signal)"><div class="pct" data-en="MEASURED" data-ja="測定される">MEASURED</div><h3 data-en="Not guessed" data-ja="推測ではない">Not guessed</h3><div class="sub" data-en="Each movement gets a number, not an opinion." data-ja="一つひとつの動きが、主観ではなく数値で表されます。">Each movement gets a number, not an opinion.</div></div>
-          <div class="pillar" style="--hue:var(--voice)"><div class="pct" data-en="FAST" data-ja="高速">FAST</div><h3 data-en="Sub-second" data-ja="1秒未満">Sub-second</h3><div class="sub" data-en="Catches expressions that pass in under a second." data-ja="1秒に満たない一瞬の表情も捉えます。">Catches expressions that pass in under a second.</div></div>
-          <div class="pillar" style="--hue:var(--content)"><div class="pct" data-en="CAMERA ONLY" data-ja="カメラのみ">CAMERA ONLY</div><h3 data-en="No extra hardware" data-ja="追加機器は不要">No extra hardware</h3><div class="sub" data-en="Works from a standard webcam, nothing worn." data-ja="標準的なウェブカメラだけで動作し、装着する機器はありません。">Works from a standard webcam, nothing worn.</div></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============ 10 · FACS SPECIMEN GRID ============ -->
-    <section class="slide" data-section="READING THE FACE">
-      <div class="wrap">
-        <div class="eyebrow" style="margin-bottom:14px"><span>06</span><span data-en="THE MOVEMENTS WE WATCH FOR" data-ja="観察している動き">THE MOVEMENTS WE WATCH FOR</span><span class="rule"></span></div>
-        <h2 class="title display" style="font-size:clamp(1.5rem,3.2vw,2.2rem);margin-bottom:16px" data-en="FACS defines over 40 movements. Here are 8 examples." data-ja="FACSは40種類以上の動きを定義しています。ここでは8つの例を紹介します。">FACS defines over 40 movements. Here are 8 examples.</h2>
-        <div class="specimens">
-          <div class="specimen"><div class="frame"><img src="assets/facs/au1-inner-brow-raise.gif" alt="AU1 inner brow raise, looping demonstration" loading="lazy"></div><div class="read"><span class="code">AU1</span><div class="nm" data-en="Inner brow goes up" data-ja="眉の内側が上がる">Inner brow goes up</div><div class="bar"><span style="width:55%"></span></div></div></div>
-          <div class="specimen"><div class="frame"><img src="assets/facs/au5-eyes-wide.gif" alt="AU5 upper lid raise, eyes opening wide, looping demonstration" loading="lazy"></div><div class="read"><span class="code">AU5</span><div class="nm" data-en="Eyes open wide" data-ja="目を大きく見開く">Eyes open wide</div><div class="bar"><span style="width:60%"></span></div></div></div>
-          <div class="specimen"><div class="frame"><img src="assets/facs/au6-cheek-raiser.gif" alt="AU6 cheek raiser, looping demonstration" loading="lazy"></div><div class="read"><span class="code">AU6</span><div class="nm" data-en="Cheeks lift up" data-ja="頬が持ち上がる">Cheeks lift up</div><div class="bar"><span style="width:70%"></span></div></div></div>
-          <div class="specimen"><div class="frame"><img src="assets/facs/au12-lip-corner-puller.gif" alt="AU12 lip corner puller, smiling, looping demonstration" loading="lazy"></div><div class="read"><span class="code">AU12</span><div class="nm" data-en="Corners of mouth pull up" data-ja="口角が上がる">Corners of mouth pull up</div><div class="bar"><span style="width:75%"></span></div></div></div>
-          <div class="specimen tension"><div class="frame"><img src="assets/facs/au4-brow-lowerer.gif" alt="AU4 brow lowerer, looping demonstration" loading="lazy"></div><div class="read"><span class="code">AU4</span><div class="nm" data-en="Brow pulls down" data-ja="眉が下がる">Brow pulls down</div><div class="bar"><span style="width:65%"></span></div></div></div>
-          <div class="specimen tension"><div class="frame"><img src="assets/facs/au7-lid-tightener.gif" alt="AU7 lid tightener, looping demonstration" loading="lazy"></div><div class="read"><span class="code">AU7</span><div class="nm" data-en="Eyelids squeeze tight" data-ja="まぶたに力が入る">Eyelids squeeze tight</div><div class="bar"><span style="width:50%"></span></div></div></div>
-          <div class="specimen tension"><div class="frame"><img src="assets/facs/au23-lip-tightener.gif" alt="AU23 lip tightener, lips pressed together, looping demonstration" loading="lazy"></div><div class="read"><span class="code">AU23</span><div class="nm" data-en="Lips press together" data-ja="唇が固く閉じる">Lips press together</div><div class="bar"><span style="width:58%"></span></div></div></div>
-          <div class="specimen"><div class="frame"><img src="assets/facs/au45-blink.gif" alt="AU45 blink, looping demonstration" loading="lazy"></div><div class="read"><span class="code">AU45</span><div class="nm" data-en="Blink" data-ja="まばたき">Blink</div><div class="bar"><span style="width:40%"></span></div></div></div>
-        </div>
-        <div class="legend">
-          <div class="item"><span class="sw" style="background:var(--signal)"></span><span data-en="part of an expression" data-ja="表情の一部">part of an expression</span></div>
-          <div class="item"><span class="sw" style="background:var(--warn)"></span><span data-en="can mean stress" data-ja="緊張を示す場合がある">can mean stress</span></div>
-          <div class="item" style="color:var(--ink-faint)"><span data-en="the bar shows how strong the movement usually is" data-ja="バーはその動きの一般的な強さを示します">the bar shows how strong the movement usually is</span></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============ 10b · FACS COMBOS: MOVEMENTS -> FEELINGS ============ -->
-    <section class="slide" data-section="READING THE FACE">
-      <div class="wrap">
-        <div class="eyebrow" style="margin-bottom:14px"><span>07</span><span data-en="PUTTING MOVEMENTS TOGETHER" data-ja="動きを組み合わせる">PUTTING MOVEMENTS TOGETHER</span><span class="rule"></span></div>
-        <h2 class="title display" style="font-size:clamp(1.5rem,3.2vw,2.2rem);margin-bottom:8px" data-en="Movements combine to signal a feeling. Four examples below." data-ja="動きの組み合わせが感情を示します。以下は4つの例です。">Movements combine to signal a feeling. Four examples below.</h2>
-        <p class="lede" style="margin-bottom:18px" data-en="A single movement means little on its own. Combinations are what make the reading reliable." data-ja="単独の動きだけでは意味を持ちません。組み合わせによって、読み取りの精度が高まります。">A single movement means little on its own. Combinations are what make the reading reliable.</p>
-        <div class="combos">
-          <div class="combo-row">
-            <div class="combo-thumb"><div class="pic"><img src="assets/facs/au6-cheek-raiser.gif" alt="AU6 cheek raiser" loading="lazy"></div><div><span class="code">AU6</span><div class="nm" data-en="Cheeks lift" data-ja="頬が上がる">Cheeks lift</div></div></div>
-            <span class="combo-plus">+</span>
-            <div class="combo-thumb"><div class="pic"><img src="assets/facs/au12-lip-corner-puller.gif" alt="AU12 lip corner puller" loading="lazy"></div><div><span class="code">AU12</span><div class="nm" data-en="Mouth pulls up" data-ja="口角が上がる">Mouth pulls up</div></div></div>
-            <div class="combo-result"><span class="arrow">=</span><span class="feeling" style="color:var(--ready)"><span data-en="A real smile" data-ja="本物の笑顔">A real smile</span><span class="jp-desc" data-en="happy, and you can tell it is genuine" data-ja="幸せで、本心からだとわかる表情">happy, and you can tell it is genuine</span></span></div>
-          </div>
-          <div class="combo-row">
-            <div class="combo-thumb"><div class="pic"><img src="assets/facs/au4-brow-lowerer.gif" alt="AU4 brow lowerer" loading="lazy"></div><div><span class="code">AU4</span><div class="nm" data-en="Brow pulls down" data-ja="眉が下がる">Brow pulls down</div></div></div>
-            <span class="combo-plus">+</span>
-            <div class="combo-thumb"><div class="pic"><img src="assets/facs/au7-lid-tightener.gif" alt="AU7 lid tightener" loading="lazy"></div><div><span class="code">AU7</span><div class="nm" data-en="Eyelids squeeze" data-ja="まぶたに力が入る">Eyelids squeeze</div></div></div>
-            <div class="combo-result"><span class="arrow">=</span><span class="feeling" style="color:var(--warn)"><span data-en="Stress or worry" data-ja="緊張や不安">Stress or worry</span><span class="jp-desc" data-en="a sign the person may feel tense" data-ja="緊張している可能性を示すサイン">a sign the person may feel tense</span></span></div>
-          </div>
-          <div class="combo-row">
-            <div class="combo-thumb"><div class="pic"><img src="assets/facs/au1-inner-brow-raise.gif" alt="AU1 inner brow raise" loading="lazy"></div><div><span class="code">AU1</span><div class="nm" data-en="Inner brow up" data-ja="眉の内側が上がる">Inner brow up</div></div></div>
-            <span class="combo-plus">+</span>
-            <div class="combo-thumb"><div class="pic"><img src="assets/facs/au5-eyes-wide.gif" alt="AU5 upper lid raise" loading="lazy"></div><div><span class="code">AU5</span><div class="nm" data-en="Eyes open wide" data-ja="目を大きく見開く">Eyes open wide</div></div></div>
-            <div class="combo-result"><span class="arrow">=</span><span class="feeling" style="color:var(--voice)"><span data-en="Surprise" data-ja="驚き">Surprise</span><span class="jp-desc" data-en="something unexpected just happened" data-ja="予期しないことが起きたサイン">something unexpected just happened</span></span></div>
-          </div>
-          <div class="combo-row">
-            <div class="combo-thumb"><div class="pic"><img src="assets/facs/au23-lip-tightener.gif" alt="AU23 lip tightener" loading="lazy"></div><div><span class="code">AU23</span><div class="nm" data-en="Lips press together" data-ja="唇が固く閉じる">Lips press together</div></div></div>
-            <span class="combo-plus">+</span>
-            <div class="combo-thumb"><div class="pic"><img src="assets/facs/au4-brow-lowerer.gif" alt="AU4 brow lowerer" loading="lazy"></div><div><span class="code">AU4</span><div class="nm" data-en="Brow pulls down" data-ja="眉が下がる">Brow pulls down</div></div></div>
-            <div class="combo-result"><span class="arrow">=</span><span class="feeling" style="color:var(--warn)"><span data-en="Holding something back" data-ja="何かを抑えている">Holding something back</span><span class="jp-desc" data-en="the person may be biting their tongue" data-ja="言いたいことを飲み込んでいる可能性">the person may be biting their tongue</span></span></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ============ 11 · THE ENGAGEMENT SCORE (infographic) ============ -->
-    <section class="slide" data-section="THE ENGAGEMENT SCORE">
-      <div class="wrap">
-        <div class="eyebrow"><span>08</span><span data-en="ARCHITECTURE · THE SCORE" data-ja="アーキテクチャ・スコア">ARCHITECTURE · THE SCORE</span><span class="rule"></span></div>
-        <h2 class="title display" style="font-size:clamp(1.5rem,3.2vw,2.2rem);margin-bottom:14px" data-en="Three weighted parts, one score." data-ja="重み付けされた3要素から、一つのスコアへ。">Three weighted parts, one score.</h2>
-        <div class="score-img-frame">
-          <img src="assets/engagement-score.png" alt="What makes someone engaging: Delivery (how you speak) 40%, Presence (how you present yourself) 35%, and Content (what you say) 25%, combining into one Engagement score." />
-        </div>
-        <div class="bands" style="margin-top:20px">
+        <div class="bands" style="margin-top:28px">
           <div class="band needs"><div class="r" data-en="Under 50" data-ja="50未満">Under 50</div><div class="n" data-en="Needs work" data-ja="要練習">Needs work</div></div>
           <div class="band almost"><div class="r" data-en="50 to 69" data-ja="50〜69">50 to 69</div><div class="n" data-en="Almost there" data-ja="もう少し">Almost there</div></div>
           <div class="band ready"><div class="r" data-en="70 and up" data-ja="70以上">70 and up</div><div class="n" data-en="Ready" data-ja="準備完了">Ready</div></div>
@@ -643,15 +629,151 @@
       </div>
     </section>
 
-    <!-- ============ 12 · KEY RESULTS & STATUS ============ -->
-    <section class="slide" data-section="RESULTS">
+    <!-- ============ 5 · HOW IT HELPS JOB SEEKERS: THE PROBLEM ============ -->
+    <section class="slide" data-section="HELPING JOB SEEKERS">
       <div class="wrap">
-        <div class="eyebrow"><span>09</span><span data-en="KEY RESULTS &amp; CURRENT STATUS" data-ja="主な成果と現状">KEY RESULTS &amp; CURRENT STATUS</span><span class="rule"></span></div>
-        <h2 class="title display" data-en="What is built and working today." data-ja="現在、すでに構築され稼働しているもの。">What is built and working today.</h2>
-        <div class="cards">
-          <div class="card"><span class="idx" data-en="LIVE TODAY" data-ja="稼働中">LIVE TODAY</span><h3 data-en="End-to-end interviews" data-ja="一連の面接フロー">End-to-end interviews</h3><p data-en="Setup, live AI conversation, camera and voice reading, and a full score report." data-ja="設定、AIとのリアルタイム会話、カメラと音声の読み取り、そして完全なスコアレポートまで。">Setup, live AI conversation, camera and voice reading, and a full score report.</p></div>
-          <div class="card"><span class="idx" data-en="PROVEN" data-ja="実証済み">PROVEN</span><h3 data-en="Three signals, one score" data-ja="3つのシグナルから、一つのスコアへ">Three signals, one score</h3><p data-en="Delivery, Presence, and Content are fused into a single Engagement Score." data-ja="話し方、振る舞い、内容を統合し、一つのエンゲージメントスコアを算出します。">Delivery, Presence, and Content are fused into a single Engagement Score.</p></div>
-          <div class="card"><span class="idx" data-en="PRIVATE BY DESIGN" data-ja="設計段階からのプライバシー配慮">PRIVATE BY DESIGN</span><h3 data-en="On-device by default" data-ja="標準でオンデバイス処理">On-device by default</h3><p data-en="Camera analysis runs in the browser. Voice recordings are deleted after scoring." data-ja="カメラの解析はブラウザ内で行われます。音声の録音はスコア算出後に削除されます。">Camera analysis runs in the browser. Voice recordings are deleted after scoring.</p></div>
+        <h2 class="title display outcome-title" style="text-align:center;max-width:22ch;margin-left:auto;margin-right:auto" data-en="Practicing alone leaves three gaps." data-ja="一人で練習すると、3つの見落としが生まれます。">Practicing alone leaves three gaps.</h2>
+        <div class="outcome-panels">
+          <div class="outcome-panel">
+            <div class="outcome-panel-img">
+              <img src="assets/gap-pace.png" alt="No one timing your speaking pace" onerror="this.remove(); this.parentElement.classList.add('outcome-panel-fallback');" />
+              <svg class="outcome-panel-icon" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
+            </div>
+            <span class="outcome-panel-label" data-en="Pace" data-ja="話す速さ">Pace</span>
+            <span class="outcome-panel-sub" data-en="No one is timing you" data-ja="誰も時間を計ってくれない">No one is timing you</span>
+          </div>
+          <div class="outcome-panel">
+            <div class="outcome-panel-img">
+              <img src="assets/gap-eyecontact.png" alt="No one watching your eye contact" onerror="this.remove(); this.parentElement.classList.add('outcome-panel-fallback');" />
+              <svg class="outcome-panel-icon" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+            </div>
+            <span class="outcome-panel-label" data-en="Eye contact" data-ja="視線">Eye contact</span>
+            <span class="outcome-panel-sub" data-en="No one is watching you" data-ja="誰も見てくれていない">No one is watching you</span>
+          </div>
+          <div class="outcome-panel">
+            <div class="outcome-panel-img">
+              <img src="assets/gap-stress.png" alt="No one reading your stress signals" onerror="this.remove(); this.parentElement.classList.add('outcome-panel-fallback');" />
+              <svg class="outcome-panel-icon" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+            </div>
+            <span class="outcome-panel-label" data-en="Stress" data-ja="緊張のサイン">Stress</span>
+            <span class="outcome-panel-sub" data-en="No one is reading you" data-ja="誰も読み取ってくれない">No one is reading you</span>
+          </div>
+        </div>
+        <p class="lede" style="text-align:center;margin:30px auto 0;max-width:56ch;color:var(--ink)" data-en="<b>molave.ai measures all three</b> into one clear score." data-ja="<b>molave.aiはこの3つすべてを測定し、</b>わかりやすい一つのスコアにまとめます。"><b>molave.ai measures all three</b> into one clear score.</p>
+      </div>
+    </section>
+
+    <!-- ============ 7 · HOW A SESSION RUNS ============ -->
+    <section class="slide" data-section="HELPING JOB SEEKERS">
+      <div class="wrap">
+        <h2 class="title display outcome-title" style="text-align:center;max-width:20ch;margin-left:auto;margin-right:auto" data-en="Three easy steps." data-ja="3つの簡単なステップ。">Three easy steps.</h2>
+        <div class="gap-panels">
+          <div class="gap-panel">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 21v-7a8 8 0 0116 0v7"/><path d="M4 21h16M9 21v-4h6v4"/></svg>
+            <span class="outcome-panel-label" data-en="Choose your setup" data-ja="設定を選ぶ">Choose your setup</span>
+            <span class="outcome-panel-sub" data-en="Role, difficulty, tone" data-ja="職種・難易度・雰囲気">Role, difficulty, tone</span>
+          </div>
+          <div class="gap-panel">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 1a4 4 0 00-4 4v6a4 4 0 008 0V5a4 4 0 00-4-4z"/><path d="M19 10v1a7 7 0 01-14 0v-1M12 18v4M8 22h8"/></svg>
+            <span class="outcome-panel-label" data-en="Have the conversation" data-ja="会話をする">Have the conversation</span>
+            <span class="outcome-panel-sub" data-en="AI talks, camera watches" data-ja="AIが話し、カメラが見守る">AI talks, camera watches</span>
+          </div>
+          <div class="gap-panel">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+            <span class="outcome-panel-label" data-en="See how you did" data-ja="結果を確認する">See how you did</span>
+            <span class="outcome-panel-sub" data-en="Score, plus coaching" data-ja="スコアとコーチング">Score, plus coaching</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 8 · THE TECHNOLOGY: SENSING ============ -->
+    <section class="slide" data-section="THE TECHNOLOGY">
+      <div class="wrap">
+        <div class="eyebrow"><span data-en="THE TECHNOLOGY BEHIND IT" data-ja="支える技術">THE TECHNOLOGY BEHIND IT</span><span class="rule"></span></div>
+        <h2 class="title display outcome-title" style="text-align:center;max-width:20ch;margin-left:auto;margin-right:auto" data-en="It watches and listens, at once." data-ja="見て、聞いて、同時に気づく。">It watches and listens, at once.</h2>
+        <div class="streams">
+          <div class="stream" style="--hue:var(--signal)">
+            <div class="lbl" data-en="FACE + GESTURE" data-ja="表情+ジェスチャー">FACE + GESTURE</div>
+            <h3 data-en="Your camera" data-ja="カメラ">Your camera</h3>
+            <div class="facts"><span data-en="eye contact" data-ja="視線">eye contact</span><span data-en="posture" data-ja="姿勢">posture</span><span data-en="hand movement" data-ja="手の動き">hand movement</span><span data-en="expression" data-ja="表情">expression</span></div>
+          </div>
+          <div class="stream" style="--hue:var(--voice)">
+            <div class="lbl" data-en="VOICE" data-ja="音声">VOICE</div>
+            <h3 data-en="Your voice" data-ja="声">Your voice</h3>
+            <div class="facts"><span data-en="speaking speed" data-ja="話す速さ">speaking speed</span><span data-en="filler words" data-ja="口ぐせ">filler words</span><span data-en="tone" data-ja="トーン">tone</span><span data-en="volume" data-ja="声の大きさ">volume</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 9 · THE TECHNOLOGY: FACS, GIF-FOCUSED ============ -->
+    <section class="slide" data-section="THE TECHNOLOGY">
+      <div class="wrap">
+        <div class="eyebrow"><span data-en="READING YOUR FACE" data-ja="表情の読み取り">READING YOUR FACE</span><span class="rule"></span></div>
+        <h2 class="title display" style="font-size:clamp(1.6rem,3.4vw,2.3rem);margin-bottom:18px" data-en="Movements stack into a feeling." data-ja="動きが積み重なって表情になる。">Movements stack into a feeling.</h2>
+        <div class="facs-combos">
+          <div class="facs-combo-col">
+            <div class="facs-combo-stack">
+              <div class="facs-combo-au"><img src="assets/facs/au6-cheek-raiser.gif" alt="AU6 cheek raiser" loading="lazy"><span class="facs-tag">AU6</span></div>
+              <div class="facs-combo-au"><img src="assets/facs/au12-lip-corner-puller.gif" alt="AU12 lip corner puller" loading="lazy"><span class="facs-tag">AU12</span></div>
+            </div>
+            <span class="facs-emotion" data-en="Happiness" data-ja="幸福・喜び">Happiness</span>
+          </div>
+          <div class="facs-combo-col">
+            <div class="facs-combo-stack">
+              <div class="facs-combo-au"><img src="assets/facs/au5-eyes-wide.gif" alt="AU5 eyes wide" loading="lazy"><span class="facs-tag">AU5</span></div>
+              <div class="facs-combo-au"><img src="assets/facs/au26-jaw-drop.gif" alt="AU26 jaw drop" loading="lazy"><span class="facs-tag">AU26</span></div>
+            </div>
+            <span class="facs-emotion" data-en="Surprise" data-ja="驚き">Surprise</span>
+          </div>
+          <div class="facs-combo-col">
+            <div class="facs-combo-stack">
+              <div class="facs-combo-au"><img src="assets/facs/au9-nose-wrinkler.gif" alt="AU9 nose wrinkler" loading="lazy"><span class="facs-tag">AU9</span></div>
+              <div class="facs-combo-au"><img src="assets/facs/au23-lip-tightener.gif" alt="AU23 lip tightener" loading="lazy"><span class="facs-tag">AU23</span></div>
+            </div>
+            <span class="facs-emotion" data-en="Anger" data-ja="怒り">Anger</span>
+          </div>
+          <div class="facs-combo-col">
+            <div class="facs-combo-stack">
+              <div class="facs-combo-au"><img src="assets/facs/au4-brow-lowerer.gif" alt="AU4 brow lowerer" loading="lazy"><span class="facs-tag">AU4</span></div>
+              <div class="facs-combo-au"><img src="assets/facs/au15-lip-corner-depressor.gif" alt="AU15 lip corner depressor" loading="lazy"><span class="facs-tag">AU15</span></div>
+            </div>
+            <span class="facs-emotion" data-en="Anger" data-ja="怒り">Sadness</span>
+          </div>
+        </div>
+        <div class="facs-strip">
+          <div class="facs-strip-tile"><img src="assets/facs/AU51-head-turn-left.gif" alt="A51 head turn left" loading="lazy"><span class="facs-tag">AU51</span></div>
+          <div class="facs-strip-tile"><img src="assets/facs/AU52-head-turn-right.gif" alt="AU52 head turn right" loading="lazy"><span class="facs-tag">AU52</span></div>
+          <div class="facs-strip-tile"><img src="assets/facs/AU53-head-up.gif" alt="AU53 head up" loading="lazy"><span class="facs-tag">AU53</span></div>
+          <div class="facs-strip-tile"><img src="assets/facs/AU54-head-down.gif" alt="AU54 head down" loading="lazy"><span class="facs-tag">AU54</span></div>
+          <div class="facs-strip-tile"><img src="assets/facs/AU55-head-tilt-left.gif" alt="AU55 head tilt left" loading="lazy"><span class="facs-tag">AU55</span></div>
+          <div class="facs-strip-tile"><img src="assets/facs/AU56-head-tilt-right.gif" alt="AU56 head tilt right" loading="lazy"><span class="facs-tag">AU56</span></div>
+          <div class="facs-strip-tile"><img src="assets/facs/AU57-head-forward.gif" alt="AU57 head forward" loading="lazy"><span class="facs-tag">AU57</span></div>
+          <div class="facs-strip-tile"><img src="assets/facs/AU58-head-back.gif" alt="AU58 head back" loading="lazy"><span class="facs-tag">AU58</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 9b · SECURITY, DEDICATED PAGE ============ -->
+    <section class="slide" data-section="SECURITY">
+      <div class="wrap">
+        <div class="security-page">
+          <div class="security-slogan-big" data-en="We don't save your data. Anyway." data-ja="お客様のデータは保存しません。それだけです。">We don't save your data. Anyway.</div>
+          <div class="security-claims security-claims-big">
+            <div class="security-claim">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M4.9 4.9l14.2 14.2"/></svg>
+              <div><h4 data-en="Never used to train AI" data-ja="AIの学習に使われることはありません">Never used to train AI</h4><p data-en="Nothing you say or show is ever used to train our models, or anyone else's." data-ja="発言内容や映像が、当社および第三者のモデル学習に使われることは一切ありません。">Nothing you say or show is ever used to train our models, or anyone else's.</p></div>
+            </div>
+            <div class="security-claim">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>
+              <div><h4 data-en="Your face is never recorded" data-ja="顔の映像は記録されません">Your face is never recorded</h4><p data-en="Facial analysis runs locally, in your browser. No video is captured, uploaded, or stored, anywhere." data-ja="表情解析はブラウザ内でローカルに処理されます。映像はどこにも取得・送信・保存されません。">Facial analysis runs locally, in your browser. No video is captured, uploaded, or stored, anywhere.</p></div>
+            </div>
+            <div class="security-claim">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
+              <div><h4 data-en="Safe from a security standpoint" data-ja="セキュリティ上、安心してご利用いただけます">Safe from a security standpoint</h4><p data-en="Only numeric scores ever leave the device. There is nothing sensitive to breach, because nothing sensitive is stored." data-ja="端末外に送られるのは数値スコアのみです。侵害されうる機密情報自体が、そもそも保存されていません。">Only numeric scores ever leave the device. There is nothing sensitive to breach, because nothing sensitive is stored.</p></div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
@@ -659,14 +781,25 @@
     <!-- ============ 14 · NEXT STEPS & WHAT WE NEED ============ -->
     <section class="slide" data-section="NEXT STEPS">
       <div class="wrap">
-        <div class="eyebrow"><span>10</span><span data-en="NEXT STEPS &amp; WHAT WE NEED" data-ja="次のステップと必要な支援">NEXT STEPS &amp; WHAT WE NEED</span><span class="rule"></span></div>
-        <h2 class="title display" data-en="What we plan to build next." data-ja="今後の開発計画。">What we plan to build next.</h2>
-        <div class="cards">
-          <div class="card"><span class="idx">01</span><h3 data-en="Avatar interviewer" data-ja="アバター面接官">Avatar interviewer</h3><p data-en="A visual, on-screen avatar to lead the interview, instead of voice only." data-ja="音声だけでなく、画面上のアバターが面接を進行します。">A visual, on-screen avatar to lead the interview, instead of voice only.</p></div>
-          <div class="card"><span class="idx">02</span><h3 data-en="Microsoft Teams bot" data-ja="Microsoft Teamsボット">Microsoft Teams bot</h3><p data-en="Run practice interviews directly inside Teams, where employees already work." data-ja="社員が普段使うTeams上で、そのまま模擬面接を実施できます。">Run practice interviews directly inside Teams, where employees already work.</p></div>
-          <div class="card"><span class="idx">03</span><h3 data-en="Wider pilot" data-ja="対象範囲の拡大">Wider pilot</h3><p data-en="More users and real interview data to keep improving scoring accuracy." data-ja="利用者数と実際の面接データを増やし、採点精度を継続的に高めます。">More users and real interview data to keep improving scoring accuracy.</p></div>
+        <h2 class="title display outcome-title" style="text-align:center;max-width:20ch;margin-left:auto;margin-right:auto" data-en="What we plan to build next." data-ja="今後の開発計画。">What we plan to build next.</h2>
+        <div class="gap-panels">
+          <div class="gap-panel">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a8 8 0 0116 0v1"/></svg>
+            <span class="outcome-panel-label" data-en="Avatar interviewer" data-ja="アバター面接官">Avatar interviewer</span>
+            <span class="outcome-panel-sub" data-en="On-screen, not just voice" data-ja="音声だけでなく画面にも">On-screen, not just voice</span>
+          </div>
+          <div class="gap-panel">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>
+            <span class="outcome-panel-label" data-en="Microsoft Teams bot" data-ja="Microsoft Teamsボット">Microsoft Teams bot</span>
+            <span class="outcome-panel-sub" data-en="Practice where you work" data-ja="普段の職場で練習">Practice where you work</span>
+          </div>
+          <div class="gap-panel">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+            <span class="outcome-panel-label" data-en="Wider pilot" data-ja="対象範囲の拡大">Wider pilot</span>
+            <span class="outcome-panel-sub" data-en="More users, more data" data-ja="利用者とデータを拡大">More users, more data</span>
+          </div>
         </div>
-        <p class="lede" style="text-align:center;margin:28px auto 0;max-width:56ch;color:var(--ink)" data-en="<b>What we need:</b> approval to pilot with a small group, and access to a Teams environment for integration testing." data-ja="<b>必要な支援:</b>小規模グループでの試験導入の承認と、統合テストのためのTeams環境へのアクセスです。"><b>What we need:</b> approval to pilot with a small group, and access to a Teams environment for integration testing.</p>
+        <p class="lede" style="text-align:center;margin:30px auto 0;max-width:56ch;color:var(--ink)" data-en="<b>What we need:</b> a small pilot group, and Teams access for testing." data-ja="<b>必要な支援:</b>小規模な試験導入グループと、テスト用のTeamsアクセスです。"><b>What we need:</b> a small pilot group, and Teams access for testing.</p>
       </div>
     </section>
 
@@ -701,19 +834,16 @@
   var current  = 0;
   var lang     = 'en';
   var total    = slides.length;
-  var paperSections = ['THE NAME'];
+  var paperSections = [];
 
   var sectionLabelsJa = {
     'INTRO': 'はじめに',
-    'AGENDA': '本日の流れ',
     'THE NAME': '名前の由来',
-    'OUR PRINCIPLES': '私たちの原則',
-    'THE PROBLEM': '課題',
-    'WHAT IT IS': 'プロダクトビジョン',
-    'HOW IT WORKS': '仕組み',
-    'READING THE FACE': '表情の読み取り',
-    'THE ENGAGEMENT SCORE': 'エンゲージメントスコア',
-    'RESULTS': '成果と現状',
+    'THE OUTCOME': '要点',
+    'THE REPORT': 'レポート',
+    'HELPING JOB SEEKERS': '求職者への支援',
+    'THE TECHNOLOGY': '技術',
+    'SECURITY': 'セキュリティ',
     'NEXT STEPS': '次のステップ',
     'SUMMARY': 'まとめ'
   };
@@ -776,49 +906,6 @@
     var dx = e.changedTouches[0].clientX - tx;
     if (Math.abs(dx) > 45) { dx < 0 ? next() : prev(); }
   }, {passive:true});
-
-  /* ------------------------------------------------------------------ */
-  /* Scope spine — animated waveform trace along the footer              */
-  /* ------------------------------------------------------------------ */
-  function buildScope(){
-    var svg = document.getElementById('scopeSvg');
-    if (!svg) return;
-    var NS = 'http://www.w3.org/2000/svg';
-
-    // build one seamless, tileable cycle (endpoints match in value and slope)
-    var n = 120;
-    var cyclePts = [];
-    for (var i = 0; i < n; i++){
-      var x = (i / n) * 1000;
-      var y = 14 + Math.sin(i / n * Math.PI * 2) * 5 + Math.sin(i / n * Math.PI * 6) * 4;
-      cyclePts.push([x, y]);
-    }
-    cyclePts.push([1000, cyclePts[0][1]]);
-
-    function toPath(pts, offsetX){
-      return 'M' + pts.map(function(p){ return (p[0] + offsetX).toFixed(1) + ',' + p[1].toFixed(1); }).join(' L');
-    }
-
-    var wrapG = document.createElementNS(NS, 'g');
-    wrapG.setAttribute('id', 'scopeWrap');
-    svg.setAttribute('viewBox', '0 0 1000 28');
-    svg.appendChild(wrapG);
-
-    var p1 = document.createElementNS(NS, 'path');
-    p1.setAttribute('d', toPath(cyclePts, 0));
-    wrapG.appendChild(p1);
-    var p2 = document.createElementNS(NS, 'path');
-    p2.setAttribute('d', toPath(cyclePts, 1000));
-    wrapG.appendChild(p2);
-
-    if (!reduce){
-      var offset = 0;
-      setInterval(function(){
-        offset = (offset + 0.6) % 1000;
-        wrapG.style.transform = 'translateX(-' + offset + 'px)';
-      }, 50);
-    }
-  }
 
   function buildHeroWave(){
     var svg = document.getElementById('heroWave');
@@ -904,9 +991,37 @@
     document.querySelectorAll('.donut-arc').forEach(function(a){ a.style.strokeDashoffset = 0; });
   }
 
-  buildScope();
+  /* ------------------------------------------------------------------ */
+  /* Title background video — mask the loop seam with a brief crossfade  */
+  /* ------------------------------------------------------------------ */
+  function smoothLoopVideo(){
+    var vid = document.getElementById('titleBgVideo');
+    if (!vid || reduce) return;
+    var FADE_WINDOW = 0.35;
+    var faded = false;
+    vid.addEventListener('timeupdate', function(){
+      if (!vid.duration) return;
+      var remaining = vid.duration - vid.currentTime;
+      if (remaining <= FADE_WINDOW && !faded){
+        faded = true;
+        vid.style.opacity = '0';
+      } else if (remaining > FADE_WINDOW && faded && vid.currentTime > FADE_WINDOW){
+        faded = false;
+      }
+    });
+    vid.addEventListener('seeked', function(){
+      if (vid.currentTime < FADE_WINDOW){
+        setTimeout(function(){ vid.style.opacity = '1'; }, 80);
+      }
+    });
+    vid.addEventListener('play', function(){
+      if (vid.currentTime < FADE_WINDOW) vid.style.opacity = '1';
+    });
+  }
+
   buildHeroWave();
   buildDonut();
+  smoothLoopVideo();
   updateChrome();
   if (reduce) animateDonut();
 })();
