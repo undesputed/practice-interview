@@ -20,11 +20,21 @@ function feedbackLooksJapanese(vd){
   return looksJapanese(sample);
 }
 
+function feedbackHasProse(vd){
+  if (!vd) return false;
+  const sample = [vd.headline, vd.next_action, vd.delivery_note, vd.presence_note, vd.content_note]
+    .concat(vd.improvements || [])
+    .concat(vd.strengths || [])
+    .filter(Boolean)
+    .join(' ');
+  return !!sample.trim();
+}
+
 function applyLocaleOverlay(s, lang){
-  if (lang !== 'ja') return s;
+  if (lang !== 'ja' && lang !== 'en') return s;
   const out = Object.assign({}, s);
-  const vLoc = s.verdict_ja;
-  const cLoc = s.coaching_ja;
+  const vLoc = s['verdict_' + lang];
+  const cLoc = s['coaching_' + lang];
   if (vLoc && s.verdict){
     out.verdict = Object.assign({}, s.verdict, vLoc);
   }
@@ -36,30 +46,39 @@ function applyLocaleOverlay(s, lang){
 
 async function loadSessionForDisplay(id, onStatus){
   let s = await api.getSession(id);
-  if (currentLang() !== 'ja') return s;
+  const lang = currentLang() === 'ja' ? 'ja' : 'en';
+  const wantJa = lang === 'ja';
+  const hasProse = feedbackHasProse(s.verdict) || feedbackHasProse(s.coaching);
+  if (!hasProse) return s;
 
-  // Prefer a cached Japanese translation when it actually looks Japanese.
-  if (s.verdict_ja && feedbackLooksJapanese(s.verdict_ja)){
-    return applyLocaleOverlay(s, 'ja');
-  }
-  // Already Japanese prose — no API call needed.
-  if (feedbackLooksJapanese(s.verdict)){
-    return s;
+  const sourceIsJa = feedbackHasProse(s.verdict)
+    ? feedbackLooksJapanese(s.verdict)
+    : feedbackLooksJapanese(s.coaching);
+
+  // Already matches the UI language — show as stored.
+  if (sourceIsJa === wantJa) return s;
+
+  // Prefer a cached translation for the target UI language.
+  const cached = s['verdict_' + lang];
+  if (cached && feedbackHasProse(cached)){
+    if (feedbackLooksJapanese(cached) === wantJa){
+      return applyLocaleOverlay(s, lang);
+    }
   }
 
-  // English (or mixed) LLM prose — translate + cache, then overlay.
-  // Do NOT trust session.language === 'ja': Claude sometimes still wrote English.
+  // Source language differs from UI — translate + cache, then overlay.
   if (onStatus) onStatus(t('report.translating'));
   try {
-    s = await api.localizeSession(id, 'ja');
-    // Guard: if the API returned English again, surface a soft warning in console.
-    if (!feedbackLooksJapanese(s.verdict)){
+    s = await api.localizeSession(id, lang);
+    if (wantJa && feedbackHasProse(s.verdict) && !feedbackLooksJapanese(s.verdict)){
       console.warn('[report] localize returned non-Japanese prose');
     }
+    if (!wantJa && feedbackHasProse(s.verdict) && feedbackLooksJapanese(s.verdict)){
+      console.warn('[report] localize returned non-English prose');
+    }
   } catch (err){
-    console.warn('[report] localize failed — showing English LLM prose', err);
+    console.warn('[report] localize failed — showing original LLM prose', err);
     if (onStatus) onStatus(t('report.translateFail'));
-    // Brief pause so the user can see the message before English content paints.
     await new Promise((r) => setTimeout(r, 1200));
   }
   return s;

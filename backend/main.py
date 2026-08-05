@@ -424,26 +424,37 @@ def rename_session_endpoint(session_id: str, req: LabelRequest):
 async def localize_session_endpoint(session_id: str, req: LocalizeRequest):
     """Translate saved LLM feedback into `language` and cache it on the session.
 
-    Used when the UI is Japanese but the session was scored in English. Returns the
-    full session with verdict/coaching text fields overlaid in the target language.
+    Used when the UI language differs from the language of the stored LLM prose
+    (e.g. UI English + Japanese session, or UI Japanese + English session).
+    Returns the full session with verdict/coaching text fields overlaid.
     """
     lang = req.language if req.language in ("en", "ja") else "ja"
     data = sessions_store.load_session(None, session_id)
     if data is None:
         raise HTTPException(404, "session not found")
 
-    # Already Japanese (or already cached) — just return an overlaid view.
-    # IMPORTANT: do NOT trust summary["language"] alone. Claude sometimes wrote
-    # English even when language=ja was requested; detect from the actual text.
+    # Detect from actual prose — do NOT trust summary["language"] alone
+    # (Claude sometimes wrote English even when language=ja was requested).
     cache_key = f"verdict_{lang}"
     coach_key = f"coaching_{lang}"
-    if lang == "en":
+    verdict = data.get("verdict") or {}
+    coaching = data.get("coaching") or {}
+    if not _feedback_has_prose(verdict) and not _feedback_has_prose(coaching):
         return data
+
+    source_is_ja = _feedback_looks_japanese(verdict if _feedback_has_prose(verdict) else coaching)
+    wants_ja = lang == "ja"
+
+    # Already in the requested language — no translation needed.
+    if wants_ja == source_is_ja:
+        return data
+
+    # Cached translation for this target language.
     cached = data.get(cache_key)
-    if cached and _feedback_looks_japanese(cached):
-        return _overlay_locale(data, lang)
-    if _feedback_looks_japanese(data.get("verdict") or {}):
-        return data
+    if cached and _feedback_has_prose(cached):
+        cached_is_ja = _feedback_looks_japanese(cached)
+        if cached_is_ja == wants_ja:
+            return _overlay_locale(data, lang)
 
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
     if not anthropic_key:
@@ -471,7 +482,7 @@ async def localize_session_endpoint(session_id: str, req: LocalizeRequest):
             # Still return an overlaid view for this request even if save failed.
             data = dict(data)
             data.update(patch)
-    elif not patch:
+    else:
         logging.warning("localize: empty translation for %s", session_id)
     return _overlay_locale(data, lang)
 
@@ -480,10 +491,9 @@ def _looks_japanese(text: str) -> bool:
     return bool(re.search(r"[\u3040-\u30ff\u3400-\u9fff]", text or ""))
 
 
-def _feedback_looks_japanese(block: dict) -> bool:
-    """True when the LLM prose block is already Japanese (or empty)."""
+def _feedback_prose_sample(block: dict) -> str:
     if not block:
-        return True
+        return ""
     parts = [
         block.get("headline") or "",
         block.get("next_action") or "",
@@ -496,9 +506,22 @@ def _feedback_looks_japanese(block: dict) -> bool:
         vals = block.get(key) or []
         if isinstance(vals, list):
             parts.extend(str(x) for x in vals)
-    sample = " ".join(p for p in parts if p).strip()
+    return " ".join(p for p in parts if p).strip()
+
+
+def _feedback_has_prose(block: dict) -> bool:
+    return bool(_feedback_prose_sample(block))
+
+
+def _feedback_looks_japanese(block: dict) -> bool:
+    """True when the LLM prose block contains Japanese script.
+
+    Empty blocks return False — callers should use `_feedback_has_prose` first
+    when deciding whether translation is needed.
+    """
+    sample = _feedback_prose_sample(block)
     if not sample:
-        return True
+        return False
     return _looks_japanese(sample)
 
 

@@ -165,8 +165,9 @@ def translate_feedback(api_key: str, verdict: Optional[dict] = None,
 
     Returns {"verdict": {...text fields...}, "coaching": {...}} with only the
     translatable fields filled in. Empty input sections stay None.
+    Supports language="ja" (→ Japanese) and language="en" (→ English).
     """
-    if language != "ja":
+    if language not in ("ja", "en"):
         return {"verdict": None, "coaching": None}
 
     payload = {}
@@ -177,19 +178,30 @@ def translate_feedback(api_key: str, verdict: Optional[dict] = None,
     if not payload:
         return {"verdict": None, "coaching": None}
 
+    if language == "ja":
+        system_text = (
+            "You translate interview-feedback JSON into concise natural Japanese for a "
+            "busy executive. Return ONLY a JSON object with the same shape as the input. "
+            "Keep every JSON key identical. Translate every string value (and every string "
+            "inside arrays) into Japanese. Do not add keys. Do not explain. Keep bullets "
+            "short — no long why-explanations."
+        )
+    else:
+        system_text = (
+            "You translate interview-feedback JSON into concise natural English for a "
+            "busy executive. Return ONLY a JSON object with the same shape as the input. "
+            "Keep every JSON key identical. Translate every string value (and every string "
+            "inside arrays) into English. Do not add keys. Do not explain. Keep bullets "
+            "short — no long why-explanations."
+        )
+
     client = Anthropic(api_key=api_key, timeout=42.0)
     resp = client.messages.create(
         model=COACH_MODEL,
         max_tokens=900,
         system=[{
             "type": "text",
-            "text": (
-                "You translate interview-feedback JSON into concise natural Japanese for a "
-                "busy executive. Return ONLY a JSON object with the same shape as the input. "
-                "Keep every JSON key identical. Translate every string value (and every string "
-                "inside arrays) into Japanese. Do not add keys. Do not explain. Keep bullets "
-                "short — no long why-explanations."
-            ),
+            "text": system_text,
             "cache_control": {"type": "ephemeral"},
         }],
         messages=[{"role": "user", "content": json.dumps(payload, ensure_ascii=False)}],

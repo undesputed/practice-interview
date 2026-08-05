@@ -6,7 +6,7 @@ import { CONFIG } from '../config.js';
 import { t } from '../i18n.js';
 import { createFaceEffects } from '../face-effects.js';
 
-// Curated blendshapes shown as bars, with friendly labels.
+// Curated blendshapes shown as secondary bars, with friendly labels.
 const DISPLAY = [
   ['mouthSmileLeft', 'Smile L'], ['mouthSmileRight', 'Smile R'],
   ['eyeBlinkLeft', 'Blink L'], ['eyeBlinkRight', 'Blink R'],
@@ -20,44 +20,97 @@ let engine = 'mediapipe';   // 'mediapipe' (live blendshapes) | 'deepface' (serv
 let mode = 'face';          // 'face' | 'pose' | 'hands'
 let effects = null;        // active reaction-effects overlay, or null
 let effectsOn = true;      // reaction effects default ON
+let panelKind = '';        // skeleton currently mounted in #fa-panel
 
 // Live server emotion track (~every EMOTION_LIVE_MS). Runs only while engine==='deepface'.
 let dfRunning = false, dfTimer = null;
 let dfStatus = 'off';   // 'off' | 'warming' | 'measuring' | 'live' | 'unavailable'
 let dfDom = null, dfScores = null;
 
-function bsBars(bs){
-  return DISPLAY.map((d) => {
-    const v = Math.max(0, Math.min(1, bs[d[0]] || 0));
-    return '<div class="bs-row"><span class="nm">' + d[1] + '</span>' +
-      '<span class="track"><span class="fill" style="width:' + Math.round(v * 100) + '%"></span></span>' +
-      '<span class="pct">' + Math.round(v * 100) + '%</span></div>';
-  }).join('');
+function barRow(id, label, cls){
+  return '<div class="bs-row ' + (cls || '') + '" data-bar="' + esc(id) + '">' +
+    '<span class="nm">' + esc(label) + '</span>' +
+    '<span class="track"><span class="fill" style="width:0%"></span></span>' +
+    '<span class="pct">0%</span></div>';
 }
 
-// The full Expression Analysis panel when the HSEmotion engine is selected
-// (server emotion only — no MediaPipe blendshapes).
-function dfPanel(){
-  let body;
-  if (dfStatus === 'warming'){
-    body = '<div class="fa-note">Warming up the emotion model… the first read takes a few seconds.</div>';
-  } else if (dfStatus === 'unavailable'){
-    body = '<div class="fa-note">Emotion analysis is off on the server. Start it with <b>EMOTION_ANALYSIS=1</b>.</div>';
-  } else if (dfStatus === 'live' && dfScores){
-    body = '<div class="bs-bars">' + EMOTION_CLASSES.map((c) => {
-      const v = Math.round(dfScores[c] || 0);
-      return '<div class="bs-row"><span class="nm">' + c + '</span>' +
-        '<span class="track"><span class="fill" style="width:' + v + '%"></span></span>' +
-        '<span class="pct">' + v + '%</span></div>';
-    }).join('') + '</div>';
-  } else {
-    body = '<div class="fa-note">Measuring…</div>';
+function emotionRows(classes){
+  return classes.map((c) => barRow(c, c, 'emo-' + c)).join('');
+}
+
+function blendshapeRows(){
+  return DISPLAY.map((d) => barRow(d[0], d[1], 'bs-muscle')).join('');
+}
+
+// Patch existing bar rows in place so CSS width transitions can run.
+function setBars(root, values, leadId){
+  if (!root) return;
+  root.querySelectorAll('[data-bar]').forEach((row) => {
+    const id = row.getAttribute('data-bar');
+    const raw = values[id];
+    const v = Math.max(0, Math.min(100, Math.round(raw == null ? 0 : raw)));
+    const fill = row.querySelector('.fill');
+    const pct = row.querySelector('.pct');
+    if (fill) fill.style.width = v + '%';
+    if (pct) pct.textContent = v + '%';
+    row.classList.toggle('lead', !!leadId && id === leadId);
+  });
+}
+
+function ensurePanel(kind, html){
+  const panel = document.getElementById('fa-panel');
+  if (!panel) return null;
+  if (panelKind !== kind){
+    panel.innerHTML = html;
+    panelKind = kind;
   }
-  const dom = (dfStatus === 'live' && dfDom) ? dfDom : '—';
+  return panel;
+}
+
+function resetPanel(){
+  panelKind = '';
+  const panel = document.getElementById('fa-panel');
+  if (panel) panel.innerHTML = '';
+}
+
+function mpSkeleton(){
+  return '<div class="phead"><div><h3>' + esc(t('facial.exprTitle')) + '</h3>' +
+    '<div class="desc">' + esc(t('facial.exprDescMp')) + '</div></div>' +
+    '<div class="fa-dom"><div class="e" data-dom-e>—</div><div class="v" data-dom-v></div></div></div>' +
+    '<div class="fa-sec-label">' + esc(t('facial.emotions')) + '</div>' +
+    '<div class="bs-bars em-bars">' + emotionRows(EMOTION_CLASSES) + '</div>' +
+    '<div class="fa-sec-label">' + esc(t('facial.muscles')) + '</div>' +
+    '<div class="bs-bars bs-muscle-bars">' + blendshapeRows() + '</div>';
+}
+
+function dfSkeleton(){
   const every = Math.round(CONFIG.EMOTION_LIVE_MS / 1000);
-  return '<div class="phead"><div><h3>Expression Analysis</h3>' +
-      '<div class="desc">HSEmotion · AffectNet model — refreshed every ' + every + 's on the server.</div></div>' +
-      '<div class="fa-dom"><div class="e">' + esc(dom) + '</div></div></div>' + body;
+  return '<div class="phead"><div><h3>' + esc(t('facial.exprTitle')) + '</h3>' +
+    '<div class="desc">' + esc(t('facial.exprDescDf', { s: every })) + '</div></div>' +
+    '<div class="fa-dom"><div class="e" data-dom-e>—</div><div class="v" data-dom-v></div></div></div>' +
+    '<div class="fa-df-body"></div>';
+}
+
+function paintDfBody(panel){
+  const body = panel.querySelector('.fa-df-body');
+  if (!body) return;
+  if (dfStatus === 'warming'){
+    body.innerHTML = '<div class="fa-note">' + esc(t('facial.dfWarming')) + '</div>';
+    return;
+  }
+  if (dfStatus === 'unavailable'){
+    body.innerHTML = '<div class="fa-note">' + esc(t('facial.dfOff')) + '</div>';
+    return;
+  }
+  if (dfStatus === 'live' && dfScores){
+    if (!body.querySelector('.em-bars')){
+      body.innerHTML = '<div class="fa-sec-label">' + esc(t('facial.emotions')) + '</div>' +
+        '<div class="bs-bars em-bars">' + emotionRows(EMOTION_CLASSES) + '</div>';
+    }
+    setBars(body, dfScores, dfDom);
+    return;
+  }
+  body.innerHTML = '<div class="fa-note">' + esc(t('facial.dfMeasuring')) + '</div>';
 }
 
 let lastFrame = null;
@@ -95,22 +148,47 @@ function stopDeepface(){
 }
 
 function paintPanel(out){
-  const panel = document.getElementById('fa-panel');
-  if (!panel) return;
+  const panelEl = document.getElementById('fa-panel');
+  if (!panelEl) return;
+
   if (out && out.mode !== 'face'){
-    panel.innerHTML = '<div class="phead"><div><h3>Expression Analysis</h3>' +
-      '<div class="desc">Switch to <b>Face</b> mode to see blendshapes and emotion.</div></div></div>' +
-      '<div class="fa-note">' + (out.mode === 'pose' ? 'Pose' : 'Hand') + ' landmarks: ' + (out ? out.detections : 0) + ' detected.</div>';
+    const kind = 'mode-' + out.mode;
+    const panel = ensurePanel(kind,
+      '<div class="phead"><div><h3>' + esc(t('facial.exprTitle')) + '</h3>' +
+        '<div class="desc">' + esc(t('facial.exprSwitchFace')) + '</div></div></div>' +
+        '<div class="fa-note" data-mode-note></div>');
+    const note = panel && panel.querySelector('[data-mode-note]');
+    if (note){
+      const label = out.mode === 'pose' ? t('facial.mode.pose') : t('facial.mode.hands');
+      note.textContent = t('facial.modeDetections', { mode: label, n: out.detections || 0 });
+    }
     return;
   }
-  if (engine === 'deepface'){ panel.innerHTML = dfPanel(); return; }
+
+  if (engine === 'deepface'){
+    const panel = ensurePanel('deepface', dfSkeleton());
+    if (!panel) return;
+    const e = panel.querySelector('[data-dom-e]');
+    const v = panel.querySelector('[data-dom-v]');
+    if (e) e.textContent = (dfStatus === 'live' && dfDom) ? dfDom : '—';
+    if (v) v.textContent = '';
+    paintDfBody(panel);
+    return;
+  }
+
+  const panel = ensurePanel('mediapipe', mpSkeleton());
+  if (!panel) return;
   const bs = (out && out.blendshapes) || {};
   const dom = dominantEmotion(bs);
-  panel.innerHTML =
-    '<div class="phead"><div><h3>Expression Analysis</h3>' +
-      '<div class="desc">MediaPipe · blendshapes — 52 face-muscle coefficients, computed live in your browser.</div></div>' +
-      '<div class="fa-dom"><div class="e">' + esc(dom.emotion) + '</div><div class="v">' + Math.round(dom.value) + '%</div></div></div>' +
-    '<div class="bs-bars">' + bsBars(bs) + '</div>';
+  const e = panel.querySelector('[data-dom-e]');
+  const v = panel.querySelector('[data-dom-v]');
+  if (e) e.textContent = dom.emotion;
+  if (v) v.textContent = Math.round(dom.value) + '%';
+
+  setBars(panel.querySelector('.em-bars'), dom.scores, dom.emotion);
+  const muscle = {};
+  for (const d of DISPLAY) muscle[d[0]] = Math.round(Math.max(0, Math.min(1, bs[d[0]] || 0)) * 100);
+  setBars(panel.querySelector('.bs-muscle-bars'), muscle, null);
 }
 
 function setStatus(out){
@@ -159,12 +237,13 @@ function stopCamera(){
 export function facial(){
   // Stop any camera left running, then re-arm a one-shot teardown for when the
   // user navigates away from this screen.
-  vision.stop(); stopDeepface();
+  vision.stop(); stopDeepface(); resetPanel();
   engine = 'mediapipe'; mode = 'face'; effectsOn = true;
   window.addEventListener('hashchange', function leave(){
     if (location.hash.replace(/^#/, '') !== '/facial'){
       vision.stop(); stopDeepface(); vision.setEffects(false);
       if (effects){ effects.destroy(); effects = null; }
+      resetPanel();
       window.removeEventListener('hashchange', leave);
     }
   });
@@ -194,6 +273,7 @@ export function facial(){
         ? t('facial.engineNoteDf')
         : t('facial.engineNoteMp');
       if (engine === 'deepface') startDeepface(); else stopDeepface();
+      resetPanel();
       paintPanel({ mode: mode, blendshapes: null });
     }));
     // wire mode radios
@@ -201,10 +281,11 @@ export function facial(){
       mode = b.getAttribute('data-mode');
       root.querySelectorAll('[data-mode]').forEach((x) => x.classList.toggle('on', x === b));
       vision.setMode(mode);
-      if (!vision.isRunning()) paintPanel({ mode: mode, blendshapes: null });
+      if (!vision.isRunning()){ resetPanel(); paintPanel({ mode: mode, blendshapes: null }); }
     }));
     document.getElementById('fa-start').addEventListener('click', startCamera);
     document.getElementById('fa-stop').addEventListener('click', stopCamera);
+    paintPanel({ mode: mode, blendshapes: null });
   });
 
   return '<div class="screen"><div class="screen-head"><h1>' + esc(t('facial.title')) + '</h1>' +

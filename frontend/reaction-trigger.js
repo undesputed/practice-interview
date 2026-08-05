@@ -5,26 +5,38 @@
 import { emotionScores } from './emotion.js';
 import { detectCombo } from './fx/combos.js';
 
-const EMOTION_ENTER_SCORE = 45;
-const EMOTION_EXIT_SCORE = 25;
-const SUSTAIN_FRAMES = 3;
+const EMOTION_ENTER_SCORE = 35;
+const EMOTION_EXIT_SCORE = 20;
+const SUSTAIN_FRAMES = 2;
 const GESTURE_COOLDOWN_MS = 1500;
 const GESTURE_COMBO_COOLDOWN_MS = 1500;
-const CONFUSED_BROW_MIN = 0.35;
-const CONFUSED_SCORE_SCALE = 130;
+const CONFUSED_BROW_MIN = 0.4;
+const CONFUSED_PRESS_MIN = 0.15;
+const CONFUSED_SCORE_SCALE = 110;
+// Classifier emotions that share brow-down / mouth-press with "confused". When any of
+// these is already clear, suppress the synthetic confused score so anger/sad/fear win.
+const CONFUSED_RIVALS = ['angry', 'sad', 'fear', 'disgust'];
 
 // The seven emotions that have effects (order = priority for ties). 'confused' is
 // synthetic; 'contempt'/'neutral' from the classifier are intentionally excluded.
 const EFFECT_EMOTIONS = ['angry', 'disgust', 'fear', 'happy', 'sad', 'surprise', 'confused'];
 
-// Best-effort 'confused' from blendshapes: a furrowed brow (with a little mouth press).
+// Best-effort 'confused' from blendshapes: furrowed brow + some mouth press, without
+// a wide/squinted eye pattern that usually means anger or fear.
 // Not a real classifier class — approximate and tunable.
 export function confusedScore(bs) {
   bs = bs || {};
   const brow = Math.max(bs.browDownLeft || 0, bs.browDownRight || 0);
   if (brow < CONFUSED_BROW_MIN) return 0;
   const press = Math.max(bs.mouthPressLeft || 0, bs.mouthPressRight || 0);
-  return Math.min(100, (brow * 0.8 + press * 0.4) * CONFUSED_SCORE_SCALE);
+  if (press < CONFUSED_PRESS_MIN) return 0;
+  // Anger/fear often raise eye wide or squint; keep confused for the milder furrow.
+  const eye = Math.max(
+    bs.eyeWideLeft || 0, bs.eyeWideRight || 0,
+    bs.eyeSquintLeft || 0, bs.eyeSquintRight || 0,
+  );
+  if (eye > 0.35) return 0;
+  return Math.min(100, (brow * 0.75 + press * 0.35) * CONFUSED_SCORE_SCALE);
 }
 
 export function createReactionTrigger(opts = {}) {
@@ -46,11 +58,18 @@ export function createReactionTrigger(opts = {}) {
   // Combined 0-100 scores across the seven effect emotions.
   function combined(bs) {
     const s = scoresFn(bs) || {};
-    return {
+    const out = {
       happy: s.happy || 0, sad: s.sad || 0, surprise: s.surprise || 0,
       angry: s.angry || 0, disgust: s.disgust || 0, fear: s.fear || 0,
       confused: confusedFn(bs),
     };
+    // Never let synthetic confused outrank a clear FACS emotion (esp. angry, which
+    // shares brow-down + mouth-press and previously stole the fire effect).
+    let rivalMax = 0;
+    for (const e of CONFUSED_RIVALS) if (out[e] > rivalMax) rivalMax = out[e];
+    if (rivalMax >= enter) out.confused = 0;
+    else if (rivalMax > 0) out.confused = Math.min(out.confused, Math.max(0, rivalMax - 8));
+    return out;
   }
   function top(scores) {
     let best = null, val = -1;
