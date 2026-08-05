@@ -5,13 +5,12 @@
 import { emotionScores, emotionRawMax } from './emotion.js';
 import { detectCombo } from './fx/combos.js';
 
-// Hold-to-fire: the emotion must stay clearly present for HOLD_MS before effects
-// start (and again to switch). Detection thresholds are moderate — duration is the
-// main anti-flicker / anti-accidental control, not an ultra-high score bar.
+// Hold-to-fire: emotion must stay present for HOLD_MS (short, ms-scale confirm)
+// before effects start / switch. Keeps single-frame noise from flashing effects.
 const EMOTION_ENTER_SCORE = 45;
 const EMOTION_EXIT_SCORE = 25;
-const HOLD_MS = 1500;             // 1.5s in the 1–2s range
-const HOLD_GRACE_MS = 280;        // brief score dips (angry↔sad) don't reset the hold
+const HOLD_MS = 120;              // short confirm (~2–4 frames) — ms, not seconds
+const HOLD_GRACE_MS = 60;         // brief score dips (angry↔sad) don't reset the hold
 const MIN_RAW_STRENGTH = 0.18;    // ignore tiny AU noise; still allow deliberate holds
 const LEAD_MARGIN = 6;
 const REARM_COOLDOWN_MS = 600;

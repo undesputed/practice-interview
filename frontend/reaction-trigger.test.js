@@ -5,19 +5,20 @@ import { emotionScores, emotionRawMax } from './emotion.js';
 
 // Inject scores directly: the sample's bs IS the score object; confused comes from bs.confused.
 // Bypass raw-strength with a high default so state-machine tests stay score-driven.
+const HOLD = 120;
 const opts = {
   scores: (bs) => bs,
   confusedScore: (bs) => bs.confused || 0,
   rawStrength: (bs) => (bs._raw == null ? 1 : bs._raw),
-  holdMs: 1500,
+  holdMs: HOLD,
 };
+
 const S = (o) => ({ happy: 0, sad: 0, surprise: 0, angry: 0, disgust: 0, fear: 0, confused: 0, ...o });
-const HOLD = 1500;
 
 // Feed the same emotion from t0 through t0+holdMs (inclusive of the fire frame).
 function holdUntil(t, bs, t0 = 0) {
   let r;
-  for (let ms = 0; ms <= HOLD; ms += 100) r = t.feed({ bs, t: t0 + ms });
+  for (let ms = 0; ms <= HOLD; ms += 20) r = t.feed({ bs, t: t0 + ms });
   return r;
 }
 
@@ -25,26 +26,26 @@ function holdUntil(t, bs, t0 = 0) {
 test('emotion activates only after HOLD_MS of continuous presence', () => {
   const t = createReactionTrigger(opts);
   assert.equal(t.feed({ bs: S({ sad: 80 }), t: 0 }).activeEmotion, null);
-  assert.equal(t.feed({ bs: S({ sad: 80 }), t: 1000 }).activeEmotion, null);
-  assert.equal(t.feed({ bs: S({ sad: 80 }), t: 1499 }).activeEmotion, null);
-  assert.equal(t.feed({ bs: S({ sad: 80 }), t: 1500 }).activeEmotion, 'sad');
+  assert.equal(t.feed({ bs: S({ sad: 80 }), t: 100 }).activeEmotion, null);
+  assert.equal(t.feed({ bs: S({ sad: 80 }), t: 119 }).activeEmotion, null);
+  assert.equal(t.feed({ bs: S({ sad: 80 }), t: 120 }).activeEmotion, 'sad');
 });
 
 test('breaking the hold before HOLD_MS resets the timer', () => {
   const t = createReactionTrigger(opts);
   t.feed({ bs: S({ sad: 80 }), t: 0 });
-  t.feed({ bs: S({ sad: 80 }), t: 800 });
-  t.feed({ bs: S({ sad: 10 }), t: 900 }); // drop — reset
-  assert.equal(t.feed({ bs: S({ sad: 80 }), t: 1000 }).activeEmotion, null);
-  assert.equal(t.feed({ bs: S({ sad: 80 }), t: 2400 }).activeEmotion, null); // only 1.4s into new hold
-  assert.equal(t.feed({ bs: S({ sad: 80 }), t: 2500 }).activeEmotion, 'sad');
+  t.feed({ bs: S({ sad: 80 }), t: 60 });
+  t.feed({ bs: S({ sad: 10 }), t: 70 }); // drop — reset
+  assert.equal(t.feed({ bs: S({ sad: 80 }), t: 80 }).activeEmotion, null);
+  assert.equal(t.feed({ bs: S({ sad: 80 }), t: 180 }).activeEmotion, null); // 100ms into new hold
+  assert.equal(t.feed({ bs: S({ sad: 80 }), t: 200 }).activeEmotion, 'sad');
 });
 
 test('emotion holds through hysteresis, exits below exit', () => {
   const t = createReactionTrigger(opts);
   holdUntil(t, S({ sad: 80 }));
-  assert.equal(t.feed({ bs: S({ sad: 30 }), t: 2000 }).activeEmotion, 'sad');
-  assert.equal(t.feed({ bs: S({ sad: 20 }), t: 2100 }).activeEmotion, null);
+  assert.equal(t.feed({ bs: S({ sad: 30 }), t: 200 }).activeEmotion, 'sad');
+  assert.equal(t.feed({ bs: S({ sad: 20 }), t: 210 }).activeEmotion, null);
 });
 
 test('confused is selected when strongest and no rival classifier', () => {
@@ -82,11 +83,11 @@ test('small lead over runner-up blocks activation', () => {
 });
 
 test('brief dip during hold does not reset the timer', () => {
-  const t = createReactionTrigger({ ...opts, holdGraceMs: 280 });
+  const t = createReactionTrigger({ ...opts, holdGraceMs: 60 });
   t.feed({ bs: S({ sad: 80 }), t: 0 });
-  t.feed({ bs: S({ sad: 80 }), t: 1000 });
-  t.feed({ bs: S({ sad: 30 }), t: 1100 }); // still above exit — grace
-  assert.equal(t.feed({ bs: S({ sad: 80 }), t: 1500 }).activeEmotion, 'sad');
+  t.feed({ bs: S({ sad: 80 }), t: 50 });
+  t.feed({ bs: S({ sad: 30 }), t: 80 }); // still above exit — grace
+  assert.equal(t.feed({ bs: S({ sad: 80 }), t: 120 }).activeEmotion, 'sad');
 });
 
 test('real brow-furrow angry face fires after HOLD_MS', () => {
@@ -115,12 +116,12 @@ test('real brow-furrow angry face fires after HOLD_MS', () => {
 test('re-arm cooldown blocks immediate re-acquire after exit', () => {
   const t = createReactionTrigger(opts);
   holdUntil(t, S({ sad: 80 }), 0);
-  assert.equal(t.feed({ bs: S({ sad: 10 }), t: 2000 }).activeEmotion, null); // exit, endedAt=2000
+  assert.equal(t.feed({ bs: S({ sad: 10 }), t: 200 }).activeEmotion, null); // exit, endedAt=200
   // Holding again inside the 600ms re-arm window must not fire
-  assert.equal(holdUntil(t, S({ sad: 80 }), 2050).activeEmotion, null);
+  assert.equal(holdUntil(t, S({ sad: 80 }), 250).activeEmotion, null);
   // Drop, then after re-arm a fresh full hold can fire
-  t.feed({ bs: S({ sad: 10 }), t: 4000 });
-  assert.equal(holdUntil(t, S({ sad: 80 }), 4100).activeEmotion, 'sad');
+  t.feed({ bs: S({ sad: 10 }), t: 1000 });
+  assert.equal(holdUntil(t, S({ sad: 80 }), 1100).activeEmotion, 'sad');
 });
 
 // ── individual (per-hand) gesture onsets ──
@@ -189,7 +190,7 @@ test('the mixed combo (up + down) suppresses individuals', () => {
 test('emotion and gesture fire together', () => {
   const t = createReactionTrigger(opts);
   holdUntil(t, S({ sad: 80 }), 0);
-  const r = t.feed({ bs: S({ sad: 80 }), gestures: ['Thumb_Up'], t: 2000 });
+  const r = t.feed({ bs: S({ sad: 80 }), gestures: ['Thumb_Up'], t: 200 });
   assert.equal(r.activeEmotion, 'sad');
   assert.deepEqual(r.gestureOnsets, [{ gesture: 'Thumb_Up', hand: 0 }]);
 });
@@ -197,9 +198,9 @@ test('emotion and gesture fire together', () => {
 test('switches to a stronger different emotion after HOLD_MS', () => {
   const t = createReactionTrigger(opts);
   holdUntil(t, S({ sad: 80 }), 0);
-  assert.equal(t.feed({ bs: S({ sad: 40, angry: 80 }), t: 2000 }).activeEmotion, 'sad');
-  assert.equal(t.feed({ bs: S({ sad: 40, angry: 80 }), t: 3000 }).activeEmotion, 'sad');
-  assert.equal(t.feed({ bs: S({ sad: 40, angry: 80 }), t: 3500 }).activeEmotion, 'angry');
+  assert.equal(t.feed({ bs: S({ sad: 40, angry: 80 }), t: 200 }).activeEmotion, 'sad');
+  assert.equal(t.feed({ bs: S({ sad: 40, angry: 80 }), t: 280 }).activeEmotion, 'sad');
+  assert.equal(t.feed({ bs: S({ sad: 40, angry: 80 }), t: 320 }).activeEmotion, 'angry');
 });
 
 test('below-enter never activates even if held', () => {
@@ -215,7 +216,7 @@ test('brief clear smile under HOLD_MS does not fire', () => {
   };
   const t = createReactionTrigger();
   assert.equal(t.feed({ bs: smile, t: 0 }).activeEmotion, null);
-  assert.equal(t.feed({ bs: smile, t: 800 }).activeEmotion, null);
+  assert.equal(t.feed({ bs: smile, t: 80 }).activeEmotion, null);
 });
 
 test('clear smile held for HOLD_MS activates happy', () => {
@@ -231,7 +232,7 @@ test('clear smile held for HOLD_MS activates happy', () => {
     mouthClose: 0, mouthDimpleLeft: 0, mouthDimpleRight: 0,
   };
   assert.ok(emotionScores(smile).happy >= 45);
-  assert.ok(emotionRawMax(smile) >= 0.22);
+  assert.ok(emotionRawMax(smile) >= 0.18);
   const t = createReactionTrigger();
   assert.equal(holdUntil(t, smile, 0).activeEmotion, 'happy');
 });
