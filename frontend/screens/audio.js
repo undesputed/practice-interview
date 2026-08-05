@@ -191,7 +191,7 @@ function drawPitchTrack(canvas) {
     ctx.fillStyle = "rgba(255,255,255,.22)";
     ctx.font = Math.round(12 * dpr) + "px sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText("Start speaking to see your pitch track", W / 2, H / 2);
+    ctx.fillText(i18n("audio.pitchHint"), W / 2, H / 2);
     ctx.textAlign = "left";
     return;
   }
@@ -276,9 +276,9 @@ function patchRow(prefix, valHtml, score) {
   }
   if (b) {
     if (score === null)   { b.innerHTML = "—"; b.className = "dg-badge dg-na"; }
-    else if (score >= 70) { b.textContent = "Good"; b.className = "dg-badge dg-good"; }
-    else if (score >= 40) { b.textContent = "OK";   b.className = "dg-badge dg-ok"; }
-    else                  { b.textContent = "Low";  b.className = "dg-badge dg-low"; }
+    else if (score >= 70) { b.textContent = i18n("audio.good"); b.className = "dg-badge dg-good"; }
+    else if (score >= 40) { b.textContent = i18n("audio.ok");   b.className = "dg-badge dg-ok"; }
+    else                  { b.textContent = i18n("audio.low");  b.className = "dg-badge dg-low"; }
   }
 }
 
@@ -293,11 +293,13 @@ function paintPanel(s) {
   const ds      = calcDeliveryScore(s.longPauseCount, pitchSD, s.rms);
 
   const bandCls   = ds >= 70 ? "dg-good" : ds >= 50 ? "dg-ok" : "dg-low";
-  const bandLabel = ds >= 70 ? "Strong"  : ds >= 50 ? "Fair"  : "Low";
+  const bandLabel = ds >= 70 ? i18n("audio.strong") : ds >= 50 ? i18n("audio.fair") : i18n("audio.low");
 
   const pitchDisp  = pitchSD !== null ? Math.round(pitchSD) + " Hz" : "—";
   const energyDisp = s.rms.toFixed(3);
-  const pauseDisp  = s.longPauseCount + (s.longPauseCount === 1 ? " pause" : " pauses");
+  const pauseDisp  = s.longPauseCount === 1
+    ? i18n("audio.pauseOne")
+    : i18n("audio.pauseN", { n: s.longPauseCount });
 
   // Build HTML structure once per session; subsequent calls only patch values.
   if (!panel.dataset.inited) {
@@ -305,9 +307,9 @@ function paintPanel(s) {
     panel.innerHTML =
       '<div class="dg-header">' +
         '<div>' +
-          '<b>Delivery score</b>' +
-          '<span class="dg-note">voice delivery \xb7 acoustic analysis</span>' +
-          '<span class="dg-scope">Pace &amp; fillers scored in full camera session</span>' +
+          '<b>' + i18n("audio.delivery") + '</b>' +
+          '<span class="dg-note">' + i18n("audio.deliveryNote") + '</span>' +
+          '<span class="dg-scope">' + i18n("audio.deliveryScope") + '</span>' +
         '</div>' +
         '<div class="dg-score">' +
           '<span class="dg-score-n" id="au-p-sn"></span>' +
@@ -315,14 +317,14 @@ function paintPanel(s) {
         '</div>' +
       '</div>' +
       '<div class="dg-rows">' +
-        dgRowShell("au-pr-pause",  "Long pauses", "≤2 pauses") +
-        dgRowShell("au-pr-pitch",  "Pitch range", "≥25 Hz std dev") +
-        dgRowShell("au-pr-energy", "Energy",      "≥0.02 RMS") +
+        dgRowShell("au-pr-pause",  i18n("audio.longPauses"), i18n("audio.pauseTarget")) +
+        dgRowShell("au-pr-pitch",  i18n("audio.pitchRange"), i18n("audio.pitchTarget")) +
+        dgRowShell("au-pr-energy", i18n("audio.energy"),     i18n("audio.energyTarget")) +
       '</div>' +
       '<div class="au-panel-stats">' +
-        '<div class="au-ps"><span>Speaking</span><b id="au-p-spk">—</b></div>' +
-        '<div class="au-ps"><span>Avg pitch</span><b id="au-p-avg">—</b></div>' +
-        '<div class="au-ps"><span>Elapsed</span><b id="au-elapsed-p">—</b></div>' +
+        '<div class="au-ps"><span>' + i18n("audio.speaking") + '</span><b id="au-p-spk">—</b></div>' +
+        '<div class="au-ps"><span>' + i18n("audio.avgPitch") + '</span><b id="au-p-avg">—</b></div>' +
+        '<div class="au-ps"><span>' + i18n("audio.elapsed") + '</span><b id="au-elapsed-p">—</b></div>' +
       '</div>';
   }
 
@@ -440,7 +442,7 @@ async function startMic() {
   const btnStart = document.getElementById("au-start");
   if (btnStart) btnStart.disabled = true;
   const ph = document.getElementById("au-ph");
-  if (ph) ph.textContent = "Requesting microphone…";
+    if (ph) ph.textContent = i18n("audio.phRequest");
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
     mic.stream   = stream;
@@ -455,7 +457,7 @@ async function startMic() {
     sessionStart = Date.now();
 
     if (ph) ph.style.display = "none";
-    const st = document.getElementById("au-state"); if (st) st.textContent = "Running";
+    const st = document.getElementById("au-state"); if (st) st.textContent = i18n("audio.running");
     const rt = document.getElementById("au-rate");  if (rt) rt.textContent = mic.ctx.sampleRate + " Hz";
 
     const canvas = document.getElementById("au-canvas");
@@ -466,7 +468,7 @@ async function startMic() {
     statsTimer = setInterval(updateStats, STATS_MS);
     setButtonState(true);
   } catch (e) {
-    if (ph) { ph.style.display = ""; ph.textContent = "Microphone unavailable: " + (e && e.message || e); }
+    if (ph) { ph.style.display = ""; ph.textContent = i18n("audio.phUnavail", { m: (e && e.message || e) }); }
     if (btnStart) btnStart.disabled = false;
   }
 }
@@ -481,10 +483,10 @@ function stopMic() {
   mic = { ctx: null, analyser: null, source: null, stream: null };
 
   const ph = document.getElementById("au-ph");
-  if (ph) { ph.style.display = ""; ph.textContent = "Microphone stopped. Press Start to resume."; }
+  if (ph) { ph.style.display = ""; ph.textContent = i18n("audio.phStopped"); }
   ["au-state", "au-rate", "au-elapsed", "au-vad"].forEach((id) => {
     const el = document.getElementById(id);
-    if (el) el.textContent = id === "au-state" ? "Stopped" : "—";
+    if (el) el.textContent = id === "au-state" ? i18n("audio.stopped") : "—";
   });
   const lv = document.getElementById("au-live");
   if (lv) lv.classList.remove("on");
@@ -495,7 +497,7 @@ function stopMic() {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
   const panel = document.getElementById("au-panel");
-  if (panel) panel.innerHTML = "<div class=\"fa-note\">Start the microphone to see live delivery analysis.</div>";
+  if (panel) panel.innerHTML = "<div class=\"fa-note\">" + i18n("audio.panelHint") + "</div>";
   setButtonState(false);
 }
 
@@ -523,40 +525,40 @@ export function audio() {
   return (
     "<div class=\"screen\">" +
     "<div class=\"screen-head\"><h1>" + i18n('audio.title') + "</h1>" +
-    "<span class=\"muted\" style=\"font-size:12px\">live &middot; computed in your browser &middot; nothing sent to our server</span></div>" +
+    "<span class=\"muted\" style=\"font-size:12px\">" + i18n('audio.liveNote') + "</span></div>" +
 
     "<div class=\"fa-grid\">" +
 
     "<div class=\"fa-rail\">" +
-      "<div class=\"lab\">Visualizer</div>" +
+      "<div class=\"lab\">" + i18n('audio.visualizer') + "</div>" +
       "<div class=\"ni-seg au-mode-seg\">" +
-        "<button class=\"on\" data-au-mode=\"spectrum\">Spectrum</button>" +
-        "<button data-au-mode=\"waveform\">Waveform</button>" +
-        "<button data-au-mode=\"pitch\">Pitch</button>" +
+        "<button class=\"on\" data-au-mode=\"spectrum\">" + i18n('audio.spectrum') + "</button>" +
+        "<button data-au-mode=\"waveform\">" + i18n('audio.waveform') + "</button>" +
+        "<button data-au-mode=\"pitch\">" + i18n('audio.pitch') + "</button>" +
       "</div>" +
-      "<button class=\"fa-btn start\" id=\"au-start\">Start microphone</button>" +
-      "<button class=\"fa-btn stop\"  id=\"au-stop\" disabled>Stop</button>" +
-      "<div class=\"lab\" style=\"margin-top:16px\">Status</div>" +
-      "<div class=\"fa-stat\"><span>State</span><b id=\"au-state\">Stopped</b></div>" +
-      "<div class=\"fa-stat\"><span>Sample rate</span><b id=\"au-rate\">—</b></div>" +
-      "<div class=\"fa-stat\"><span>Elapsed</span><b id=\"au-elapsed\">—</b></div>" +
-      "<div class=\"fa-stat\"><span>Voice activity</span><b id=\"au-vad\">—</b></div>" +
+      "<button class=\"fa-btn start\" id=\"au-start\">" + i18n('audio.start') + "</button>" +
+      "<button class=\"fa-btn stop\"  id=\"au-stop\" disabled>" + i18n('audio.stop') + "</button>" +
+      "<div class=\"lab\" style=\"margin-top:16px\">" + i18n('audio.status') + "</div>" +
+      "<div class=\"fa-stat\"><span>" + i18n('audio.state') + "</span><b id=\"au-state\">" + i18n('audio.stopped') + "</b></div>" +
+      "<div class=\"fa-stat\"><span>" + i18n('audio.sampleRate') + "</span><b id=\"au-rate\">—</b></div>" +
+      "<div class=\"fa-stat\"><span>" + i18n('audio.elapsed') + "</span><b id=\"au-elapsed\">—</b></div>" +
+      "<div class=\"fa-stat\"><span>" + i18n('audio.vad') + "</span><b id=\"au-vad\">—</b></div>" +
     "</div>" +
 
     "<div>" +
       "<div class=\"fa-stage\" style=\"aspect-ratio:3/1\">" +
-        "<div class=\"fa-live\" id=\"au-live\"><span class=\"dot\"></span> SPEAKING</div>" +
+        "<div class=\"fa-live\" id=\"au-live\"><span class=\"dot\"></span> " + i18n('audio.speaking') + "</div>" +
         "<canvas id=\"au-canvas\" style=\"transform:none;width:100%;height:100%\"></canvas>" +
-        "<div class=\"ph\" id=\"au-ph\">Press &ldquo;Start microphone&rdquo; to begin. Audio stays in your browser.</div>" +
+        "<div class=\"ph\" id=\"au-ph\">" + i18n('audio.ph') + "</div>" +
       "</div>" +
 
       "<div class=\"au-tl-wrap\">" +
-        "<span class=\"au-tl-label\">Speaking timeline &mdash; last 60s</span>" +
+        "<span class=\"au-tl-label\">" + i18n('audio.timeline') + "</span>" +
         "<canvas id=\"au-timeline\"></canvas>" +
       "</div>" +
 
       "<div class=\"fa-panel\" id=\"au-panel\">" +
-        "<div class=\"fa-note\">Start the microphone to see live delivery analysis.</div>" +
+        "<div class=\"fa-note\">" + i18n('audio.panelHint') + "</div>" +
       "</div>" +
 
     "</div>" +

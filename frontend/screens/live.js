@@ -8,7 +8,7 @@ import { computeLiveMetrics } from '../live-metrics.js';
 import { emotionScores, dominantEmotion } from '../emotion.js';
 import { setPendingSession } from '../pending-session.js';
 import { setNotesCache } from './notes.js';
-import { currentLang } from '../i18n.js';
+import { currentLang, t } from '../i18n.js';
 
 let agent = null;          // active Deepgram voice agent, or null
 let cursorEl    = null;    // air-touch cursor dot
@@ -62,7 +62,7 @@ let metricsInterval = null;
 
 // ── Interactive Book (in-session notes) ──────────────────────────────────────
 let bookOpen        = false;
-let bookTitle       = 'Interview Notes';
+let bookTitle       = '';
 const BOOK_PAGES    = 10;
 let bookNotes       = Array.from({ length: BOOK_PAGES }, () => []);  // pages; each page = [{ts, text}]
 let bookCurrentPage = 0;
@@ -266,7 +266,7 @@ function bookRender() {
   const pn   = byId('bk-pagenum');
   if (!left || !right) return;
   const lPageNum = bookCurrentPage * 2 + 1;
-  if (pn) pn.textContent = 'Pages ' + lPageNum + '–' + (lPageNum + 1) + ' of ' + BOOK_PAGES;
+  if (pn) pn.textContent = t('live.pagesOf', { a: lPageNum, b: lPageNum + 1 });
 
   const renderPanel = (el, notes, pageNum, isLeft) => {
     const numStr = '<div class="bk-page-num">' + pageNum + '</div>';
@@ -365,7 +365,7 @@ async function loadMasterNotebook() {
 
 function resetBook() {
   bookOpen = false; bookNotes = Array.from({ length: BOOK_PAGES }, () => []); bookCurrentPage = 0;
-  bookTitle = 'My Notebook';
+  bookTitle = t('notes.heading');
   lastSwipePos = null; swipeCooldown = false;
   palmHeldStart = 0; palmCooldown = false;
   bookDragging = false;
@@ -373,10 +373,12 @@ function resetBook() {
   if (el) el.style.display = 'none';
 }
 
-const SCORE_STEPS = ['Analyzing camera & presence', 'Analyzing your voice', 'Generating your report'];
+function scoreSteps(){
+  return [t('thanks.step.camera'), t('thanks.step.voice'), t('thanks.step.report')];
+}
 function showScoreSteps(activeIdx){
   const el = byId('lv-steps'); if (!el) return;
-  el.innerHTML = SCORE_STEPS.map((s, i) =>
+  el.innerHTML = scoreSteps().map((s, i) =>
     '<div class="lv-step ' + (i < activeIdx ? 'done' : i === activeIdx ? 'active' : '') + '">' + s + '</div>'
   ).join('');
   el.style.display = 'flex';
@@ -470,7 +472,7 @@ function onAction(ev){ events.push(ev); }
 function onTranscript({ speaker, text }){
   if (speaker === 'interviewer'){ turn += 1; engine.setTurn(turn); }   // matches questions_from_transcript
   segments.push({ speaker, text, t: performance.now() - startTs });
-  const who = speaker === 'interviewer' ? 'Interviewer' : 'You';
+  const who = speaker === 'interviewer' ? t('live.interviewer') : t('live.you');
   const cls = speaker === 'interviewer' ? 'interviewer' : 'candidate';
   const cap = byId('lv-cap');
   if (cap){
@@ -491,12 +493,12 @@ function onTranscript({ speaker, text }){
 
 function onAiSpeaking(on){
   const tile = byId('lv-ai'); if (tile) tile.classList.toggle('speaking', !!on);
-  setText('lv-ai-state', on ? 'speaking' : 'listening');
+  setText('lv-ai-state', on ? t('live.speaking') : t('live.listening'));
 }
 
 async function startAgent(){
   const cfg = getInterviewConfig();
-  setVoice('Connecting…');
+  setVoice(t('live.connecting'));
   try {
     const tok = await api.interviewToken({
       scenario: cfg.scenario, role: cfg.role, focus: cfg.focus, difficulty: cfg.difficulty,
@@ -511,14 +513,14 @@ async function startAgent(){
       onTranscript,
       onNote: addNote,
       onSpeaking: onAiSpeaking,
-      onError: (m) => setVoice('Voice error: ' + m),
+      onError: (m) => setVoice(t('live.voiceErr', { m: m })),
       onClose: (e, info) => {
         if (info && info.fatal){ voiceAgentFailed(info.message); return; }   // dead interview — don't score
         if (engine.isRunning()) finishInterview();
       },
     });
-    setVoice(muted ? 'Muted' : 'Live');
-  } catch (e){ setVoice('Voice unavailable: ' + (e && e.message ? e.message : e)); }
+    setVoice(muted ? t('live.muted') : t('live.live'));
+  } catch (e){ setVoice(t('live.voiceUnavail', { m: (e && e.message ? e.message : e) })); }
 }
 
 function stopAgent(){ if (agent){ try { agent.stop(); } catch (_){} agent = null; } }
@@ -528,7 +530,7 @@ function toggleMute(){
   if (agent && agent.setMuted) agent.setMuted(muted);
   if (recorder){ if (muted){ if (recorder.pause) recorder.pause(); } else if (recorder.resume){ recorder.resume(); } }
   const btn = byId('lv-mute'); if (btn) btn.classList.toggle('off', muted);
-  setVoice(muted ? 'Muted' : 'Live');
+  setVoice(muted ? t('live.muted') : t('live.live'));
 }
 
 function toggleCamera(){
@@ -549,7 +551,7 @@ function clearImmersive(){
 
 // Leave WITHOUT scoring (confirm first). Tears down and returns to the dashboard.
 function exitInterview(){
-  if (!window.confirm("Leave without scoring? Your interview won’t be saved.")) return;
+  if (!window.confirm(t('live.leaveConfirm'))) return;
   stopMetrics();
   stopAgent();
   if (recorder && recorder.stop){ try { recorder.stop(); } catch (_){} }
@@ -594,7 +596,7 @@ async function finishInterview(){
   engine.stop();
 
   if (!frames.length){
-    overlay('Nothing to score.'); showStart('Start');
+    overlay(t('live.nothing')); showStart(t('live.start'));
     return;
   }
 
@@ -627,7 +629,7 @@ async function finishInterview(){
 function resetConvo(){
   convoCount = 0;
   const cap = byId('lv-cap'); if (cap){ cap.className = 'li-cap'; cap.innerHTML = ''; }
-  const convo = byId('lv-convo'); if (convo) convo.innerHTML = '<div class="fa-note">The interviewer will greet you when the connection is ready…</div>';
+  const convo = byId('lv-convo'); if (convo) convo.innerHTML = '<div class="fa-note">' + t('live.convoHint') + '</div>';
   const panel = byId('lv-transcript'); if (panel) panel.classList.remove('open');
   const sp = byId('lv-stats'); if (sp) sp.classList.remove('open');
   onAiSpeaking(false);
@@ -645,17 +647,16 @@ function voiceAgentFailed(message){
   stopAgent();
   engine.stop();
   console.warn("[live] voiceAgentFailed:", message);
-  overlay('The interviewer’s AI couldn’t respond, so the interview stopped. This is usually a ' +
-          'Deepgram Voice Agent LLM access/billing issue, not your answers. Please try again.');
+  overlay(t('live.agentFail'));
   setState('Error'); setVoice('—');
-  showControls(false); showStart('Retry');
+  showControls(false); showStart(t('practice.retry'));
 }
 
 function cameraError(e){
-  overlay('Camera unavailable: ' + (e && e.message ? e.message : e));
+  overlay(t('live.camUnavail', { m: (e && e.message ? e.message : e) }));
   showControls(false);
   setState('Error'); setVoice('—');
-  showStart('Retry');
+  showStart(t('practice.retry'));
 }
 
 async function startEngine(){
@@ -673,8 +674,8 @@ async function startEngine(){
   const mb = byId('lv-mute'); if (mb){ mb.classList.remove('off'); mb.disabled = false; }
   const cb = byId('lv-cam'); if (cb) cb.classList.remove('off');
   resetConvo();
-  loading('Loading model…'); showControls(false); showStart(null);
-  setState('Starting…'); setVoice('—');
+  loading(t('live.loading')); showControls(false); showStart(null);
+  setState(t('live.starting')); setVoice('—');
 
   // Try camera + mic; fall back to vision-only if the mic is blocked.
   let micOk = true;
@@ -687,14 +688,14 @@ async function startEngine(){
   }
   if (!engine.isRunning()) return;   // superseded (navigated away or restarted mid-load)
   overlay(null); showControls(true);
-  setState('Detecting');
+  setState(t('live.detecting'));
   stopMetrics();
   metricsInterval = setInterval(updateLiveStats, 2000);
   if (micOk){
     startAgent();
     recorder = startRecording(engine.getStream());   // capture audio for Delivery analysis
   } else {
-    setVoice('Mic unavailable — analysis only');
+    setVoice(t('live.micUnavail'));
     if (mb) mb.disabled = true;   // nothing to mute
   }
 }
@@ -744,7 +745,7 @@ export function live(){
         const commit = () => {
           bookTitle = inp.value.trim() || bookTitle;
           const sp = document.createElement('span');
-          sp.id = 'bk-title'; sp.className = 'bk-title'; sp.title = 'Click to rename';
+          sp.id = 'bk-title'; sp.className = 'bk-title'; sp.title = t('live.rename');
           sp.textContent = bookTitle;
           inp.replaceWith(sp);
         };
@@ -785,75 +786,75 @@ export function live(){
   return '' +
   '<div class="live-imm" id="live-imm">' +
     '<canvas id="lv-canvas"></canvas>' +
-    '<div class="li-camoff"><span>Camera off</span></div>' +
+    '<div class="li-camoff"><span>' + t('live.camOff') + '</span></div>' +
     '<div class="li-top">' +
       '<div class="li-left">' +
-        '<button class="li-pill ghost" id="lv-exit" type="button">← Exit</button>' +
+        '<button class="li-pill ghost" id="lv-exit" type="button">' + t('live.exit') + '</button>' +
         '<span class="li-pill live"><span class="dot"></span> <span id="lv-time">00:00</span></span>' +
         '<span class="li-pill" id="lv-voice">—</span>' +
         '<span id="lv-state" style="display:none"></span>' +
       '</div>' +
       '<div class="li-right">' +
-        '<button class="li-pill ghost" id="lv-stats-btn" type="button" data-gesture-btn>Stats</button>' +
-        '<button class="li-pill ghost" id="lv-tx-btn" type="button" data-gesture-btn>Transcript</button>' +
-        '<span class="li-book-hint" title="Hold Open Palm (✋) to open/close notebook">📒 ✋ hold</span>' +
+        '<button class="li-pill ghost" id="lv-stats-btn" type="button" data-gesture-btn>' + t('live.stats') + '</button>' +
+        '<button class="li-pill ghost" id="lv-tx-btn" type="button" data-gesture-btn>' + t('live.transcript') + '</button>' +
+        '<span class="li-book-hint" title="Hold Open Palm (✋)">' + t('live.bookHint') + '</span>' +
       '</div>' +
     '</div>' +
     '<div class="li-ai" id="lv-ai">' +
       '<div class="ava">AI<span class="ring"></span></div>' +
-      '<div class="ainame"><span class="dot"></span> Interviewer · <span id="lv-ai-state">listening</span></div>' +
+      '<div class="ainame"><span class="dot"></span> ' + t('live.interviewer') + ' · <span id="lv-ai-state">' + t('live.listening') + '</span></div>' +
     '</div>' +
     '<div class="li-cap" id="lv-cap"></div>' +
     '<div class="li-controls" id="lv-controls" style="display:none">' +
-      '<button class="li-ctrl" id="lv-mute" type="button" title="Mute" aria-label="Mute" data-gesture-btn>' + MIC_SVG + '</button>' +
-      '<button class="li-ctrl" id="lv-cam" type="button" title="Turn camera off" aria-label="Camera" data-gesture-btn>' + CAM_SVG + '</button>' +
-      '<button class="li-ctrl end" id="lv-end" type="button" data-gesture-btn data-gesture-dwell="2500">End interview</button>' +
+      '<button class="li-ctrl" id="lv-mute" type="button" title="' + t('live.mute') + '" aria-label="' + t('live.mute') + '" data-gesture-btn>' + MIC_SVG + '</button>' +
+      '<button class="li-ctrl" id="lv-cam" type="button" title="' + t('live.camOffTitle') + '" aria-label="' + t('live.cam') + '" data-gesture-btn>' + CAM_SVG + '</button>' +
+      '<button class="li-ctrl end" id="lv-end" type="button" data-gesture-btn data-gesture-dwell="2500">' + t('live.end') + '</button>' +
     '</div>' +
     '<aside class="li-stats" id="lv-stats">' +
       '<div class="li-st-head">' +
-        '<h3>Live stats</h3>' +
-        '<button class="li-tx-close" id="lv-stats-close" type="button" aria-label="Close" data-gesture-btn>✕</button>' +
+        '<h3>' + t('live.liveStats') + '</h3>' +
+        '<button class="li-tx-close" id="lv-stats-close" type="button" aria-label="' + t('live.close') + '" data-gesture-btn>✕</button>' +
       '</div>' +
       '<div class="lv-section">' +
-        '<div class="lv-sec-lbl">Presence</div>' +
+        '<div class="lv-sec-lbl">' + t('live.presence') + '</div>' +
         '<div class="lv-score-grid">' +
-          '<div class="lv-score-card"><div class="lv-score-num" id="lm-att">—</div><div class="lv-score-lbl">Attention</div><div class="lv-score-bar"><i id="lm-att-bar"></i></div></div>' +
-          '<div class="lv-score-card"><div class="lv-score-num" id="lm-comp">—</div><div class="lv-score-lbl">Composure</div><div class="lv-score-bar"><i id="lm-comp-bar"></i></div></div>' +
-          '<div class="lv-score-card"><div class="lv-score-num" id="lm-eye">—</div><div class="lv-score-lbl">Eye contact</div><div class="lv-score-bar"><i id="lm-eye-bar"></i></div></div>' +
+          '<div class="lv-score-card"><div class="lv-score-num" id="lm-att">—</div><div class="lv-score-lbl">' + t('report.attention') + '</div><div class="lv-score-bar"><i id="lm-att-bar"></i></div></div>' +
+          '<div class="lv-score-card"><div class="lv-score-num" id="lm-comp">—</div><div class="lv-score-lbl">' + t('report.composure') + '</div><div class="lv-score-bar"><i id="lm-comp-bar"></i></div></div>' +
+          '<div class="lv-score-card"><div class="lv-score-num" id="lm-eye">—</div><div class="lv-score-lbl">' + t('live.eye') + '</div><div class="lv-score-bar"><i id="lm-eye-bar"></i></div></div>' +
         '</div>' +
       '</div>' +
       '<div class="lv-section">' +
         '<div class="lv-expr-head">' +
-          '<span class="lv-sec-lbl">Expression</span>' +
+          '<span class="lv-sec-lbl">' + t('live.expression') + '</span>' +
           '<div class="lv-dom-chip"><span class="lv-dom-name" id="lm-emo-dom">—</span><span class="lv-dom-pct" id="lm-emo-pct"></span></div>' +
         '</div>' +
         '<div id="lm-emo-bars"></div>' +
       '</div>' +
       '<div class="lv-section">' +
-        '<div class="lv-sec-lbl">FACS signals</div>' +
+        '<div class="lv-sec-lbl">' + t('live.facs') + '</div>' +
         '<div id="lm-facs-bars"></div>' +
       '</div>' +
       '<div class="lv-section">' +
-        '<div class="lv-sec-lbl">Speaking pace</div>' +
-        '<div class="lv-wpm-row"><span class="lv-wpm-num" id="lm-wpm">—</span><span class="lv-wpm-unit">wpm</span></div>' +
+        '<div class="lv-sec-lbl">' + t('live.pace') + '</div>' +
+        '<div class="lv-wpm-row"><span class="lv-wpm-num" id="lm-wpm">—</span><span class="lv-wpm-unit">' + t('live.wpm') + '</span></div>' +
       '</div>' +
     '</aside>' +
-    '<div class="li-ph" id="lv-ph"><span class="li-spin" id="lv-spin"></span><span id="lv-ph-txt">Loading model…</span><div class="lv-steps" id="lv-steps" style="display:none"></div></div>' +
-    '<button class="li-start" id="lv-start" type="button" style="display:none">Start</button>' +
+    '<div class="li-ph" id="lv-ph"><span class="li-spin" id="lv-spin"></span><span id="lv-ph-txt">' + t('live.loading') + '</span><div class="lv-steps" id="lv-steps" style="display:none"></div></div>' +
+    '<button class="li-start" id="lv-start" type="button" style="display:none">' + t('live.start') + '</button>' +
     '<aside class="li-transcript" id="lv-transcript">' +
-      '<div class="li-tx-head"><h3>Conversation</h3><button class="li-tx-close" id="lv-tx-close" type="button" aria-label="Close" data-gesture-btn>✕</button></div>' +
-      '<div class="convo" id="lv-convo"><div class="fa-note">The interviewer will greet you when the connection is ready…</div></div>' +
+      '<div class="li-tx-head"><h3>' + t('live.conversation') + '</h3><button class="li-tx-close" id="lv-tx-close" type="button" aria-label="' + t('live.close') + '" data-gesture-btn>✕</button></div>' +
+      '<div class="convo" id="lv-convo"><div class="fa-note">' + t('live.convoHint') + '</div></div>' +
     '</aside>' +
   '</div>' +
   // ── Interactive Book overlay ────────────────────────────────────────────
   '<div id="lv-book" class="lv-book" style="display:none">' +
     '<div id="lv-book-drag" class="bk-drag">' +
       '<span class="bk-drag-grip" aria-hidden="true">⠿</span>' +
-      '<span id="bk-title" class="bk-title" title="Click to rename">Interview Notes</span>' +
+      '<span id="bk-title" class="bk-title" title="' + t('live.rename') + '">' + t('live.notesTitle') + '</span>' +
     '</div>' +
     '<div class="bk-head">' +
-      '<span id="bk-pagenum" class="bk-page-info">Pages 1–2 of 10</span>' +
-      '<button id="lv-book-close" class="bk-close-btn" type="button" data-gesture-btn>Close</button>' +
+      '<span id="bk-pagenum" class="bk-page-info">' + t('live.pagesOf', { a: 1, b: 2 }) + '</span>' +
+      '<button id="lv-book-close" class="bk-close-btn" type="button" data-gesture-btn>' + t('live.close') + '</button>' +
     '</div>' +
     '<div class="bk-spread">' +
       '<div id="bk-left" class="bk-page"></div>' +
@@ -861,8 +862,8 @@ export function live(){
       '<div id="bk-right" class="bk-page"></div>' +
     '</div>' +
     '<div class="bk-footer">' +
-      '<span>← prev</span>' +
-      '<span>next →</span>' +
+      '<span>' + t('live.prev') + '</span>' +
+      '<span>' + t('live.next') + '</span>' +
     '</div>' +
   '</div>' +
   '<div id="lv-cursor" class="lv-cursor"></div>';

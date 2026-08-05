@@ -114,7 +114,7 @@ function paintPanel(out){
 }
 
 function setStatus(out){
-  const st = document.getElementById('fa-state'); if (st) st.textContent = vision.isRunning() ? 'Detecting' : 'Stopped';
+  const st = document.getElementById('fa-state'); if (st) st.textContent = vision.isRunning() ? t('facial.detecting') : t('facial.stopped');
   const fp = document.getElementById('fa-fps'); if (fp) fp.textContent = out ? out.fps : 0;
   const dt = document.getElementById('fa-det'); if (dt) dt.textContent = out ? out.detections : 0;
   const live = document.getElementById('fa-live'); if (live) live.classList.toggle('on', vision.isRunning());
@@ -134,14 +134,14 @@ async function startCamera(){
   const canvas = document.getElementById('fa-canvas');
   const ph = document.getElementById('fa-ph');
   if (btn) btn.disabled = true;   // block a double-Start during the multi-second model load
-  if (ph) ph.textContent = 'Loading model…';
+  if (ph) ph.textContent = t('live.loading');
   try {
     await vision.start(canvas, mode, onFrame);
     if (ph) ph.style.display = 'none';
     setStatus(null);
     if (engine === 'deepface') startDeepface();
   } catch (e){
-    if (ph){ ph.style.display = ''; ph.textContent = 'Camera unavailable: ' + (e && e.message ? e.message : e); }
+    if (ph){ ph.style.display = ''; ph.textContent = t('live.camUnavail', { m: (e && e.message ? e.message : e) }); }
   } finally {
     if (btn) btn.disabled = false;
   }
@@ -151,7 +151,7 @@ function stopCamera(){
   stopDeepface();
   vision.stop();
   const ph = document.getElementById('fa-ph');
-  if (ph){ ph.style.display = ''; ph.textContent = 'Camera stopped. Press Start to resume.'; }
+  if (ph){ ph.style.display = ''; ph.textContent = t('facial.phStopped'); }
   setStatus(null);
   paintPanel({ mode: mode, detections: 0, blendshapes: null });
 }
@@ -191,8 +191,8 @@ export function facial(){
       root.querySelectorAll('[data-engine]').forEach((x) => x.classList.toggle('on', x === b));
       const note = document.getElementById('fa-engine-note');
       if (note) note.textContent = engine === 'deepface'
-        ? 'HSEmotion scores a face snapshot on the server every ~2s (replaces the live MediaPipe reading).'
-        : 'MediaPipe runs live in your browser, every frame.';
+        ? t('facial.engineNoteDf')
+        : t('facial.engineNoteMp');
       if (engine === 'deepface') startDeepface(); else stopDeepface();
       paintPanel({ mode: mode, blendshapes: null });
     }));
@@ -208,30 +208,30 @@ export function facial(){
   });
 
   return '<div class="screen"><div class="screen-head"><h1>' + esc(t('facial.title')) + '</h1>' +
-    '<span class="muted" style="font-size:12px">live · nothing is saved</span></div>' +
+    '<span class="muted" style="font-size:12px">' + esc(t('facial.liveNote')) + '</span></div>' +
     '<div id="facial-body"><div class="fa-grid">' +
       '<div class="fa-rail">' +
-        '<div class="lab">Emotion engine</div>' +
+        '<div class="lab">' + esc(t('facial.engine')) + '</div>' +
         '<div class="seg"><button data-engine="mediapipe" class="on">MediaPipe</button>' +
           '<button data-engine="deepface">HSEmotion</button></div>' +
-        '<div class="seg-note" id="fa-engine-note">MediaPipe runs live in your browser, every frame.</div>' +
-        '<div class="lab" style="margin-top:16px">Detection mode</div>' +
-        '<button class="mode on" data-mode="face"><span class="r"></span> Face landmarks</button>' +
-        '<button class="mode" data-mode="pose"><span class="r"></span> Pose landmarks</button>' +
-        '<button class="mode" data-mode="hands"><span class="r"></span> Hand landmarks</button>' +
-        '<div class="lab" style="margin-top:16px">Reaction effects</div>' +
-        '<div class="seg"><button data-fx="on" class="on">On</button><button data-fx="off">Off</button></div>' +
-        '<button class="fa-btn start" id="fa-start">Start camera</button>' +
-        '<button class="fa-btn stop" id="fa-stop">Stop</button>' +
-        '<div class="lab" style="margin-top:16px">Status</div>' +
-        '<div class="fa-stat"><span>State</span><b id="fa-state">Stopped</b></div>' +
-        '<div class="fa-stat"><span>FPS</span><b id="fa-fps">0</b></div>' +
-        '<div class="fa-stat"><span>Detections</span><b id="fa-det">0</b></div>' +
+        '<div class="seg-note" id="fa-engine-note">' + esc(t('facial.engineNoteMp')) + '</div>' +
+        '<div class="lab" style="margin-top:16px">' + esc(t('facial.mode')) + '</div>' +
+        '<button class="mode on" data-mode="face"><span class="r"></span> ' + esc(t('facial.mode.face')) + '</button>' +
+        '<button class="mode" data-mode="pose"><span class="r"></span> ' + esc(t('facial.mode.pose')) + '</button>' +
+        '<button class="mode" data-mode="hands"><span class="r"></span> ' + esc(t('facial.mode.hands')) + '</button>' +
+        '<div class="lab" style="margin-top:16px">' + esc(t('facial.fx')) + '</div>' +
+        '<div class="seg"><button data-fx="on" class="on">' + esc(t('facial.fxOn')) + '</button><button data-fx="off">' + esc(t('facial.fxOff')) + '</button></div>' +
+        '<button class="fa-btn start" id="fa-start">' + esc(t('facial.start')) + '</button>' +
+        '<button class="fa-btn stop" id="fa-stop">' + esc(t('facial.stop')) + '</button>' +
+        '<div class="lab" style="margin-top:16px">' + esc(t('facial.status')) + '</div>' +
+        '<div class="fa-stat"><span>' + esc(t('facial.state')) + '</span><b id="fa-state">' + esc(t('facial.stopped')) + '</b></div>' +
+        '<div class="fa-stat"><span>' + esc(t('facial.fps')) + '</span><b id="fa-fps">0</b></div>' +
+        '<div class="fa-stat"><span>' + esc(t('facial.detections')) + '</span><b id="fa-det">0</b></div>' +
       '</div>' +
-      '<div><div class="fa-stage"><div class="fa-live" id="fa-live"><span class="dot"></span> LIVE</div>' +
+      '<div><div class="fa-stage"><div class="fa-live" id="fa-live"><span class="dot"></span> ' + esc(t('facial.live')) + '</div>' +
         '<canvas id="fa-canvas"></canvas>' +
         '<canvas class="fa-fx" id="fa-fx"></canvas>' +
-        '<div class="ph" id="fa-ph">Press "Start camera" to begin. Video stays on your device.</div></div>' +
+        '<div class="ph" id="fa-ph">' + esc(t('facial.ph')) + '</div></div>' +
         '<div class="fa-panel" id="fa-panel"></div></div>' +
     '</div></div></div>';
 }

@@ -6,55 +6,31 @@
 import { api } from "../api.js";
 import { takePendingSession, peekPendingSession, setPendingSession } from "../pending-session.js";
 import { computeAcousticFeatures } from "../acoustic-features.js";
+import { t } from "../i18n.js";
 
-// Scoring dimension weights (mirrors backend/verdict.py WEIGHTS).
-const DIMS = [
-  { name: "Voice Delivery",   pct: 40, desc: "Speaking pace, filler words, pauses &amp; expressiveness" },
-  { name: "Camera Presence",  pct: 35, desc: "Eye contact, posture, composure &amp; confidence" },
-  { name: "Content Quality",  pct: 25, desc: "Clarity, structure, specificity &amp; relevance of answers" },
-];
+function dims() {
+  return [
+    { name: t("thanks.dim.voice"), pct: 40, desc: t("thanks.dim.voiceDesc") },
+    { name: t("thanks.dim.presence"), pct: 35, desc: t("thanks.dim.presenceDesc") },
+    { name: t("thanks.dim.content"), pct: 25, desc: t("thanks.dim.contentDesc") },
+  ];
+}
 
-const FACTS = [
-  "Interviewers form initial impressions within the first 7 seconds of meeting a candidate.",
-  "Speaking at 130 to 150 words per minute is considered ideal -- clear, confident, and easy to follow.",
-  "Eye contact during 60 to 70 percent of a conversation is associated with higher perceived trustworthiness.",
-  "Candidates who use specific examples and numbers in their answers score significantly higher on content.",
-  "Posture affects not just how others see you -- sitting upright can also boost your own confidence.",
-  "The STAR method (Situation, Task, Action, Result) is the most common structured-answer framework used by interviewers.",
-];
+function facts() {
+  return [0, 1, 2, 3, 4, 5].map(function(i) { return t("thanks.fact." + i); });
+}
 
-const STEPS = [
-  "Analyzing camera & presence",
-  "Analyzing your voice",
-  "Generating your report",
-];
+function steps() {
+  return [t("thanks.step.camera"), t("thanks.step.voice"), t("thanks.step.report")];
+}
 
-// Log messages shown while voice analysis runs (step 1).
-const VOICE_LOG = [
-  "Processing audio recording...",
-  "Transcribing speech to text...",
-  "Measuring speaking pace (words per minute)...",
-  "Counting filler words (um, uh, like)...",
-  "Analyzing pause patterns...",
-  "Computing voice delivery score...",
-];
+function voiceLog() {
+  return [0, 1, 2, 3, 4, 5].map(function(i) { return t("thanks.vlog." + i); });
+}
 
-// Log messages shown while the session POST runs (step 2).
-const SESSION_LOG = [
-  "Analyzing captured video frames...",
-  "Detecting face and landmark positions...",
-  "Calculating eye contact percentage...",
-  "Measuring head stability and composure...",
-  "Scoring posture and shoulder alignment...",
-  "Computing overall presence score...",
-  "Reading your full interview transcript...",
-  "Evaluating clarity and structure of answers...",
-  "Assessing use of examples and specifics...",
-  "Generating personalized coaching feedback...",
-  "Writing your performance summary...",
-  "Computing your readiness score...",
-  "Saving your report...",
-];
+function sessionLog() {
+  return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(function(i) { return t("thanks.slog." + i); });
+}
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -92,8 +68,6 @@ function addLogLine(text, state) {
   log.scrollTop = log.scrollHeight;
 }
 
-// Schedule a sequence of log messages at `intervalMs` apart.
-// Each new message marks the previous active one as done.
 function startPhaseLog(messages, intervalMs) {
   clearLogTimers();
   messages.forEach(function(msg, i) {
@@ -107,7 +81,6 @@ function startPhaseLog(messages, intervalMs) {
   });
 }
 
-// Mark whatever is currently "active" as done and stop all pending timers.
 function finishPhaseLog() {
   clearLogTimers();
   const log = document.getElementById("th-log");
@@ -119,7 +92,7 @@ function finishPhaseLog() {
 // ── HTML builders ─────────────────────────────────────────────────────────────
 
 function stepsHTML(activeIdx) {
-  return STEPS.map(function(s, i) {
+  return steps().map(function(s, i) {
     const cls = i < activeIdx ? "done" : i === activeIdx ? "active" : "";
     return '<div class="lv-step ' + cls + '" id="th-step-' + i + '">' + s + "</div>";
   }).join("");
@@ -130,7 +103,7 @@ function statsHTML(stats) {
   return (
     '<div class="th-words">' +
     '<span class="th-words-n">' + fmtN(stats.wordCount) + "</span>" +
-    '<span class="th-words-l">words spoken in this interview</span>' +
+    '<span class="th-words-l">' + t("thanks.wordsSpoken") + "</span>" +
     "</div>"
   );
 }
@@ -138,8 +111,8 @@ function statsHTML(stats) {
 function formulaHTML() {
   return (
     '<div class="th-section">' +
-    '<div class="th-section-label">How your readiness score is calculated</div>' +
-    DIMS.map(function(d) {
+    '<div class="th-section-label">' + t("thanks.scoreHow") + "</div>" +
+    dims().map(function(d) {
       return (
         '<div class="th-dim">' +
         '<div class="th-dim-head">' +
@@ -151,12 +124,13 @@ function formulaHTML() {
         "</div>"
       );
     }).join("") +
-    '<div class="th-dim-note">Missing signals are dropped and remaining weights are renormalized -- partial results are never penalized.</div>' +
+    '<div class="th-dim-note">' + t("thanks.scoreNote") + "</div>" +
     "</div>"
   );
 }
 
 function insightsHTML(stats) {
+  const factList = facts();
   return (
     '<div class="th-insights">' +
     statsHTML(stats) +
@@ -164,8 +138,8 @@ function insightsHTML(stats) {
     '<div class="th-fact">' +
     '<div class="th-fact-icon">&#128161;</div>' +
     '<div>' +
-    '<div class="th-fact-label">Did you know?</div>' +
-    '<div class="th-fact-text" id="th-fact-text">' + FACTS[0] + "</div>" +
+    '<div class="th-fact-label">' + t("thanks.didYouKnow") + "</div>" +
+    '<div class="th-fact-text" id="th-fact-text">' + factList[0] + "</div>" +
     "</div>" +
     "</div>" +
     "</div>"
@@ -178,8 +152,8 @@ function pendingHTML(peek) {
     '<div class="screen">' +
     '<div class="thanks-wrap">' +
     '<div id="th-icon" class="th-ring-spin"></div>' +
-    '<h1 id="th-title">Preparing your report...</h1>' +
-    '<p class="muted" id="th-sub">Hang tight, this usually takes about 20 seconds.</p>' +
+    '<h1 id="th-title">' + t("thanks.preparing") + "</h1>" +
+    '<p class="muted" id="th-sub">' + t("thanks.hangTight") + "</p>" +
     '<div class="lv-steps" id="th-steps">' + stepsHTML(1) + "</div>" +
     '<div class="th-log" id="th-log"></div>' +
     '<div class="thanks-actions" id="th-actions" style="display:none"></div>' +
@@ -191,55 +165,48 @@ function pendingHTML(peek) {
 
 function readyHTML(id) {
   const viewBtn = id
-    ? '<a class="btn btn-green" style="text-decoration:none" href="#/session/' + encodeURIComponent(id) + '">View results</a>'
+    ? '<a class="btn btn-green" style="text-decoration:none" href="#/session/' + encodeURIComponent(id) + '">' + t("thanks.viewResults") + "</a>"
     : "";
   return (
     '<div class="screen"><div class="thanks-wrap">' +
     '<div class="thanks-check">✓</div>' +
-    "<h1>Thank you!</h1>" +
-    '<p class="muted">Your interview is complete' + (id ? " and your results are ready." : ".") + "</p>" +
+    "<h1>" + t("thanks.thankYou") + "</h1>" +
+    '<p class="muted">' + (id ? t("thanks.completeReady") : t("thanks.complete")) + "</p>" +
     '<div class="thanks-actions">' +
     viewBtn +
-    '<a class="btn btn-ghost" style="text-decoration:none" href="#/progress">See your progress</a>' +
-    '<a class="btn btn-ghost" style="text-decoration:none" href="#/practice-interview">New practice interview</a>' +
+    '<a class="btn btn-ghost" style="text-decoration:none" href="#/progress">' + t("thanks.seeProgress") + "</a>" +
+    '<a class="btn btn-ghost" style="text-decoration:none" href="#/practice-interview">' + t("thanks.newPractice") + "</a>" +
     "</div></div></div>"
   );
 }
-
-// ── step helpers ──────────────────────────────────────────────────────────────
 
 function setStepState(idx, state) {
   const el = document.getElementById("th-step-" + idx);
   if (el) el.className = "lv-step" + (state ? " " + state : "");
 }
 
-// ── fact rotation ─────────────────────────────────────────────────────────────
-
 let _factTimer = null;
 
 function startFactRotation() {
   let idx = 0;
+  const factList = facts();
   _factTimer = setInterval(function() {
     if (location.hash !== "#/thanks/pending") { clearInterval(_factTimer); return; }
     const el = document.getElementById("th-fact-text");
     if (!el) { clearInterval(_factTimer); return; }
-    idx = (idx + 1) % FACTS.length;
+    idx = (idx + 1) % factList.length;
     el.style.opacity = "0";
     setTimeout(function() {
-      if (el.isConnected) { el.textContent = FACTS[idx]; el.style.opacity = "1"; }
+      if (el.isConnected) { el.textContent = factList[idx]; el.style.opacity = "1"; }
     }, 300);
   }, 6000);
 }
-
-// ── bar animation ─────────────────────────────────────────────────────────────
 
 function animateBars() {
   document.querySelectorAll(".th-dim-fill").forEach(function(el) {
     el.style.width = el.getAttribute("data-w") || "0%";
   });
 }
-
-// ── main export ───────────────────────────────────────────────────────────────
 
 export function thanks(params) {
   const id = params && params.id;
@@ -255,8 +222,6 @@ export function thanks(params) {
   return readyHTML(id);
 }
 
-// ── scoring pipeline ──────────────────────────────────────────────────────────
-
 async function runPendingSession() {
   const pending = takePendingSession();
   if (!pending) {
@@ -266,10 +231,9 @@ async function runPendingSession() {
 
   const { scenario, role, frames, transcript, events, emotion, audioBlob, language } = pending;
 
-  // Step 1: voice analysis (Deepgram, 2-5s)
   let voice = null;
   if (audioBlob) {
-    startPhaseLog(VOICE_LOG, 900);
+    startPhaseLog(voiceLog(), 900);
     try {
       const acoustic = await computeAcousticFeatures(audioBlob);
       voice = await api.analyzeVoice(audioBlob, acoustic || {});
@@ -279,11 +243,10 @@ async function runPendingSession() {
   }
   finishPhaseLog();
 
-  // Step 2: session POST (presence analysis + Claude, 10-20s)
   setStepState(1, "done");
   setStepState(2, "active");
 
-  startPhaseLog(SESSION_LOG, 1400);
+  startPhaseLog(sessionLog(), 1400);
 
   try {
     const resp = await api.createSession({
@@ -301,54 +264,52 @@ async function runPendingSession() {
   }
 }
 
-// ── error state ───────────────────────────────────────────────────────────────
-
 function showError(pending, voice, err) {
   const icon    = document.getElementById("th-icon");
   const title   = document.getElementById("th-title");
   const sub     = document.getElementById("th-sub");
-  const steps   = document.getElementById("th-steps");
+  const stepsEl = document.getElementById("th-steps");
   const log     = document.getElementById("th-log");
   const actions = document.getElementById("th-actions");
 
   if (icon)  { icon.className = "thanks-check"; icon.style.cssText = "background:#c0392b;box-shadow:0 10px 24px -14px #c0392b"; icon.textContent = "✕"; }
-  if (title) title.textContent = "Something went wrong";
+  if (title) title.textContent = t("thanks.errorTitle");
   const detail = err && err.message ? String(err.message) : "";
   if (sub) {
     sub.textContent = detail
-      ? ("We could not score your interview (" + detail + "). You can retry or go to the dashboard.")
-      : "We could not score your interview. You can retry or go to the dashboard.";
+      ? t("thanks.errorBodyDetail", { detail: detail })
+      : t("thanks.errorBody");
   }
-  if (steps) steps.style.display = "none";
+  if (stepsEl) stepsEl.style.display = "none";
   if (log)   log.style.display = "none";
   if (!actions) return;
 
-  // All innerHTML values are hardcoded constants -- no user data interpolated.
   actions.innerHTML =
-    '<button class="btn btn-green" id="th-retry">Retry scoring</button>' +
-    '<a class="btn btn-ghost" style="text-decoration:none" href="#/">Go to dashboard</a>';
+    '<button class="btn btn-green" id="th-retry">' + t("thanks.retry") + "</button>" +
+    '<a class="btn btn-ghost" style="text-decoration:none" href="#/">' + t("thanks.goDash") + "</a>";
   actions.style.display = "";
 
   const btn = document.getElementById("th-retry");
   if (!btn) return;
 
   btn.addEventListener("click", async function() {
+    const stepLabels = steps();
     btn.disabled = true;
-    btn.textContent = "Retrying...";
+    btn.textContent = t("thanks.retrying");
     if (icon)  { icon.className = "th-ring-spin"; icon.style.cssText = ""; icon.textContent = ""; }
-    if (title) title.textContent = "Preparing your report...";
-    if (sub)   sub.textContent = "Hang tight, this usually takes about 20 seconds.";
-    if (steps) {
-      steps.innerHTML =
-        '<div class="lv-step done" id="th-step-0">' + STEPS[0] + "</div>" +
-        '<div class="lv-step done" id="th-step-1">' + STEPS[1] + "</div>" +
-        '<div class="lv-step active" id="th-step-2">' + STEPS[2] + "</div>";
-      steps.style.display = "flex";
+    if (title) title.textContent = t("thanks.preparing");
+    if (sub)   sub.textContent = t("thanks.hangTight");
+    if (stepsEl) {
+      stepsEl.innerHTML =
+        '<div class="lv-step done" id="th-step-0">' + stepLabels[0] + "</div>" +
+        '<div class="lv-step done" id="th-step-1">' + stepLabels[1] + "</div>" +
+        '<div class="lv-step active" id="th-step-2">' + stepLabels[2] + "</div>";
+      stepsEl.style.display = "flex";
     }
     if (log) { log.innerHTML = ""; log.style.display = ""; }
     actions.style.display = "none";
 
-    startPhaseLog(SESSION_LOG, 1400);
+    startPhaseLog(sessionLog(), 1400);
 
     try {
       const resp = await api.createSession({
@@ -361,9 +322,9 @@ function showError(pending, voice, err) {
       if (location.hash === "#/thanks/pending") {
         location.replace(location.pathname + location.search + "#/thanks/" + resp.session_id);
       }
-    } catch (err) {
+    } catch (retryErr) {
       finishPhaseLog();
-      showError(pending, voice, err);
+      showError(pending, voice, retryErr);
     }
   });
 }

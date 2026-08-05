@@ -1,4 +1,5 @@
 // frontend/screens/notes.js — Open-book spread viewer
+import { t, currentLang } from '../i18n.js';
 
 const byId = (id) => document.getElementById(id);
 const esc  = (s) => String(s ?? '')
@@ -17,8 +18,9 @@ function fmtDate(iso) {
   if (!iso) return '';
   try {
     const d = new Date(iso);
-    return d.toLocaleDateString('en', { month: 'short', day: 'numeric' }) +
-      ' · ' + d.toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' });
+    const loc = currentLang() === 'ja' ? 'ja' : 'en';
+    return d.toLocaleDateString(loc, { month: 'short', day: 'numeric' }) +
+      ' · ' + d.toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' });
   } catch { return iso; }
 }
 
@@ -28,8 +30,8 @@ function pageNotes(pg, idx, totalNotes) {
   if (!pg || !pg.length) {
     return '<div class="nb-pg-empty">' +
       (idx === 0 && totalNotes === 0
-        ? 'Hold an open palm during an interview to open this notebook and take notes.'
-        : 'Empty page') +
+        ? esc(t('notes.emptyHint'))
+        : esc(t('notes.emptyPage'))) +
       '</div>';
   }
   return pg.map(n =>
@@ -46,8 +48,8 @@ function openPage(pg, idx, side, totalNotes) {
     '<div class="nb-page nb-pg-' + side + (empty ? ' nb-pg-bare' : '') + '">' +
       '<div class="nb-pg-hdr">' +
         (side === 'left'
-          ? '<span class="nb-pg-num">' + (idx + 1) + '</span><span class="nb-pg-ttl">Notes</span>'
-          : '<span class="nb-pg-ttl">Notes</span><span class="nb-pg-num">' + (idx + 1) + '</span>'
+          ? '<span class="nb-pg-num">' + (idx + 1) + '</span><span class="nb-pg-ttl">' + esc(t('notes.pageLabel')) + '</span>'
+          : '<span class="nb-pg-ttl">' + esc(t('notes.pageLabel')) + '</span><span class="nb-pg-num">' + (idx + 1) + '</span>'
         ) +
       '</div>' +
       '<div class="nb-pg-body">' + pageNotes(pg, idx, totalNotes) + '</div>' +
@@ -60,13 +62,13 @@ function lockedPage(pageNum, side) {
     '<div class="nb-page nb-pg-' + side + ' nb-pg-locked">' +
       '<div class="nb-pg-hdr">' +
         (side === 'left'
-          ? '<span class="nb-pg-num">' + pageNum + '</span><span class="nb-pg-ttl">Notes</span>'
-          : '<span class="nb-pg-ttl">Notes</span><span class="nb-pg-num">' + pageNum + '</span>'
+          ? '<span class="nb-pg-num">' + pageNum + '</span><span class="nb-pg-ttl">' + esc(t('notes.pageLabel')) + '</span>'
+          : '<span class="nb-pg-ttl">' + esc(t('notes.pageLabel')) + '</span><span class="nb-pg-num">' + pageNum + '</span>'
         ) +
       '</div>' +
       '<div class="nb-pg-lock">' +
         '<div class="nb-lock-ring">🔒</div>' +
-        (side === 'left' ? '<div class="nb-lock-msg">Upgrade to unlock<br>more pages</div>' : '') +
+        (side === 'left' ? '<div class="nb-lock-msg">' + t('notes.upgradeMsg') + '</div>' : '') +
       '</div>' +
     '</div>'
   );
@@ -100,7 +102,8 @@ function dotsHtml(current) {
   // Locked dot
   dots.push(
     '<button class="nb-dot nb-dot-lock' + (current >= FREE_SPREADS ? ' nb-dot-on' : '') +
-    '" data-spread="' + FREE_SPREADS + '" aria-label="Upgrade for more pages" title="Upgrade for more pages">+</button>'
+    '" data-spread="' + FREE_SPREADS + '" aria-label="' + esc(t('notes.upgradeMore')) +
+    '" title="' + esc(t('notes.upgradeMore')) + '">+</button>'
   );
   return dots.join('');
 }
@@ -112,9 +115,10 @@ function buildHtml(nb) {
   const totalNotes = pages.reduce((n, p) => n + (p ? p.length : 0), 0);
   const usedPages  = pages.filter(p => p && p.length).length;
   const lastSaved  = nb.updated_at ? fmtDate(nb.updated_at) : null;
-  const title      = nb.title || 'My Notebook';
+  const title      = nb.title || t('notes.heading');
   const fillPct    = Math.round(usedPages / 10 * 100);
   const spread     = Math.min(_currentSpread, FREE_SPREADS);
+  const noteLabel  = totalNotes === 1 ? t('notes.noteCountOne') : t('notes.noteCount', { n: totalNotes });
 
   return (
     // ── Book cover header ────────────────────────────────────────────────────
@@ -123,33 +127,33 @@ function buildHtml(nb) {
       '<div class="nb-cover-body">' +
         '<div class="nb-cover-top">' +
           '<div>' +
-            '<div class="nb-cover-label">My Notebook</div>' +
+            '<div class="nb-cover-label">' + esc(t('notes.heading')) + '</div>' +
             '<div class="nb-cover-title">' + esc(title) + '</div>' +
           '</div>' +
           '<div class="nb-cover-right">' +
             '<div class="nb-fill-wrap">' +
               '<div class="nb-fill-bar"><div class="nb-fill-inner" style="width:' + fillPct + '%"></div></div>' +
-              '<div class="nb-fill-lbl">' + usedPages + ' / 10 pages</div>' +
+              '<div class="nb-fill-lbl">' + esc(t('notes.pagesOf', { used: usedPages })) + '</div>' +
             '</div>' +
           '</div>' +
         '</div>' +
         '<div class="nb-cover-meta">' +
-          totalNotes + ' note' + (totalNotes !== 1 ? 's' : '') +
-          (lastSaved ? ' &nbsp;·&nbsp; last saved ' + esc(lastSaved) : '') +
+          esc(noteLabel) +
+          (lastSaved ? ' &nbsp;·&nbsp; ' + esc(t('notes.lastSaved', { when: lastSaved })) : '') +
         '</div>' +
       '</div>' +
     '</div>' +
 
     // ── Open book spread ─────────────────────────────────────────────────────
     '<div class="nb-reader">' +
-      '<button class="nb-nav nb-nav-prev" id="nb-prev" aria-label="Previous spread"' +
+      '<button class="nb-nav nb-nav-prev" id="nb-prev" aria-label="' + esc(t('notes.prev')) + '"' +
         (spread === 0 ? ' disabled' : '') + '>‹</button>' +
 
       '<div class="nb-open-book" id="nb-spread">' +
         spreadHtml(pages, spread, totalNotes) +
       '</div>' +
 
-      '<button class="nb-nav nb-nav-next" id="nb-next" aria-label="Next spread"' +
+      '<button class="nb-nav nb-nav-next" id="nb-next" aria-label="' + esc(t('notes.next')) + '"' +
         (spread >= FREE_SPREADS ? ' disabled' : '') + '>›</button>' +
     '</div>' +
 
@@ -160,18 +164,18 @@ function buildHtml(nb) {
     '<div class="nb-upgrade-card" id="nb-upgrade-card">' +
       '<div class="nb-uc-left">' +
         '<div class="nb-uc-eyebrow">molave.ai Pro</div>' +
-        '<div class="nb-uc-title">More pages, more insight.</div>' +
+        '<div class="nb-uc-title">' + esc(t('notes.upgradeTitle')) + '</div>' +
         '<ul class="nb-uc-list">' +
-          '<li>50 notebook pages</li>' +
-          '<li>AI-generated session summaries</li>' +
-          '<li>Export notes to PDF</li>' +
-          '<li>Priority support</li>' +
+          '<li>' + esc(t('notes.upgrade.li1')) + '</li>' +
+          '<li>' + esc(t('notes.upgrade.li2')) + '</li>' +
+          '<li>' + esc(t('notes.upgrade.li3')) + '</li>' +
+          '<li>' + esc(t('notes.upgrade.li4')) + '</li>' +
         '</ul>' +
       '</div>' +
       '<div class="nb-uc-right">' +
-        '<div class="nb-uc-badge">Coming soon</div>' +
-        '<button class="nb-uc-btn" disabled>Get Pro</button>' +
-        '<button class="nb-notify-btn" id="nb-notify-btn" type="button">Notify me when ready</button>' +
+        '<div class="nb-uc-badge">' + esc(t('notes.comingSoon')) + '</div>' +
+        '<button class="nb-uc-btn" disabled>' + esc(t('notes.getPro')) + '</button>' +
+        '<button class="nb-notify-btn" id="nb-notify-btn" type="button">' + esc(t('notes.notify')) + '</button>' +
       '</div>' +
     '</div>'
   );
@@ -236,7 +240,7 @@ function wireNav(pages, totalNotes) {
   if (notifyBtn && !notifyBtn._wired) {
     notifyBtn._wired = true;
     notifyBtn.addEventListener('click', () => {
-      notifyBtn.textContent = "You're on the list ✓";
+      notifyBtn.textContent = t('notes.notified');
       notifyBtn.disabled = true;
       notifyBtn.classList.add('nb-notify-done');
     });
@@ -266,7 +270,7 @@ async function renderMaster(container) {
     return;
   }
 
-  container.innerHTML = '<p class="nt-loading">Loading notebook…</p>';
+  container.innerHTML = '<p class="nt-loading">' + esc(t('notes.loading')) + '</p>';
   try {
     const res = await fetch('/api/notes/master');
     const nb  = res.ok ? await res.json() : null;
@@ -278,8 +282,8 @@ async function renderMaster(container) {
   } catch (_) {
     container.innerHTML =
       '<div class="nt-empty"><div class="nt-empty-icon">📒</div>' +
-      '<p>Could not load notebook.</p>' +
-      '<p class="muted" style="font-size:12px;margin-top:4px">Start a practice interview to begin.</p>' +
+      '<p>' + esc(t('notes.loadFail')) + '</p>' +
+      '<p class="muted" style="font-size:12px;margin-top:4px">' + esc(t('notes.loadFailHint')) + '</p>' +
       '</div>';
   }
 }
@@ -293,7 +297,7 @@ export function notes() {
   });
   return (
     '<div class="nt-shell">' +
-      '<div class="screen-head" style="margin-bottom:20px"><h1>My Notebook</h1></div>' +
+      '<div class="screen-head" style="margin-bottom:20px"><h1>' + esc(t('notes.heading')) + '</h1></div>' +
       '<div id="nt-content" class="nt-content"></div>' +
     '</div>'
   );

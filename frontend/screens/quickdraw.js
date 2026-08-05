@@ -3,6 +3,7 @@
 // Uses interview-engine.js for simultaneous face + hand tracking.
 import * as engine from '../interview-engine.js';
 import { dominantEmotion, emotionScores, EMOTION_CLASSES } from '../emotion.js';
+import { t } from '../i18n.js';
 
 // ── constants ────────────────────────────────────────────────────────────────
 const ROUND_COUNT  = 5;
@@ -226,7 +227,7 @@ async function doLiveGuess() {
         const bar = byId('qd-live-guess');
         if (bar) {
           bar.style.display = 'flex';
-          bar.innerHTML = '<span style="opacity:.55;font-size:.78rem">AI guessing unavailable — keep drawing!</span>';
+          bar.innerHTML = '<span style="opacity:.55;font-size:.78rem">' + esc(t('qd.aiUnavail')) + '</span>';
         }
       }
       isGuessing = false;
@@ -249,10 +250,11 @@ async function doLiveGuess() {
     if (liveGuessHist.length > 9) liveGuessHist.length = 9;
     // updateLiveGuessUI() fires from onplay so words appear in sync with voice.
 
-    // Combine all guesses into one sentence: "Is it a sun? Maybe a line? Or a dash?"
-    const pfx = ['Is it a ', 'Maybe a ', 'Or a '];
+    // Combine all guesses into one sentence (language follows UI).
+    const pfx = [t('qd.guessPfx0'), t('qd.guessPfx1'), t('qd.guessPfx2')];
+    const sfx = t('qd.guessSfx');
     const phrase = guesses.slice(0, 3)
-      .map((g, i) => pfx[i] + (g.word || '?') + '?')
+      .map((g, i) => pfx[i] + (g.word || '?') + sfx)
       .join(' ');
 
     if (hitGuess) {
@@ -267,15 +269,15 @@ async function doLiveGuess() {
         onended: () => {
           isGuessing = false;
           hideLiveGuess();
-          speak("Yes! It's a " + prompt + '!');
+          speak(t('qd.yesSpeak', { p: prompt }));
           const ov = byId('qd-state-overlay');
           if (ov) {
             ov.style.display = 'flex';
             ov.innerHTML =
               '<div class="qd-state-card">' +
                 '<div style="font-size:3.5rem;margin-bottom:.4rem">🎉</div>' +
-                '<div style="font-size:1.4rem;font-weight:900;color:#4ade80;margin-bottom:.2rem">I got it!</div>' +
-                '<div>It\'s a <strong>' + esc(prompt.toUpperCase()) + '</strong>!</div>' +
+                '<div style="font-size:1.4rem;font-weight:900;color:#4ade80;margin-bottom:.2rem">' + esc(t('qd.gotIt')) + '</div>' +
+                '<div><strong>' + esc(prompt.toUpperCase()) + '</strong></div>' +
               '</div>';
           }
           const thumb = captureThumb();
@@ -340,8 +342,8 @@ function startGame() {
   currentRound = 0;
   sessionPrompts = pickPrompts();
   // Pre-fetch all Deepgram phrases used this session so they play instantly
-  prefetch("Sorry, I couldn't get that one!");
-  for (const p of sessionPrompts) prefetch("Yes! It's a " + p + "!");
+  prefetch(t('qd.sorrySpeak'));
+  for (const p of sessionPrompts) prefetch(t('qd.yesSpeak', { p: p }));
   startRound(0);
 }
 
@@ -361,7 +363,7 @@ function showCountdown(n) {
   ov.innerHTML =
     '<div class="qd-state-card">' +
       '<div class="qd-countdown-num">' + n + '</div>' +
-      '<div style="color:var(--ink-2);font-size:.9rem;margin-top:.5rem">Get ready to draw…</div>' +
+      '<div style="color:var(--ink-2);font-size:.9rem;margin-top:.5rem">' + esc(t('qd.getReady')) + '</div>' +
     '</div>';
   if (n > 1) {
     setTimeout(() => showCountdown(n - 1), 900);
@@ -398,7 +400,7 @@ function showPromptOverlay() {
   const prompt = sessionPrompts[currentRound] || '?';
   ov.style.display = 'flex';
   ov.innerHTML =
-    '<div class="qd-prompt">✏ Draw: <strong>' + prompt.toUpperCase() + '</strong></div>' +
+    '<div class="qd-prompt">' + esc(t('qd.draw')) + '<strong>' + esc(prompt.toUpperCase()) + '</strong></div>' +
     '<div class="qd-timer" id="qd-timer-display">' + timerVal + 's</div>';
 }
 
@@ -423,18 +425,18 @@ function endRound() {
   hidePromptOverlay();
   rounds.push({
     prompt: sessionPrompts[currentRound] || '?',
-    guess: '—', score: 0, comment: "Sorry, I couldn't get that one!",
+    guess: '—', score: 0, comment: t('qd.sorrySpeak'),
     thumb: captureThumb(),
   });
-  speak("Sorry, I couldn't get that one!");
+  speak(t('qd.sorrySpeak'));
   const ov = byId('qd-state-overlay');
   if (ov) {
     ov.style.display = 'flex';
     ov.innerHTML =
       '<div class="qd-state-card">' +
         '<div style="font-size:2.5rem">⏰</div>' +
-        '<div style="font-weight:600;margin-top:.5rem">Time\'s up!</div>' +
-        '<div style="color:var(--ink-2);font-size:.85rem;margin-top:.25rem">Sorry, I couldn\'t figure that one out!</div>' +
+        '<div style="font-weight:600;margin-top:.5rem">' + esc(t('qd.timesUp')) + '</div>' +
+        '<div style="color:var(--ink-2);font-size:.85rem;margin-top:.25rem">' + esc(t('qd.timesUpSub')) + '</div>' +
       '</div>';
   }
   setTimeout(nextRound, 3000);
@@ -471,13 +473,13 @@ function showResult(result, thumb, prompt) {
     ov.innerHTML =
       '<div class="qd-state-card">' +
         '<div style="font-size:2rem;margin-bottom:.5rem">' + (correct ? '🎉' : '🤔') + '</div>' +
-        '<div style="font-size:.8rem;color:var(--ink-2);margin-bottom:.25rem">You drew: <strong>' + prompt.toUpperCase() + '</strong></div>' +
-        '<div style="font-size:.85rem;margin-bottom:.5rem">AI guessed: <strong>' + esc(result.guess) + '</strong></div>' +
+        '<div style="font-size:.8rem;color:var(--ink-2);margin-bottom:.25rem">' + esc(t('qd.youDrew')) + '<strong>' + esc(prompt.toUpperCase()) + '</strong></div>' +
+        '<div style="font-size:.85rem;margin-bottom:.5rem">' + esc(t('qd.aiGuessed')) + '<strong>' + esc(result.guess) + '</strong></div>' +
         '<span class="qd-score-chip ' + scoreClass(result.score) + '">' + result.score + ' / 100</span>' +
         '<div style="margin-top:.75rem;font-size:.8rem;color:var(--ink-2);font-style:italic">' + esc(result.comment) + '</div>' +
         (currentRound < ROUND_COUNT - 1
-          ? '<button class="fa-btn" id="qd-next" style="margin-top:1rem;width:100%" data-gesture-btn>Next Round</button>'
-          : '<button class="fa-btn" id="qd-next" style="margin-top:1rem;width:100%;background:var(--brand)" data-gesture-btn>See Results</button>'
+          ? '<button class="fa-btn" id="qd-next" style="margin-top:1rem;width:100%" data-gesture-btn>' + esc(t('qd.nextRound')) + '</button>'
+          : '<button class="fa-btn" id="qd-next" style="margin-top:1rem;width:100%;background:var(--brand)" data-gesture-btn>' + esc(t('qd.seeResults')) + '</button>'
         ) +
       '</div>';
     const nb = byId('qd-next');
@@ -521,10 +523,10 @@ function showFinal() {
 
   let cardsHtml = rounds.map((r, i) =>
     '<div class="qd-round-card">' +
-      '<img class="qd-thumb" src="' + r.thumb + '" alt="round ' + (i+1) + '">' +
+      '<img class="qd-thumb" src="' + r.thumb + '" alt="' + esc(t('qd.roundN', { n: i + 1 })) + '">' +
       '<div class="qd-card-body">' +
-        '<div style="font-size:.75rem;color:var(--ink-2)">Round ' + (i+1) + ' · ' + r.prompt.toUpperCase() + '</div>' +
-        '<div style="font-size:.9rem;margin:.1rem 0">AI: <strong>' + esc(r.guess) + '</strong></div>' +
+        '<div style="font-size:.75rem;color:var(--ink-2)">' + esc(t('qd.roundN', { n: i + 1 })) + ' · ' + esc(r.prompt.toUpperCase()) + '</div>' +
+        '<div style="font-size:.9rem;margin:.1rem 0">' + esc(t('qd.ai')) + '<strong>' + esc(r.guess) + '</strong></div>' +
         '<div style="font-size:.75rem;color:var(--ink-2);font-style:italic">' + esc(r.comment) + '</div>' +
       '</div>' +
       '<span class="qd-score-chip ' + scoreClass(r.score) + '" style="flex-shrink:0">' + r.score + '</span>' +
@@ -535,12 +537,12 @@ function showFinal() {
   if (topEmotions.length) {
     const total = emotionLog.length || 1;
     emotionHtml =
-      '<div style="margin-top:1rem;font-size:.8rem;font-weight:600;color:var(--ink-2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.5rem">Emotions while drawing</div>' +
+      '<div style="margin-top:1rem;font-size:.8rem;font-weight:600;color:var(--ink-2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.5rem">' + esc(t('qd.emotions')) + '</div>' +
       topEmotions.map(([em, cnt]) => {
         const pct = Math.round(cnt / total * 100);
         return '<div style="margin-bottom:.4rem">' +
           '<div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:.15rem">' +
-            '<span>' + em + '</span><span>' + pct + '%</span>' +
+            '<span>' + esc(em) + '</span><span>' + pct + '%</span>' +
           '</div>' +
           '<div style="height:6px;border-radius:3px;background:var(--line);overflow:hidden">' +
             '<div style="height:100%;width:' + pct + '%;background:var(--brand);border-radius:3px"></div>' +
@@ -549,18 +551,18 @@ function showFinal() {
       }).join('');
   }
 
-  const band = avg >= 70 ? '🎨 Artist' : avg >= 40 ? '✏ Sketcher' : '🖊 Doodler';
+  const band = avg >= 70 ? t('qd.band.artist') : avg >= 40 ? t('qd.band.sketcher') : t('qd.band.doodler');
 
   const panel = byId('qd-panel');
   if (panel) {
     panel.innerHTML =
       '<div style="text-align:center;padding:1rem 0 .75rem">' +
         '<div style="font-size:2.5rem;font-weight:900;color:var(--brand)">' + avg + '</div>' +
-        '<div style="font-size:.85rem;color:var(--ink-2)">avg score · ' + band + '</div>' +
+        '<div style="font-size:.85rem;color:var(--ink-2)">' + esc(t('qd.avgScore', { band: band })) + '</div>' +
       '</div>' +
       cardsHtml +
       emotionHtml +
-      '<button class="fa-btn" id="qd-again" style="width:100%;margin-top:1rem" data-gesture-btn>Play Again</button>';
+      '<button class="fa-btn" id="qd-again" style="width:100%;margin-top:1rem" data-gesture-btn>' + esc(t('qd.playAgain')) + '</button>';
     const ab = byId('qd-again');
     if (ab) ab.addEventListener('click', () => { if (engine.isRunning()) startGame(); });
   }
@@ -686,9 +688,9 @@ function onStats(out) {
 // ── camera ───────────────────────────────────────────────────────────────────
 async function startCamera() {
   const startBtn = byId('qd-start');
-  if (startBtn) { startBtn.disabled = true; startBtn.textContent = 'Loading…'; }
+  if (startBtn) { startBtn.disabled = true; startBtn.textContent = t('qd.loading'); }
   const ph = byId('qd-ph');
-  if (ph) ph.textContent = 'Loading models…';
+  if (ph) ph.textContent = t('qd.loadingModels');
 
   try {
     const canvas = byId('qd-canvas');
@@ -696,12 +698,12 @@ async function startCamera() {
     engine.setHandThrottle(33);  // 30fps hand tracking for smooth strokes
     initDrawCanvas();
     if (ph) ph.style.display = 'none';
-    if (startBtn) { startBtn.disabled = false; startBtn.textContent = 'Start Game'; }
+    if (startBtn) { startBtn.disabled = false; startBtn.textContent = t('qd.start'); }
     // Wire start button now that camera is live
     if (startBtn) startBtn.addEventListener('click', startGame, { once: true });
   } catch (e) {
-    if (ph) ph.textContent = 'Camera error: ' + e.message;
-    if (startBtn) { startBtn.disabled = false; startBtn.textContent = 'Retry'; }
+    if (ph) ph.textContent = t('qd.camError', { m: e.message });
+    if (startBtn) { startBtn.disabled = false; startBtn.textContent = t('qd.retry'); }
   }
 }
 
@@ -758,22 +760,22 @@ export function quickdraw() {
 
   return (
     '<div class="screen">' +
-      '<div class="screen-head"><h1 class="screen-title">Quick Draw Challenge</h1></div>' +
+      '<div class="screen-head"><h1 class="screen-title">' + esc(t('qd.heading')) + '</h1></div>' +
       '<div class="fa-grid">' +
 
         // ── Rail ──────────────────────────────────────────────────────────
         '<div class="fa-rail">' +
-          '<div style="font-size:.75rem;font-weight:600;color:var(--ink-2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.5rem">Air Draw · AI Guesses</div>' +
+          '<div style="font-size:.75rem;font-weight:600;color:var(--ink-2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.5rem">' + esc(t('qd.subtitle')) + '</div>' +
           '<div style="font-size:.8rem;color:var(--ink-2);margin-bottom:1rem;line-height:1.5">' +
-            '🤌 Pinch thumb+finger to draw<br>☝ Release thumb to lift pen<br>Hover a button to click' +
+            t('qd.howto') +
           '</div>' +
 
-          '<div class="fa-stat"><span class="fa-stat-l">Round</span><span class="fa-stat-r" id="qd-round">—</span></div>' +
-          '<div class="fa-stat"><span class="fa-stat-l">Timer</span><span class="fa-stat-r" id="qd-timer-stat">—</span></div>' +
-          '<div class="fa-stat"><span class="fa-stat-l">FPS</span><span class="fa-stat-r" id="qd-fps">—</span></div>' +
-          '<div class="fa-stat"><span class="fa-stat-l">Hands</span><span class="fa-stat-r" id="qd-det">—</span></div>' +
+          '<div class="fa-stat"><span class="fa-stat-l">' + esc(t('qd.round')) + '</span><span class="fa-stat-r" id="qd-round">—</span></div>' +
+          '<div class="fa-stat"><span class="fa-stat-l">' + esc(t('qd.timer')) + '</span><span class="fa-stat-r" id="qd-timer-stat">—</span></div>' +
+          '<div class="fa-stat"><span class="fa-stat-l">' + esc(t('qd.fps')) + '</span><span class="fa-stat-r" id="qd-fps">—</span></div>' +
+          '<div class="fa-stat"><span class="fa-stat-l">' + esc(t('qd.hands')) + '</span><span class="fa-stat-r" id="qd-det">—</span></div>' +
 
-          '<button class="fa-btn" id="qd-start" disabled style="margin-top:auto" data-gesture-btn data-gesture-dwell="1500">Start Game</button>' +
+          '<button class="fa-btn" id="qd-start" disabled style="margin-top:auto" data-gesture-btn data-gesture-dwell="1500">' + esc(t('qd.start')) + '</button>' +
         '</div>' +
 
         // ── Stage + Panel ─────────────────────────────────────────────────
@@ -795,11 +797,11 @@ export function quickdraw() {
               '<span id="qd-guess-words"></span>' +
             '</div>' +
             // Placeholder
-            '<div class="ph" id="qd-ph" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--surface-2);color:var(--ink-2);font-size:.9rem">Starting camera…</div>' +
+            '<div class="ph" id="qd-ph" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--surface-2);color:var(--ink-2);font-size:.9rem">' + esc(t('qd.startingCam')) + '</div>' +
           '</div>' +
 
           '<div class="fa-panel" id="qd-panel">' +
-            '<div style="color:var(--ink-2);font-size:.85rem;padding:.5rem 0">Start the game to begin drawing. Your facial expressions will be tracked throughout!</div>' +
+            '<div style="color:var(--ink-2);font-size:.85rem;padding:.5rem 0">' + esc(t('qd.panelHint')) + '</div>' +
           '</div>' +
         '</div>' +
 
