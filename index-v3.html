@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>molave.ai · Readout</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --void:       #0B0D12;
+    --panel:      #12161F;
+    --panel-2:    #171C27;
+    --paper:      #F5F3EC;
+    --paper-dim:  #E8E4D8;
+    --ink:        #EDEFF4;
+    --ink-dim:    #8891A3;
+    --ink-faint:  #545E70;
+    --ink-on-paper:      #14161C;
+    --ink-on-paper-dim:  #52514A;
+
+    --signal:     #5EEAD4;   /* the "reading" teal — presence/vision */
+    --signal-dim: #2C8C81;
+    --warn:       #FF8A5C;   /* tension / AU highlight — amber-coral */
+    --voice:      #F3C969;   /* delivery / voice */
+    --content:    #B7A6FF;   /* content / answers */
+    --ready:      #6EE7A8;   /* verdict / positive */
+
+    --line:       rgba(237,239,244,.10);
+    --line-2:     rgba(237,239,244,.05);
+    --line-paper: rgba(20,22,28,.12);
+
+    --f-display:  'Fraunces', Georgia, serif;
+    --f-body:     'Inter', system-ui, sans-serif;
+    --f-mono:     'IBM Plex Mono', ui-monospace, monospace;
+  }
+
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    background:var(--void);
+    color:var(--ink);
+    font-family:var(--f-body);
+    -webkit-font-smoothing:antialiased;
+    overflow:hidden;
+  }
+
+  .display{ font-family:var(--f-display); letter-spacing:-.01em; line-height:1.04; font-optical-sizing:auto; }
+  .mono{ font-family:var(--f-mono); }
+  ::selection{ background:var(--signal); color:var(--void); }
+
+  /* ------------------------------------------------------------------ */
+  /* Instrument frame (fixed chrome)                                     */
+  /* ------------------------------------------------------------------ */
+  .tick{ position:fixed; z-index:40; pointer-events:none; opacity:.5; transition:opacity .5s, border-color .5s; border-color:var(--ink-dim); }
+  .tick.tl{ top:26px; left:26px; width:18px; height:18px; border-top:1px solid; border-left:1px solid; }
+  .tick.tr{ top:26px; right:26px; width:18px; height:18px; border-top:1px solid; border-right:1px solid; }
+  .tick.bl{ bottom:52px; left:26px; width:18px; height:18px; border-bottom:1px solid; border-left:1px solid; }
+  .tick.br{ bottom:52px; right:26px; width:18px; height:18px; border-bottom:1px solid; border-right:1px solid; }
+  body.on-paper .tick{ border-color:var(--ink-on-paper-dim); opacity:.35; }
+
+  .topbar{ position:fixed; top:0; left:0; right:0; z-index:41; display:flex; align-items:center;
+    justify-content:space-between; padding:26px 44px; pointer-events:none; }
+  .topbar > *{ pointer-events:auto; }
+
+  .brand{ display:flex; align-items:center; gap:10px; font-family:var(--f-mono);
+    font-size:13px; font-weight:500; letter-spacing:.02em; color:var(--ink); }
+  body.on-paper .brand{ color:var(--ink-on-paper); }
+  .brand .rec{ width:7px; height:7px; border-radius:50%; background:var(--warn); flex:none; }
+  .is-active .brand .rec{ animation:recPulse 1.8s ease-in-out infinite; }
+  @keyframes recPulse{ 0%,100%{ opacity:1; } 50%{ opacity:.25; } }
+
+  .section-label{ font-family:var(--f-mono); font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--ink-dim); transition:color .5s; }
+  body.on-paper .section-label{ color:var(--ink-on-paper-dim); }
+
+  .counter{ font-family:var(--f-mono); font-size:11px; letter-spacing:.08em; color:var(--ink-dim); }
+  body.on-paper .counter{ color:var(--ink-on-paper-dim); }
+
+  /* bottom: scope spine */
+  .botbar{ position:fixed; bottom:0; left:0; right:0; z-index:41; height:52px;
+    display:flex; align-items:center; padding:0 44px; gap:22px; }
+  .botbar .meta{ display:flex; align-items:center; gap:16px; flex:none; }
+  .scope{ flex:1; height:28px; position:relative; overflow:hidden; }
+  .scope svg{ width:100%; height:100%; display:block; }
+  .scope path{ fill:none; stroke:var(--signal); stroke-width:1.3; opacity:.55; vector-effect:non-scaling-stroke; }
+  body.on-paper .scope path{ stroke:var(--signal-dim); opacity:.7; }
+
+  .nav{ position:fixed; bottom:14px; z-index:42; width:34px; height:34px;
+    border-radius:50%; border:1px solid var(--line); background:transparent;
+    cursor:pointer; display:grid; place-items:center; color:var(--ink-dim); transition:.2s; }
+  .nav:hover{ border-color:var(--signal); color:var(--signal); }
+  .nav.prev{ right:88px; } .nav.next{ right:44px; }
+  body.on-paper .nav{ border-color:var(--line-paper); color:var(--ink-on-paper-dim); }
+  body.on-paper .nav:hover{ border-color:var(--signal-dim); color:var(--signal-dim); }
+  .nav svg{ width:14px; height:14px; }
+  .nav:focus-visible{ outline:2px solid var(--signal); outline-offset:3px; }
+
+  /* ------------------------------------------------------------------ */
+  /* Deck & slides                                                       */
+  /* ------------------------------------------------------------------ */
+  .deck{ position:fixed; inset:0; }
+  .slide{ position:absolute; inset:0; display:grid;
+    grid-template-rows:minmax(64px,1fr) auto minmax(64px,1fr);
+    padding:0 clamp(26px,6vw,100px); overflow-y:auto;
+    opacity:0; visibility:hidden; pointer-events:none;
+    transform:translateY(10px); transition:opacity .5s ease, transform .5s ease; }
+  .slide.is-active{ opacity:1; visibility:visible; pointer-events:auto; transform:none; }
+  .slide.on-paper{ background:var(--paper); color:var(--ink-on-paper); }
+  .wrap{ grid-row:2; width:100%; max-width:1180px; margin:34px auto; }
+
+  .eyebrow{ display:flex; align-items:center; gap:14px; font-family:var(--f-mono);
+    font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--signal); margin-bottom:20px; }
+  .on-paper .eyebrow{ color:var(--signal-dim); }
+  .eyebrow .rule{ flex:1; height:1px; background:var(--line); max-width:70px; }
+  .on-paper .eyebrow .rule{ background:var(--line-paper); }
+
+  .title{ font-size:clamp(1.8rem,4.2vw,3rem); font-weight:600; margin:0 0 20px; color:var(--ink); }
+  .on-paper .title{ color:var(--ink-on-paper); }
+  .lede{ font-size:clamp(1rem,1.5vw,1.2rem); line-height:1.6; color:var(--ink-dim);
+    max-width:60ch; margin:0 0 16px; }
+  .on-paper .lede{ color:var(--ink-on-paper-dim); }
+  b, strong{ color:var(--ink); font-weight:600; }
+  .on-paper b, .on-paper strong{ color:var(--ink-on-paper); }
+
+  /* ---- Title slide ---- */
+  .hero{ text-align:center; padding-top:2vh; }
+  .hero-eyebrow{ font-family:var(--f-mono); font-size:12.5px; letter-spacing:.24em; text-transform:uppercase;
+    color:var(--ink-dim); margin-bottom:26px; }
+  .hero h1{ font-size:clamp(3.4rem,10vw,7.2rem); font-weight:600; margin:0; letter-spacing:-.03em; }
+  .hero h1 .dot{ color:var(--signal); }
+  .hero .tag{ font-size:clamp(1.05rem,1.7vw,1.3rem); line-height:1.55; color:var(--ink-dim);
+    max-width:38ch; margin:20px auto 0; font-family:var(--f-body); }
+  .hero .wave{ margin:44px auto 0; max-width:640px; width:100%; height:64px; overflow:visible; }
+  .hero .wave svg{ width:100%; height:100%; display:block; overflow:visible; }
+  .hero .wave path{ fill:none; stroke:var(--signal); stroke-width:1.4; vector-effect:non-scaling-stroke; }
+  .hero .stack{ display:flex; flex-wrap:wrap; gap:10px; justify-content:center; margin-top:34px; }
+  .chip{ font-family:var(--f-mono); font-size:12px; letter-spacing:.02em; padding:7px 14px;
+    border:1px solid var(--line); border-radius:999px; color:var(--ink-dim);
+    display:inline-flex; align-items:center; gap:8px; }
+  .chip i{ width:6px; height:6px; border-radius:50%; display:block; }
+
+  /* ---- agenda / timeframe slide ---- */
+  .agenda-list{ display:flex; flex-direction:column; gap:1px; background:var(--line); border:1px solid var(--line);
+    max-width:760px; margin:34px auto 0; }
+  .agenda-row{ display:flex; align-items:center; gap:22px; padding:20px 26px; background:var(--panel); }
+  .agenda-time{ font-family:var(--f-mono); font-size:13px; font-weight:600; color:var(--signal);
+    border:1px solid var(--line); border-radius:999px; padding:6px 14px; flex:none; min-width:64px; text-align:center; }
+  .agenda-name{ font-family:var(--f-display); font-size:1.15rem; font-weight:600; color:var(--ink); }
+  .agenda-total{ max-width:760px; margin:18px auto 0; display:flex; align-items:center; justify-content:space-between;
+    padding:14px 26px; border:1px solid var(--line); border-radius:6px; }
+  .agenda-total span:first-child{ font-family:var(--f-mono); font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-dim); }
+  .agenda-total-val{ font-family:var(--f-display); font-weight:600; font-size:1.3rem; color:var(--signal); }
+  @media (max-width:900px){
+    .agenda-row{ flex-direction:column; align-items:flex-start; gap:10px; }
+  }
+
+  /* ---- generic cards ---- */
+  .cards{ display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); border:1px solid var(--line); }
+  .card{ background:var(--panel); padding:26px 24px; }
+  .on-paper .card{ background:var(--paper); }
+  .card .idx{ font-family:var(--f-mono); font-size:11px; color:var(--signal); letter-spacing:.1em; margin-bottom:16px; display:block; }
+  .card h3{ font-family:var(--f-display); font-size:1.2rem; font-weight:600; margin:0 0 8px; color:var(--ink); }
+  .on-paper .card h3{ color:var(--ink-on-paper); }
+  .card p{ margin:0; font-size:.94rem; line-height:1.55; color:var(--ink-dim); }
+  .on-paper .card p{ color:var(--ink-on-paper-dim); }
+
+  /* ---- flow (steps) ---- */
+  .flow{ display:grid; grid-template-columns:repeat(3,1fr); gap:0; counter-reset:step; }
+  .step{ position:relative; padding:0 30px; }
+  .step:first-child{ padding-left:0; }
+  .step:not(:last-child){ border-right:1px solid var(--line); }
+  .on-paper .step:not(:last-child){ border-right-color:var(--line-paper); }
+  .step .no{ font-family:var(--f-mono); font-size:34px; font-weight:400; color:var(--line); letter-spacing:0; margin-bottom:18px; line-height:1; }
+  .on-paper .step .no{ color:var(--line-paper); }
+  .step h3{ font-family:var(--f-display); font-size:1.3rem; font-weight:600; margin:0 0 10px; color:var(--ink); }
+  .on-paper .step h3{ color:var(--ink-on-paper); }
+  .step p{ margin:0; color:var(--ink-dim); line-height:1.55; font-size:.96rem; }
+  .on-paper .step p{ color:var(--ink-on-paper-dim); }
+
+  /* ---- two sensing streams ---- */
+  .streams{ display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line); border:1px solid var(--line); margin-bottom:20px; }
+  .stream{ padding:26px 26px 24px; background:var(--panel); border-top:2px solid var(--hue); }
+  .stream .lbl{ font-family:var(--f-mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--hue); margin-bottom:10px; }
+  .stream h3{ font-family:var(--f-display); font-size:1.4rem; font-weight:600; margin:0 0 10px; color:var(--ink); }
+  .stream p{ margin:0 0 16px; color:var(--ink-dim); line-height:1.55; }
+  .stream .facts{ display:flex; flex-wrap:wrap; gap:8px; }
+  .stream .facts span{ font-family:var(--f-mono); font-size:11px; padding:6px 10px; border-radius:5px;
+    background:rgba(237,239,244,.05); color:var(--ink-dim); border:1px solid var(--line); }
+  .privacy{ display:flex; align-items:flex-start; gap:14px; padding:16px 22px; border-radius:4px;
+    border:1px solid var(--line); font-size:.95rem; line-height:1.5; color:var(--ink-dim); }
+  .privacy svg{ flex:none; color:var(--signal); margin-top:2px; }
+
+  /* ---- readiness slide ---- */
+  .ready-grid{ display:grid; grid-template-columns:.85fr 1.15fr; gap:56px; align-items:center; }
+  .donut-wrap{ position:relative; display:grid; place-items:center; }
+  .donut-wrap svg{ width:min(300px,64vw); height:auto; }
+  .donut-center{ position:absolute; text-align:center; }
+  .donut-center .lab{ font-family:var(--f-mono); font-size:11px; letter-spacing:.16em; color:var(--ink-dim); }
+  .donut-center .val{ font-family:var(--f-display); font-weight:600; font-size:2.2rem; margin-top:4px; }
+
+  .weights{ display:flex; flex-direction:column; }
+  .weight-row{ display:flex; align-items:center; gap:14px; padding:14px 0; border-top:1px solid var(--line); }
+  .weight-row:first-child{ border-top:0; }
+  .weight-row i{ width:9px; height:9px; border-radius:50%; flex:none; }
+  .weight-row .wtxt{ flex:1; font-size:.98rem; line-height:1.4; }
+  .weight-row .wpct{ font-family:var(--f-mono); font-weight:600; font-size:1.15rem; color:var(--ink); }
+
+  .bands{ display:flex; gap:1px; margin-top:22px; background:var(--line); border:1px solid var(--line); }
+  .band{ flex:1; padding:12px 10px; text-align:center; background:var(--panel); }
+  .band .r{ font-family:var(--f-mono); font-size:11px; letter-spacing:.02em; color:var(--ink-dim); }
+  .band .n{ font-weight:600; margin-top:4px; font-size:.88rem; }
+  .band.needs .n{ color:#FF8A7A; }
+  .band.almost .n{ color:var(--voice); }
+  .band.ready .n{ color:var(--ready); }
+
+  /* ---- pillars ---- */
+  .pillars{ display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); border:1px solid var(--line); }
+  .pillar{ padding:24px; background:var(--panel); border-top:3px solid var(--hue); }
+  .pillar .pct{ font-family:var(--f-mono); font-size:12px; letter-spacing:.06em; color:var(--hue); }
+  .pillar h3{ font-family:var(--f-display); font-size:1.3rem; font-weight:600; margin:8px 0 4px; color:var(--ink); }
+  .pillar .sub{ font-size:.85rem; color:var(--ink-dim); margin-bottom:16px; }
+  .pillar ul{ list-style:none; margin:0; padding:0; }
+  .pillar li{ font-size:.9rem; padding:11px 0; border-top:1px solid var(--line); color:var(--ink-dim); line-height:1.5; }
+  .pillar li:first-child{ border-top:0; }
+  .pillar li b{ color:var(--ink); }
+
+  /* ---- name / wordmark slide ---- */
+  .word-hero{ text-align:center; }
+  .word-hero .molave{ font-family:var(--f-display); font-weight:600; font-size:clamp(3.4rem,11vw,8rem);
+    letter-spacing:-.02em; color:var(--ink); line-height:1; }
+  .word-hero .gloss{ font-family:var(--f-mono); font-size:13px; letter-spacing:.12em; text-transform:uppercase;
+    color:var(--signal); margin-top:18px; }
+  .word-hero .def{ font-size:clamp(1rem,1.6vw,1.2rem); color:var(--ink-dim); max-width:56ch; margin:20px auto 0; line-height:1.6; }
+  .on-paper .molave{ color:var(--ink-on-paper); }
+  .on-paper .word-hero .gloss{ color:var(--signal-dim); }
+  .on-paper .word-hero .def{ color:var(--ink-on-paper-dim); }
+
+  .trait-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:1px; background:var(--line); border:1px solid var(--line); margin-top:8px; }
+  .on-paper .trait-grid{ background:var(--line-paper); border-color:var(--line-paper); }
+  .trait{ padding:24px; background:var(--panel); text-align:left; }
+  .on-paper .trait{ background:var(--paper); }
+  .trait .glyph{ width:30px; height:30px; margin-bottom:16px; color:var(--signal); }
+  .on-paper .trait .glyph{ color:var(--signal-dim); }
+  .trait h4{ font-family:var(--f-display); font-size:1.1rem; font-weight:600; margin:0 0 8px; color:var(--ink); }
+  .on-paper .trait h4{ color:var(--ink-on-paper); }
+  .trait p{ margin:0; font-size:.9rem; line-height:1.5; color:var(--ink-dim); }
+  .on-paper .trait p{ color:var(--ink-on-paper-dim); }
+
+  /* ---- FACS specimen grid ---- */
+  .specimens{ display:grid; grid-template-columns:repeat(4,1fr); gap:1px; background:var(--line); border:1px solid var(--line); }
+  .specimen{ background:var(--panel); position:relative; }
+  .specimen .frame{ height:min(15vh,150px); overflow:hidden; position:relative; background:#000; }
+  .specimen .frame img{ width:100%; height:100%; object-fit:cover; object-position:50% 35%; filter:grayscale(.15) contrast(1.05); display:block; }
+  .specimen .frame::after{ content:''; position:absolute; inset:0; box-shadow:inset 0 0 0 1px rgba(237,239,244,.08); pointer-events:none; }
+  .specimen .read{ padding:10px 14px 12px; }
+  .specimen .code{ font-family:var(--f-mono); font-size:12.5px; font-weight:600; color:var(--signal); }
+  .specimen.tension .code{ color:var(--warn); }
+  .specimen .nm{ font-size:.8rem; color:var(--ink); margin-top:2px; line-height:1.25; }
+  .specimen .bar{ margin-top:8px; height:3px; background:var(--line); border-radius:2px; overflow:hidden; }
+  .specimen .bar span{ display:block; height:100%; background:var(--signal); }
+  .specimen.tension .bar span{ background:var(--warn); }
+
+  .legend{ display:flex; align-items:center; gap:22px; margin-top:16px; flex-wrap:wrap; }
+  .legend .item{ display:flex; align-items:center; gap:8px; font-family:var(--f-mono); font-size:11.5px; color:var(--ink-dim); }
+  .legend .sw{ width:10px; height:10px; border-radius:2px; flex:none; }
+
+  /* ---- FACS combo rows: AU + AU -> named feeling ---- */
+  .combos{ display:flex; flex-direction:column; gap:1px; background:var(--line); border:1px solid var(--line); }
+  .combo-row{ display:grid; grid-template-columns:auto auto auto 1fr; align-items:center; gap:18px; padding:14px 20px; background:var(--panel); }
+  .combo-thumb{ display:flex; align-items:center; gap:10px; }
+  .combo-thumb .pic{ width:52px; height:52px; border-radius:6px; overflow:hidden; flex:none; background:#000; box-shadow:inset 0 0 0 1px rgba(237,239,244,.1); }
+  .combo-thumb .pic img{ width:100%; height:100%; object-fit:cover; object-position:50% 35%; filter:grayscale(.15) contrast(1.05); display:block; }
+  .combo-thumb .code{ font-family:var(--f-mono); font-size:12px; font-weight:600; color:var(--signal); }
+  .combo-thumb .nm{ font-size:.76rem; color:var(--ink-dim); }
+  .combo-plus{ font-family:var(--f-display); font-size:1.3rem; color:var(--ink-faint); }
+  .combo-result{ display:flex; align-items:center; gap:12px; justify-self:end; text-align:right; }
+  .combo-result .arrow{ color:var(--ink-faint); font-size:1.1rem; }
+  .combo-result .feeling{ font-family:var(--f-display); font-size:1.3rem; font-weight:600; color:var(--ink); }
+  .combo-result .feeling .jp-desc{ display:block; font-family:var(--f-body); font-size:.72rem; font-weight:400; color:var(--ink-dim); margin-top:2px; }
+  @media (max-width:900px){
+    .combo-row{ grid-template-columns:1fr; text-align:center; gap:10px; }
+    .combo-thumb{ justify-content:center; }
+    .combo-result{ justify-self:center; flex-direction:column; }
+  }
+
+  /* ---- engagement score infographic (image asset) ---- */
+  .score-img-frame{ border-radius:8px; overflow:hidden; border:1px solid var(--line); line-height:0;
+    display:flex; justify-content:center; background:#0B0D12; max-height:56vh; }
+  .score-img-frame img{ display:block; width:auto; height:auto; max-width:100%; max-height:56vh; object-fit:contain; }
+
+  /* ---- why-built list ---- */
+  .eng{ display:grid; grid-template-columns:1fr 1fr; gap:1px; background:var(--line); border:1px solid var(--line); }
+  .eng-item{ display:flex; gap:16px; padding:22px 24px; background:var(--panel); }
+  .eng-item .n{ font-family:var(--f-mono); color:var(--signal); font-size:12px; padding-top:3px; flex:none; }
+  .eng-item h4{ margin:0 0 5px; font-size:1.02rem; font-weight:600; color:var(--ink); }
+  .eng-item p{ margin:0; color:var(--ink-dim); font-size:.9rem; line-height:1.5; }
+
+  /* ---- closing ---- */
+  .close-hero{ text-align:center; }
+  .close-hero .big{ font-family:var(--f-display); font-size:clamp(1.9rem,4.4vw,3.1rem); font-weight:600; line-height:1.18; max-width:24ch; margin:0 auto; }
+  .close-hero .big em{ font-style:italic; color:var(--signal); }
+  .close-pillars{ display:inline-flex; gap:26px; flex-wrap:wrap; justify-content:center; margin:34px 0; }
+  .close-pillars span{ font-family:var(--f-mono); font-size:12px; letter-spacing:.04em; display:flex; align-items:center; gap:8px; color:var(--ink-dim); }
+  .close-pillars i{ width:8px; height:8px; border-radius:50%; flex:none; }
+  .thanks{ font-family:var(--f-display); font-size:1.5rem; font-weight:600; color:var(--ink); }
+
+  /* ---- reveal animation ---- */
+  .rise{ opacity:0; transform:translateY(10px); }
+  .is-active .rise{ animation:riseIn .6s cubic-bezier(.16,1,.3,1) forwards; }
+  @keyframes riseIn{ to{ opacity:1; transform:none; } }
+
+  /* ------------------------------------------------------------------ */
+  /* Responsive                                                          */
+  /* ------------------------------------------------------------------ */
+  @media (max-width:900px){
+    .cards,.pillars,.streams,.eng,.trait-grid{ grid-template-columns:1fr; }
+    .specimens{ grid-template-columns:repeat(2,1fr); }
+    .flow{ grid-template-columns:1fr; }
+    .step{ padding:16px 0 !important; border-right:0 !important; border-bottom:1px solid var(--line); }
+    .on-paper .step{ border-bottom-color:var(--line-paper); }
+    .ready-grid{ grid-template-columns:1fr; gap:30px; }
+    .nav{ display:none; }
+    .topbar{ padding:18px; }
+    .botbar{ padding:0 18px; }
+    .slide{ grid-template-rows:56px auto 56px; }
+    .wrap{ margin:20px auto; }
+    .equation{ gap:14px; padding:28px 14px; }
+    .eq-op{ display:none; }
+  }
+  @media (max-width:560px){
+    .specimens{ grid-template-columns:1fr 1fr; }
+  }
+
+  @media (prefers-reduced-motion:reduce){
+    *{ transition:none !important; animation:none !important; }
+    .rise{ opacity:1; transform:none; }
+  }
+</style>
+</head>
+<body>
+
+  <span class="tick tl"></span><span class="tick tr"></span>
+  <span class="tick bl"></span><span class="tick br"></span>
+
+  <div class="topbar">
+    <div class="brand"><span class="rec"></span><span>molave.ai</span></div>
+    <div class="counter"><span id="counter">01 / 15</span></div>
+  </div>
+
+  <div class="botbar">
+    <div class="meta"><span class="section-label" id="sectionLabel">INTRO</span></div>
+    <div class="scope"><svg id="scopeSvg" viewBox="0 0 1000 28" preserveAspectRatio="none" aria-hidden="true"></svg></div>
+  </div>
+
+  <button class="nav prev" id="prevBtn" aria-label="Previous slide">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+  </button>
+  <button class="nav next" id="nextBtn" aria-label="Next slide">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+  </button>
+
+  <div class="deck" id="deck">
+
+    <!-- ============ 1 · TITLE ============ -->
+    <section class="slide is-active" data-section="INTRO">
+      <div class="wrap">
+        <div class="hero">
+          <div class="hero-eyebrow rise">A PRODUCT WE BUILT WITH CARE</div>
+          <h1 class="display rise" style="animation-delay:.05s">molave<span class="dot">.</span>ai</h1>
+          <p class="tag rise" style="animation-delay:.12s">An AI that sits with you while you practice. It listens to your voice, watches your face, and reads your answers, then tells you, gently and honestly, how ready you really are.</p>
+          <div class="wave rise" style="animation-delay:.2s"><svg id="heroWave" viewBox="0 0 640 64" preserveAspectRatio="none" aria-hidden="true"></svg></div>
+          <div class="stack rise" style="animation-delay:.3s">
+            <span class="chip"><i style="background:var(--signal)"></i>MediaPipe + FACS</span>
+            <span class="chip"><i style="background:var(--voice)"></i>Deepgram Voice Agent</span>
+            <span class="chip"><i style="background:var(--content)"></i>Claude Sonnet</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 1b · AGENDA / TIMEFRAME ============ -->
+    <section class="slide" data-section="AGENDA">
+      <div class="wrap">
+        <div class="eyebrow"><span class="rule" style="max-width:40px"></span><span>PRESENTATION OVERVIEW</span><span class="rule" style="max-width:40px"></span></div>
+        <h2 class="title display" style="text-align:center;margin-left:auto;margin-right:auto">What we'll cover today.</h2>
+        <div class="agenda-list">
+          <div class="agenda-row">
+            <span class="agenda-time">4 min</span>
+            <span class="agenda-name">What molave.ai is — product vision</span>
+          </div>
+          <div class="agenda-row">
+            <span class="agenda-time">6 min</span>
+            <span class="agenda-name">Architecture: face + voice + gesture → Engagement Score</span>
+          </div>
+          <div class="agenda-row">
+            <span class="agenda-time">5 min</span>
+            <span class="agenda-name">Key results and current status</span>
+          </div>
+          <div class="agenda-row">
+            <span class="agenda-time">5 min</span>
+            <span class="agenda-name">Next steps and what we need</span>
+          </div>
+        </div>
+        <div class="agenda-total">
+          <span>Total</span>
+          <span class="agenda-total-val">20 minutes</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 2 · WHY THE NAME ============ -->
+    <section class="slide" data-section="THE NAME">
+      <div class="wrap">
+        <div class="word-hero">
+          <div class="eyebrow" style="justify-content:center"><span class="rule" style="max-width:40px"></span><span>WHY THIS NAME</span><span class="rule" style="max-width:40px"></span></div>
+          <div class="molave rise">Molave</div>
+          <div class="gloss rise" style="animation-delay:.08s">said "moh LAH veh"</div>
+          <p class="def rise" style="animation-delay:.16s">Molave is one of the strongest hardwoods in the Philippines, known for lasting a long time without cracking or bending. We picked the name because we want the product to have that same reputation: strong, reliable, and built to last.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 3 · WHAT WE STAND FOR ============ -->
+    <section class="slide" data-section="OUR PRINCIPLES">
+      <div class="wrap">
+        <div class="eyebrow"><span>01</span><span>WHAT WE STAND FOR</span><span class="rule"></span></div>
+        <h2 class="title display">Three principles behind every decision.</h2>
+        <p class="lede">These guide how we designed the product.</p>
+        <div class="trait-grid">
+          <div class="trait">
+            <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 22V9M12 9C12 9 5 9 5 4c0 0 7 0 7 5zM12 9c0 0 7 0 7-5 0 0-7 0-7 5z"/><path d="M8 22h8"/></svg>
+            <h4>Built to be used often</h4>
+            <p>People can practice as many times as they need, with no limit and no judgment, until they feel ready.</p>
+          </div>
+          <div class="trait">
+            <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2l9 4.5v9L12 20l-9-4.5v-9z"/><path d="M12 11v9M3 6.5l9 4.5 9-4.5"/></svg>
+            <h4>One score you can trust</h4>
+            <p>Voice, face, and answers are combined into a single, consistent score, calculated the same way every time.</p>
+          </div>
+          <div class="trait">
+            <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M8 12l2.5 2.5L16 9"/></svg>
+            <h4>Plain, honest feedback</h4>
+            <p>Coaching is written in plain language, with no exaggeration and no false praise.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 4 · THE PROBLEM ============ -->
+    <section class="slide" data-section="THE PROBLEM">
+      <div class="wrap">
+        <div class="eyebrow" style="justify-content:center"><span class="rule" style="max-width:40px"></span><span>THE PROBLEM</span><span class="rule" style="max-width:40px"></span></div>
+        <h2 class="title display" style="text-align:center;max-width:26ch;margin-left:auto;margin-right:auto">Practicing alone leaves three gaps.</h2>
+        <div class="cards" style="margin-top:32px">
+          <div class="card" style="text-align:center">
+            <span class="idx">SPEAKING PACE</span>
+            <h3>No one is timing you</h3>
+            <p>Speaking too fast, too slow, or with too many filler words is hard to notice on your own.</p>
+          </div>
+          <div class="card" style="text-align:center">
+            <span class="idx">EYE CONTACT</span>
+            <h3>No one is watching you</h3>
+            <p>Eye contact and body language are difficult to judge from the inside.</p>
+          </div>
+          <div class="card" style="text-align:center">
+            <span class="idx">VISIBLE STRESS</span>
+            <h3>No one is reading you</h3>
+            <p>Small signs of stress, like a tense jaw or a lowered brow, often go unnoticed.</p>
+          </div>
+        </div>
+        <p class="lede" style="text-align:center;margin:26px auto 0;max-width:56ch;color:var(--ink)"><b>molave.ai measures all three</b> and turns them into one clear score.</p>
+      </div>
+    </section>
+
+    <!-- ============ 5 · WHAT IT IS ============ -->
+    <section class="slide" data-section="WHAT IT IS">
+      <div class="wrap">
+        <div class="eyebrow"><span>02</span><span>PRODUCT VISION</span><span class="rule"></span></div>
+        <h2 class="title display">One conversation, three things measured.</h2>
+        <p class="lede" style="margin-bottom:26px">molave.ai runs a live, spoken interview and measures three areas at the same time.</p>
+        <div class="cards">
+          <div class="card"><span class="idx">YOUR VOICE</span><h3>Delivery</h3><p>Speaking pace, pauses, and filler words like "um" and "uh."</p></div>
+          <div class="card"><span class="idx">YOUR CAMERA</span><h3>Presence</h3><p>Face and posture, read live in the browser during the conversation.</p></div>
+          <div class="card"><span class="idx">YOUR WORDS</span><h3>Content</h3><p>What was actually said, checked for clarity and relevance to the question.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 6 · HOW: FLOW ============ -->
+    <section class="slide" data-section="HOW IT WORKS">
+      <div class="wrap">
+        <div class="eyebrow"><span>03</span><span>ARCHITECTURE</span><span class="rule"></span></div>
+        <h2 class="title display">Three easy steps, start to finish.</h2>
+        <div class="flow">
+          <div class="step"><div class="no">01</div><h3>Choose your setup</h3><p>Pick the role you're practicing for, how hard the questions should be, and how tough the interviewer sounds.</p></div>
+          <div class="step"><div class="no">02</div><h3>Have the conversation</h3><p>An AI interviewer talks with you out loud, like a real person would. Your camera quietly watches while you answer.</p></div>
+          <div class="step"><div class="no">03</div><h3>See how you did</h3><p>The moment you finish, you get your score and warm, practical coaching to help you improve.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 7 · HOW: TWO STREAMS ============ -->
+    <section class="slide" data-section="HOW IT WORKS">
+      <div class="wrap">
+        <div class="eyebrow"><span>04</span><span>ARCHITECTURE · SENSING</span><span class="rule"></span></div>
+        <h2 class="title display">It watches, listens, and notices, all at once.</h2>
+        <div class="streams">
+          <div class="stream" style="--hue:var(--signal)">
+            <div class="lbl">FACE + GESTURE</div>
+            <h3>Your camera, right in the browser</h3>
+            <p>It gently notices where you look, how you sit, your expressions, and the small movements of your hands. Nothing is recorded. Only the numbers ever leave your device.</p>
+            <div class="facts"><span>eye contact</span><span>posture</span><span>hand movement</span><span>expression</span></div>
+          </div>
+          <div class="stream" style="--hue:var(--voice)">
+            <div class="lbl">VOICE</div>
+            <h3>Your voice, as you speak</h3>
+            <p>It hears your words, and also how you say them: your pace, your tone, and the warmth or nerves that come through.</p>
+            <div class="facts"><span>speaking speed</span><span>filler words</span><span>tone</span><span>volume</span></div>
+          </div>
+        </div>
+        <div class="privacy">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
+          <span>Your video and audio are never saved. They become numbers, then are deleted right away. We built it this way because your trust matters more than our data.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 9 · FACS INTRO ============ -->
+    <section class="slide" data-section="READING THE FACE">
+      <div class="wrap">
+        <div class="eyebrow"><span>05</span><span>READING YOUR FACE</span><span class="rule"></span></div>
+        <h2 class="title display">A standard method for reading expressions.</h2>
+        <p class="lede">We use <b>FACS</b> (Facial Action Coding System), a method used in research for over 40 years to measure facial movement. It works from a normal camera, with no extra hardware, and turns expressions into consistent, repeatable measurements instead of opinions.</p>
+        <div class="pillars" style="margin-top:30px">
+          <div class="pillar" style="--hue:var(--signal)"><div class="pct">MEASURED</div><h3>Not guessed</h3><div class="sub">Each movement gets a number, not an opinion.</div></div>
+          <div class="pillar" style="--hue:var(--voice)"><div class="pct">FAST</div><h3>Sub-second</h3><div class="sub">Catches expressions that pass in under a second.</div></div>
+          <div class="pillar" style="--hue:var(--content)"><div class="pct">CAMERA ONLY</div><h3>No extra hardware</h3><div class="sub">Works from a standard webcam, nothing worn.</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 10 · FACS SPECIMEN GRID ============ -->
+    <section class="slide" data-section="READING THE FACE">
+      <div class="wrap">
+        <div class="eyebrow" style="margin-bottom:14px"><span>06</span><span>THE MOVEMENTS WE WATCH FOR</span><span class="rule"></span></div>
+        <h2 class="title display" style="font-size:clamp(1.5rem,3.2vw,2.2rem);margin-bottom:16px">FACS defines over 40 movements. Here are 8 examples.</h2>
+        <div class="specimens">
+          <div class="specimen"><div class="frame"><img src="assets/facs/au1-inner-brow-raise.gif" alt="AU1 inner brow raise, looping demonstration" loading="lazy"></div><div class="read"><span class="code">AU1</span><div class="nm">Inner brow goes up</div><div class="bar"><span style="width:55%"></span></div></div></div>
+          <div class="specimen"><div class="frame"><img src="assets/facs/au5-eyes-wide.gif" alt="AU5 upper lid raise, eyes opening wide, looping demonstration" loading="lazy"></div><div class="read"><span class="code">AU5</span><div class="nm">Eyes open wide</div><div class="bar"><span style="width:60%"></span></div></div></div>
+          <div class="specimen"><div class="frame"><img src="assets/facs/au6-cheek-raiser.gif" alt="AU6 cheek raiser, looping demonstration" loading="lazy"></div><div class="read"><span class="code">AU6</span><div class="nm">Cheeks lift up</div><div class="bar"><span style="width:70%"></span></div></div></div>
+          <div class="specimen"><div class="frame"><img src="assets/facs/au12-lip-corner-puller.gif" alt="AU12 lip corner puller, smiling, looping demonstration" loading="lazy"></div><div class="read"><span class="code">AU12</span><div class="nm">Corners of mouth pull up</div><div class="bar"><span style="width:75%"></span></div></div></div>
+          <div class="specimen tension"><div class="frame"><img src="assets/facs/au4-brow-lowerer.gif" alt="AU4 brow lowerer, looping demonstration" loading="lazy"></div><div class="read"><span class="code">AU4</span><div class="nm">Brow pulls down</div><div class="bar"><span style="width:65%"></span></div></div></div>
+          <div class="specimen tension"><div class="frame"><img src="assets/facs/au7-lid-tightener.gif" alt="AU7 lid tightener, looping demonstration" loading="lazy"></div><div class="read"><span class="code">AU7</span><div class="nm">Eyelids squeeze tight</div><div class="bar"><span style="width:50%"></span></div></div></div>
+          <div class="specimen tension"><div class="frame"><img src="assets/facs/au23-lip-tightener.gif" alt="AU23 lip tightener, lips pressed together, looping demonstration" loading="lazy"></div><div class="read"><span class="code">AU23</span><div class="nm">Lips press together</div><div class="bar"><span style="width:58%"></span></div></div></div>
+          <div class="specimen"><div class="frame"><img src="assets/facs/au45-blink.gif" alt="AU45 blink, looping demonstration" loading="lazy"></div><div class="read"><span class="code">AU45</span><div class="nm">Blink</div><div class="bar"><span style="width:40%"></span></div></div></div>
+        </div>
+        <div class="legend">
+          <div class="item"><span class="sw" style="background:var(--signal)"></span>part of an expression</div>
+          <div class="item"><span class="sw" style="background:var(--warn)"></span>can mean stress</div>
+          <div class="item" style="color:var(--ink-faint)">the bar shows how strong the movement usually is</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 10b · FACS COMBOS: MOVEMENTS -> FEELINGS ============ -->
+    <section class="slide" data-section="READING THE FACE">
+      <div class="wrap">
+        <div class="eyebrow" style="margin-bottom:14px"><span>07</span><span>PUTTING MOVEMENTS TOGETHER</span><span class="rule"></span></div>
+        <h2 class="title display" style="font-size:clamp(1.5rem,3.2vw,2.2rem);margin-bottom:8px">Movements combine to signal a feeling. Four examples below.</h2>
+        <p class="lede" style="margin-bottom:18px">A single movement means little on its own. Combinations are what make the reading reliable.</p>
+        <div class="combos">
+          <div class="combo-row">
+            <div class="combo-thumb"><div class="pic"><img src="assets/facs/au6-cheek-raiser.gif" alt="AU6 cheek raiser" loading="lazy"></div><div><span class="code">AU6</span><div class="nm">Cheeks lift</div></div></div>
+            <span class="combo-plus">+</span>
+            <div class="combo-thumb"><div class="pic"><img src="assets/facs/au12-lip-corner-puller.gif" alt="AU12 lip corner puller" loading="lazy"></div><div><span class="code">AU12</span><div class="nm">Mouth pulls up</div></div></div>
+            <div class="combo-result"><span class="arrow">=</span><span class="feeling" style="color:var(--ready)">A real smile<span class="jp-desc">happy, and you can tell it is genuine</span></span></div>
+          </div>
+          <div class="combo-row">
+            <div class="combo-thumb"><div class="pic"><img src="assets/facs/au4-brow-lowerer.gif" alt="AU4 brow lowerer" loading="lazy"></div><div><span class="code">AU4</span><div class="nm">Brow pulls down</div></div></div>
+            <span class="combo-plus">+</span>
+            <div class="combo-thumb"><div class="pic"><img src="assets/facs/au7-lid-tightener.gif" alt="AU7 lid tightener" loading="lazy"></div><div><span class="code">AU7</span><div class="nm">Eyelids squeeze</div></div></div>
+            <div class="combo-result"><span class="arrow">=</span><span class="feeling" style="color:var(--warn)">Stress or worry<span class="jp-desc">a sign the person may feel tense</span></span></div>
+          </div>
+          <div class="combo-row">
+            <div class="combo-thumb"><div class="pic"><img src="assets/facs/au1-inner-brow-raise.gif" alt="AU1 inner brow raise" loading="lazy"></div><div><span class="code">AU1</span><div class="nm">Inner brow up</div></div></div>
+            <span class="combo-plus">+</span>
+            <div class="combo-thumb"><div class="pic"><img src="assets/facs/au5-eyes-wide.gif" alt="AU5 upper lid raise" loading="lazy"></div><div><span class="code">AU5</span><div class="nm">Eyes open wide</div></div></div>
+            <div class="combo-result"><span class="arrow">=</span><span class="feeling" style="color:var(--voice)">Surprise<span class="jp-desc">something unexpected just happened</span></span></div>
+          </div>
+          <div class="combo-row">
+            <div class="combo-thumb"><div class="pic"><img src="assets/facs/au23-lip-tightener.gif" alt="AU23 lip tightener" loading="lazy"></div><div><span class="code">AU23</span><div class="nm">Lips press together</div></div></div>
+            <span class="combo-plus">+</span>
+            <div class="combo-thumb"><div class="pic"><img src="assets/facs/au4-brow-lowerer.gif" alt="AU4 brow lowerer" loading="lazy"></div><div><span class="code">AU4</span><div class="nm">Brow pulls down</div></div></div>
+            <div class="combo-result"><span class="arrow">=</span><span class="feeling" style="color:var(--warn)">Holding something back<span class="jp-desc">the person may be biting their tongue</span></span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 11 · THE ENGAGEMENT SCORE (infographic) ============ -->
+    <section class="slide" data-section="THE ENGAGEMENT SCORE">
+      <div class="wrap">
+        <div class="eyebrow"><span>08</span><span>ARCHITECTURE · THE SCORE</span><span class="rule"></span></div>
+        <h2 class="title display" style="font-size:clamp(1.5rem,3.2vw,2.2rem);margin-bottom:14px">Three weighted parts, one score.</h2>
+        <div class="score-img-frame">
+          <img src="assets/engagement-score.png" alt="What makes someone engaging: Delivery (how you speak) 40%, Presence (how you present yourself) 35%, and Content (what you say) 25%, combining into one Engagement score." />
+        </div>
+        <div class="bands" style="margin-top:20px">
+          <div class="band needs"><div class="r">Under 50</div><div class="n">Needs work</div></div>
+          <div class="band almost"><div class="r">50 to 69</div><div class="n">Almost there</div></div>
+          <div class="band ready"><div class="r">70 and up</div><div class="n">Ready</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 12 · KEY RESULTS & STATUS ============ -->
+    <section class="slide" data-section="RESULTS">
+      <div class="wrap">
+        <div class="eyebrow"><span>09</span><span>KEY RESULTS &amp; CURRENT STATUS</span><span class="rule"></span></div>
+        <h2 class="title display">What is built and working today.</h2>
+        <div class="cards">
+          <div class="card"><span class="idx">LIVE TODAY</span><h3>End-to-end interviews</h3><p>Setup, live AI conversation, camera and voice reading, and a full score report.</p></div>
+          <div class="card"><span class="idx">PROVEN</span><h3>Three signals, one score</h3><p>Delivery, Presence, and Content are fused into a single Engagement Score.</p></div>
+          <div class="card"><span class="idx">PRIVATE BY DESIGN</span><h3>On-device by default</h3><p>Camera analysis runs in the browser. Voice recordings are deleted after scoring.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 14 · NEXT STEPS & WHAT WE NEED ============ -->
+    <section class="slide" data-section="NEXT STEPS">
+      <div class="wrap">
+        <div class="eyebrow"><span>10</span><span>NEXT STEPS &amp; WHAT WE NEED</span><span class="rule"></span></div>
+        <h2 class="title display">What we plan to build next.</h2>
+        <div class="cards">
+          <div class="card"><span class="idx">01</span><h3>Avatar interviewer</h3><p>A visual, on-screen avatar to lead the interview, instead of voice only.</p></div>
+          <div class="card"><span class="idx">02</span><h3>Microsoft Teams bot</h3><p>Run practice interviews directly inside Teams, where employees already work.</p></div>
+          <div class="card"><span class="idx">03</span><h3>Wider pilot</h3><p>More users and real interview data to keep improving scoring accuracy.</p></div>
+        </div>
+        <p class="lede" style="text-align:center;margin:28px auto 0;max-width:56ch;color:var(--ink)"><b>What we need:</b> approval to pilot with a small group, and access to a Teams environment for integration testing.</p>
+      </div>
+    </section>
+
+    <!-- ============ 15 · CLOSE ============ -->
+    <section class="slide" data-section="SUMMARY">
+      <div class="wrap">
+        <div class="close-hero">
+          <div class="hero-eyebrow rise" style="color:var(--signal)">molave.ai</div>
+          <h2 class="big display rise" style="animation-delay:.08s">Practice like it's real, and <em>know</em> you're ready, not just hope so.</h2>
+          <div class="close-pillars rise" style="animation-delay:.16s">
+            <span><i style="background:var(--voice)"></i>Delivery 40%</span>
+            <span><i style="background:var(--signal)"></i>Presence 35%</span>
+            <span><i style="background:var(--content)"></i>Content 25%</span>
+          </div>
+          <div class="thanks rise" style="animation-delay:.24s">Thank you for your time and your trust.</div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+<script>
+(function(){
+  "use strict";
+  var slides   = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var deck     = document.getElementById('deck');
+  var counter  = document.getElementById('counter');
+  var secLabel = document.getElementById('sectionLabel');
+  var prevBtn  = document.getElementById('prevBtn');
+  var nextBtn  = document.getElementById('nextBtn');
+  var reduce   = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var current  = 0;
+  var total    = slides.length;
+  var paperSections = ['THE NAME'];
+
+  function pad(n){ return (n < 10 ? '0' : '') + n; }
+
+  function updateChrome(){
+    var s = slides[current];
+    var sec = s.getAttribute('data-section') || '';
+    counter.textContent = pad(current + 1) + ' / ' + pad(total);
+    secLabel.textContent = sec;
+    var onPaper = paperSections.indexOf(sec) !== -1;
+    s.classList.toggle('on-paper', onPaper);
+    document.body.classList.toggle('on-paper', onPaper);
+  }
+
+  function goTo(i){
+    i = Math.max(0, Math.min(total - 1, i));
+    if (i === current) return;
+    slides[current].classList.remove('is-active');
+    current = i;
+    slides[current].classList.add('is-active');
+    updateChrome();
+    if (!donutDone && slides[current].querySelector('#donutSvg') && !reduce){
+      donutDone = true;
+      setTimeout(animateDonut, 80);
+    }
+  }
+  function next(){ goTo(current + 1); }
+  function prev(){ goTo(current - 1); }
+
+  nextBtn.addEventListener('click', next);
+  prevBtn.addEventListener('click', prev);
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); next(); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); prev(); }
+    else if (e.key === 'Home') { goTo(0); }
+    else if (e.key === 'End') { goTo(total - 1); }
+  });
+  var tx = 0;
+  deck.addEventListener('touchstart', function(e){ tx = e.changedTouches[0].clientX; }, {passive:true});
+  deck.addEventListener('touchend', function(e){
+    var dx = e.changedTouches[0].clientX - tx;
+    if (Math.abs(dx) > 45) { dx < 0 ? next() : prev(); }
+  }, {passive:true});
+
+  /* ------------------------------------------------------------------ */
+  /* Scope spine — animated waveform trace along the footer              */
+  /* ------------------------------------------------------------------ */
+  function buildScope(){
+    var svg = document.getElementById('scopeSvg');
+    if (!svg) return;
+    var NS = 'http://www.w3.org/2000/svg';
+
+    // build one seamless, tileable cycle (endpoints match in value and slope)
+    var n = 120;
+    var cyclePts = [];
+    for (var i = 0; i < n; i++){
+      var x = (i / n) * 1000;
+      var y = 14 + Math.sin(i / n * Math.PI * 2) * 5 + Math.sin(i / n * Math.PI * 6) * 4;
+      cyclePts.push([x, y]);
+    }
+    cyclePts.push([1000, cyclePts[0][1]]);
+
+    function toPath(pts, offsetX){
+      return 'M' + pts.map(function(p){ return (p[0] + offsetX).toFixed(1) + ',' + p[1].toFixed(1); }).join(' L');
+    }
+
+    var wrapG = document.createElementNS(NS, 'g');
+    wrapG.setAttribute('id', 'scopeWrap');
+    svg.setAttribute('viewBox', '0 0 1000 28');
+    svg.appendChild(wrapG);
+
+    var p1 = document.createElementNS(NS, 'path');
+    p1.setAttribute('d', toPath(cyclePts, 0));
+    wrapG.appendChild(p1);
+    var p2 = document.createElementNS(NS, 'path');
+    p2.setAttribute('d', toPath(cyclePts, 1000));
+    wrapG.appendChild(p2);
+
+    if (!reduce){
+      var offset = 0;
+      setInterval(function(){
+        offset = (offset + 0.6) % 1000;
+        wrapG.style.transform = 'translateX(-' + offset + 'px)';
+      }, 50);
+    }
+  }
+
+  function buildHeroWave(){
+    var svg = document.getElementById('heroWave');
+    if (!svg) return;
+    var NS = 'http://www.w3.org/2000/svg';
+    var path = document.createElementNS(NS, 'path');
+    var pts = [];
+    var n = 90;
+    for (var i = 0; i <= n; i++){
+      var x = (i / n) * 640;
+      var t = i / n;
+      var env = Math.sin(t * Math.PI);
+      var y = 32 + Math.sin(i * 0.5) * 16 * env + Math.sin(i * 0.13) * 8 * env;
+      pts.push(x.toFixed(1) + ',' + y.toFixed(1));
+    }
+    path.setAttribute('d', 'M' + pts.join(' L'));
+    var len = 900;
+    path.style.strokeDasharray = len;
+    path.style.strokeDashoffset = reduce ? 0 : len;
+    path.style.transition = 'stroke-dashoffset 1.6s cubic-bezier(.16,1,.3,1) .4s';
+    svg.appendChild(path);
+    if (!reduce){
+      requestAnimationFrame(function(){ requestAnimationFrame(function(){
+        path.style.strokeDashoffset = 0;
+      }); });
+    }
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Readiness donut (weight split 40 / 35 / 25)                         */
+  /* ------------------------------------------------------------------ */
+  var donutDone = false;
+  function buildDonut(){
+    var svg = document.getElementById('donutSvg');
+    if (!svg) return;
+    var NS = 'http://www.w3.org/2000/svg';
+    var cx = 150, cy = 150, r = 118;
+    var C = 2 * Math.PI * r;
+    var segs = [
+      {frac:0.40, color:'#F3C969'},
+      {frac:0.35, color:'#5EEAD4'},
+      {frac:0.25, color:'#B7A6FF'}
+    ];
+    var track = document.createElementNS(NS, 'circle');
+    track.setAttribute('cx', cx); track.setAttribute('cy', cy); track.setAttribute('r', r);
+    track.setAttribute('fill', 'none'); track.setAttribute('stroke', 'rgba(237,239,244,.08)');
+    track.setAttribute('stroke-width', '20');
+    svg.appendChild(track);
+
+    var gapPx = 6;
+    var start = 0;
+    segs.forEach(function(s, i){
+      var seg = s.frac * C - gapPx;
+      var arc = document.createElementNS(NS, 'circle');
+      arc.setAttribute('cx', cx); arc.setAttribute('cy', cy); arc.setAttribute('r', r);
+      arc.setAttribute('fill', 'none');
+      arc.setAttribute('stroke', s.color);
+      arc.setAttribute('stroke-width', '20');
+      arc.setAttribute('stroke-linecap', 'butt');
+      arc.setAttribute('stroke-dasharray', seg + ' ' + (C - seg));
+      arc.style.transformOrigin = cx + 'px ' + cy + 'px';
+      arc.style.transform = 'rotate(' + (start * 360 - 90) + 'deg)';
+      arc.style.strokeDashoffset = reduce ? 0 : seg;
+      arc.style.transition = 'stroke-dashoffset .9s ease ' + (0.2 + i * 0.25) + 's';
+      arc.classList.add('donut-arc');
+      svg.appendChild(arc);
+      start += s.frac;
+
+      var mid = (start - s.frac / 2) * 2 * Math.PI - Math.PI / 2;
+      var tx2 = cx + Math.cos(mid) * r;
+      var ty2 = cy + Math.sin(mid) * r;
+      var t = document.createElementNS(NS, 'text');
+      t.setAttribute('x', tx2); t.setAttribute('y', ty2 + 4);
+      t.setAttribute('text-anchor', 'middle');
+      t.setAttribute('fill', '#0B0D12');
+      t.setAttribute('font-family', "'IBM Plex Mono', monospace");
+      t.setAttribute('font-size', '13'); t.setAttribute('font-weight', '600');
+      t.textContent = Math.round(s.frac * 100);
+      svg.appendChild(t);
+    });
+  }
+  function animateDonut(){
+    document.querySelectorAll('.donut-arc').forEach(function(a){ a.style.strokeDashoffset = 0; });
+  }
+
+  buildScope();
+  buildHeroWave();
+  buildDonut();
+  updateChrome();
+  if (reduce) animateDonut();
+})();
+</script>
+</body>
+</html>
