@@ -360,6 +360,16 @@
     .name-photo-fade{ background:linear-gradient(0deg, var(--void) 0%, rgba(11,13,18,0) 40%); }
     .name-copy{ padding:28px clamp(24px,6vw,48px); }
   }
+
+  /* ---- security cover: full-bleed photo + centered slogan ---- */
+  .security-cover{ position:absolute; inset:0; background:var(--void); }
+  .security-cover img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center; display:block; }
+  .security-cover-fallback{ position:absolute; inset:0; display:none; align-items:center; justify-content:center; color:var(--signal); opacity:.35; }
+  .security-cover-fade{ position:absolute; inset:0; pointer-events:none;
+    background:linear-gradient(0deg, rgba(11,13,18,.92) 0%, rgba(11,13,18,.62) 45%, rgba(11,13,18,.42) 100%); }
+  .security-cover-copy{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    text-align:center; padding:0 40px; }
+
   .trait{ padding:24px; background:var(--panel); text-align:left; }
   .on-paper .trait{ background:var(--paper); }
   .trait .glyph{ width:30px; height:30px; margin-bottom:16px; color:var(--signal); }
@@ -484,7 +494,7 @@
         <button data-lang="en" class="active">EN</button>
         <button data-lang="ja">日本語</button>
       </div>
-      <div class="counter"><span id="counter">01 / 11</span></div>
+      <div class="counter"><span id="counter">01 / 13</span></div>
     </div>
   </div>
 
@@ -579,7 +589,38 @@
       </div>
     </section>
 
-    <!-- ============ 4 · THE REPORT ============ -->
+    <!-- ============ 4 · WHY MOLAVE: BENEFITS ============ -->
+    <section class="slide" data-section="WHY MOLAVE">
+      <div class="wrap">
+        <h2 class="title display outcome-title" style="text-align:center;max-width:22ch;margin-left:auto;margin-right:auto" data-en="Why practice with Molave" data-ja="なぜMolaveで練習するのか">Why practice with Molave</h2>
+        <div class="gap-panels">
+          <div class="gap-panel">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
+            <span class="outcome-panel-label" data-en="Practice without the risk" data-ja="リスクなく練習できる">Practice without the risk</span>
+            <span class="outcome-panel-sub" data-en="A safe space to fail, before the real interview" data-ja="本番の前に、失敗しても大丈夫な場所">A safe space to fail, before the real interview</span>
+          </div>
+          <div class="gap-panel">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+            <span class="outcome-panel-label" data-en="Feedback you can trust" data-ja="信頼できるフィードバック">Feedback you can trust</span>
+            <span class="outcome-panel-sub" data-en="Objective, consistent, not just a friend's opinion" data-ja="友人の感想ではなく、客観的で一貫した評価">Objective, consistent, not just a friend's opinion</span>
+          </div>
+          <div class="gap-panel">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13 2L3 14h7l-1 8 10-12h-7l1-8z"/></svg>
+            <span class="outcome-panel-label" data-en="Walk in with confidence" data-ja="自信を持って本番に臨める">Walk in with confidence</span>
+            <span class="outcome-panel-sub" data-en="Know your gaps before the interviewer does" data-ja="面接官に指摘される前に、自分の弱点がわかる">Know your gaps before the interviewer does</span>
+          </div>
+        </div>
+        <div class="eyebrow" style="justify-content:center;margin-top:40px"><span data-en="FOR INTERVIEWEES APPLYING FOR WORK" data-ja="就職・転職活動中の面接対策として">FOR INTERVIEWEES APPLYING FOR WORK</span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:14px">
+          <span class="chip"><i style="background:var(--voice)"></i><span data-en="New graduates" data-ja="新卒者">New graduates</span></span>
+          <span class="chip"><i style="background:var(--signal)"></i><span data-en="Career changers" data-ja="転職希望者">Career changers</span></span>
+          <span class="chip"><i style="background:var(--content)"></i><span data-en="Returning to work" data-ja="復職を目指す方">Returning to work</span></span>
+          <span class="chip"><i style="background:var(--ready)"></i><span data-en="Anyone nervous about interviews" data-ja="面接に不安がある方全般">Anyone nervous about interviews</span></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 4a · THE REPORT ============ -->
     <section class="slide" data-section="THE REPORT">
       <div class="wrap">
         <h2 class="title display outcome-title" style="text-align:center;max-width:24ch;margin-left:auto;margin-right:auto" data-en="Three signals. One report." data-ja="3つのシグナルから、1つのレポートへ。">Three signals. One report.</h2>
@@ -667,19 +708,28 @@
     <section class="slide" data-section="HELPING JOB SEEKERS">
       <div class="wrap">
         <h2 class="title display outcome-title" style="text-align:center;max-width:20ch;margin-left:auto;margin-right:auto" data-en="Three easy steps." data-ja="3つの簡単なステップ。">Three easy steps.</h2>
-        <div class="gap-panels">
-          <div class="gap-panel">
-            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 21v-7a8 8 0 0116 0v7"/><path d="M4 21h16M9 21v-4h6v4"/></svg>
+        <div class="outcome-panels">
+          <div class="outcome-panel">
+            <div class="outcome-panel-img">
+              <img src="assets/step-setup.png" alt="Choosing your interview setup" onerror="this.remove(); this.parentElement.classList.add('outcome-panel-fallback');" />
+              <svg class="outcome-panel-icon" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 21v-7a8 8 0 0116 0v7"/><path d="M4 21h16M9 21v-4h6v4"/></svg>
+            </div>
             <span class="outcome-panel-label" data-en="Choose your setup" data-ja="設定を選ぶ">Choose your setup</span>
             <span class="outcome-panel-sub" data-en="Role, difficulty, tone" data-ja="職種・難易度・雰囲気">Role, difficulty, tone</span>
           </div>
-          <div class="gap-panel">
-            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 1a4 4 0 00-4 4v6a4 4 0 008 0V5a4 4 0 00-4-4z"/><path d="M19 10v1a7 7 0 01-14 0v-1M12 18v4M8 22h8"/></svg>
+          <div class="outcome-panel">
+            <div class="outcome-panel-img">
+              <img src="assets/step-conversation.png" alt="Having the live interview conversation" onerror="this.remove(); this.parentElement.classList.add('outcome-panel-fallback');" />
+              <svg class="outcome-panel-icon" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 1a4 4 0 00-4 4v6a4 4 0 008 0V5a4 4 0 00-4-4z"/><path d="M19 10v1a7 7 0 01-14 0v-1M12 18v4M8 22h8"/></svg>
+            </div>
             <span class="outcome-panel-label" data-en="Have the conversation" data-ja="会話をする">Have the conversation</span>
             <span class="outcome-panel-sub" data-en="AI talks, camera watches" data-ja="AIが話し、カメラが見守る">AI talks, camera watches</span>
           </div>
-          <div class="gap-panel">
-            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+          <div class="outcome-panel">
+            <div class="outcome-panel-img">
+              <img src="assets/step-results.png" alt="Seeing the results" onerror="this.remove(); this.parentElement.classList.add('outcome-panel-fallback');" />
+              <svg class="outcome-panel-icon" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+            </div>
             <span class="outcome-panel-label" data-en="See how you did" data-ja="結果を確認する">See how you did</span>
             <span class="outcome-panel-sub" data-en="Score, plus coaching" data-ja="スコアとコーチング">Score, plus coaching</span>
           </div>
@@ -687,25 +737,6 @@
       </div>
     </section>
 
-    <!-- ============ 8 · THE TECHNOLOGY: SENSING ============ -->
-    <section class="slide" data-section="THE TECHNOLOGY">
-      <div class="wrap">
-        <div class="eyebrow"><span data-en="THE TECHNOLOGY BEHIND IT" data-ja="支える技術">THE TECHNOLOGY BEHIND IT</span><span class="rule"></span></div>
-        <h2 class="title display outcome-title" style="text-align:center;max-width:20ch;margin-left:auto;margin-right:auto" data-en="It watches and listens, at once." data-ja="見て、聞いて、同時に気づく。">It watches and listens, at once.</h2>
-        <div class="streams">
-          <div class="stream" style="--hue:var(--signal)">
-            <div class="lbl" data-en="FACE + GESTURE" data-ja="表情+ジェスチャー">FACE + GESTURE</div>
-            <h3 data-en="Your camera" data-ja="カメラ">Your camera</h3>
-            <div class="facts"><span data-en="eye contact" data-ja="視線">eye contact</span><span data-en="posture" data-ja="姿勢">posture</span><span data-en="hand movement" data-ja="手の動き">hand movement</span><span data-en="expression" data-ja="表情">expression</span></div>
-          </div>
-          <div class="stream" style="--hue:var(--voice)">
-            <div class="lbl" data-en="VOICE" data-ja="音声">VOICE</div>
-            <h3 data-en="Your voice" data-ja="声">Your voice</h3>
-            <div class="facts"><span data-en="speaking speed" data-ja="話す速さ">speaking speed</span><span data-en="filler words" data-ja="口ぐせ">filler words</span><span data-en="tone" data-ja="トーン">tone</span><span data-en="volume" data-ja="声の大きさ">volume</span></div>
-          </div>
-        </div>
-      </div>
-    </section>
 
     <!-- ============ 9 · THE TECHNOLOGY: FACS, GIF-FOCUSED ============ -->
     <section class="slide" data-section="THE TECHNOLOGY">
@@ -739,7 +770,7 @@
               <div class="facs-combo-au"><img src="assets/facs/au4-brow-lowerer.gif" alt="AU4 brow lowerer" loading="lazy"><span class="facs-tag">AU4</span></div>
               <div class="facs-combo-au"><img src="assets/facs/au15-lip-corner-depressor.gif" alt="AU15 lip corner depressor" loading="lazy"><span class="facs-tag">AU15</span></div>
             </div>
-            <span class="facs-emotion" data-en="Anger" data-ja="怒り">Sadness</span>
+            <span class="facs-emotion" data-en="Sadness" data-ja="悲しみ">Sadness</span>
           </div>
         </div>
         <div class="facs-strip">
@@ -751,6 +782,22 @@
           <div class="facs-strip-tile"><img src="assets/facs/AU56-head-tilt-right.gif" alt="AU56 head tilt right" loading="lazy"><span class="facs-tag">AU56</span></div>
           <div class="facs-strip-tile"><img src="assets/facs/AU57-head-forward.gif" alt="AU57 head forward" loading="lazy"><span class="facs-tag">AU57</span></div>
           <div class="facs-strip-tile"><img src="assets/facs/AU58-head-back.gif" alt="AU58 head back" loading="lazy"><span class="facs-tag">AU58</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 9a · SECURITY, COVER ============ -->
+    <section class="slide slide-bleed" data-section="SECURITY">
+      <div class="security-cover" id="securityCoverFrame">
+        <img src="assets/security-cover.png" alt="A secure, private data shield concept"
+             onerror="this.remove(); document.getElementById('securityCoverFallback').style.display='flex';" />
+        <div id="securityCoverFallback" class="security-cover-fallback" style="display:none">
+          <svg width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
+        </div>
+        <div class="security-cover-fade"></div>
+        <div class="security-cover-copy">
+          <div class="eyebrow" style="justify-content:center;color:var(--signal)"><span data-en="PRIORITY: SECURITY" data-ja="最優先事項:セキュリティ">PRIORITY: SECURITY</span></div>
+          <h2 class="title" style="color:#fff;font-size:clamp(2rem,5vw,3.4rem);max-width:16ch;margin:0 auto" data-en="Before anything else: your data is safe." data-ja="何よりも先に伝えたいこと:あなたのデータは安全です。">Before anything else: your data is safe.</h2>
         </div>
       </div>
     </section>
@@ -773,6 +820,30 @@
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z"/><path d="M9 12l2 2 4-4"/></svg>
               <div><h4 data-en="Safe from a security standpoint" data-ja="セキュリティ上、安心してご利用いただけます">Safe from a security standpoint</h4><p data-en="Only numeric scores ever leave the device. There is nothing sensitive to breach, because nothing sensitive is stored." data-ja="端末外に送られるのは数値スコアのみです。侵害されうる機密情報自体が、そもそも保存されていません。">Only numeric scores ever leave the device. There is nothing sensitive to breach, because nothing sensitive is stored.</p></div>
             </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 9c · HOW YOU IMPROVE ============ -->
+    <section class="slide" data-section="HOW YOU IMPROVE">
+      <div class="wrap">
+        <h2 class="title display outcome-title" style="text-align:center;max-width:22ch;margin-left:auto;margin-right:auto" data-en="Not just a score. A loop that makes you better." data-ja="スコアだけではない。あなたを成長させるループ。">Not just a score. A loop that makes you better.</h2>
+        <div class="gap-panels">
+          <div class="gap-panel">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+            <span class="outcome-panel-label" data-en="See exactly what to fix" data-ja="直すべき点が明確にわかる">See exactly what to fix</span>
+            <span class="outcome-panel-sub" data-en="Specific notes, not just a score" data-ja="スコアだけでなく具体的な指摘">Specific notes, not just a score</span>
+          </div>
+          <div class="gap-panel">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 12a9 9 0 109-9 9.75 9.75 0 00-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            <span class="outcome-panel-label" data-en="Practice that exact weak spot" data-ja="弱点だけを集中的に練習できる">Practice that exact weak spot</span>
+            <span class="outcome-panel-sub" data-en="No limit, no judgment" data-ja="回数制限なく、評価もされない">No limit, no judgment</span>
+          </div>
+          <div class="gap-panel">
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+            <span class="outcome-panel-label" data-en="Watch the score move" data-ja="スコアの変化を実感できる">Watch the score move</span>
+            <span class="outcome-panel-sub" data-en="Same scale, every time" data-ja="毎回同じ基準で測定">Same scale, every time</span>
           </div>
         </div>
       </div>
@@ -841,9 +912,11 @@
     'THE NAME': '名前の由来',
     'THE OUTCOME': '要点',
     'THE REPORT': 'レポート',
+    'WHY MOLAVE': '選ばれる理由',
     'HELPING JOB SEEKERS': '求職者への支援',
     'THE TECHNOLOGY': '技術',
     'SECURITY': 'セキュリティ',
+    'HOW YOU IMPROVE': '成長の後押し',
     'NEXT STEPS': '次のステップ',
     'SUMMARY': 'まとめ'
   };

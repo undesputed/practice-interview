@@ -1,0 +1,498 @@
+<title>molave.ai — Live Demo Script</title>
+<style>
+  :root{
+    --bg:#f4f8f5; --surface:#ffffff; --surface-2:#eef4f0; --surface-3:#e4ede7;
+    --ink:#0f1714; --ink-2:#45514b; --ink-3:#7c8a82;
+    --line:#e1eae4; --line-2:#d9e5de;
+    --brand:#0d9488; --brand-2:#16a34a;
+    --warn:#b45309; --warn-soft:#fdf1e2; --warn-line:#f0d9b5;
+    --info:#0369a1;
+    --brand-soft:#e3f4f1;
+    --shadow:0 1px 2px rgba(16,30,24,.05), 0 16px 32px -22px rgba(16,30,24,.28);
+    --font-display: -apple-system, "Segoe UI", "Segoe UI Semibold", system-ui, sans-serif;
+    --font-body: -apple-system, "Segoe UI", system-ui, sans-serif;
+    --font-mono: ui-monospace, "Cascadia Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0a0f0c; --surface:#141b16; --surface-2:#19221c; --surface-3:#212d25;
+      --ink:#e7f0ea; --ink-2:#aabcb1; --ink-3:#71857a;
+      --line:#232f27; --line-2:#1a251f;
+      --brand:#2dd4bf; --brand-2:#4ade80;
+      --warn:#fbbf24; --warn-soft:#241c0c; --warn-line:#4a3a17;
+      --info:#38bdf8;
+      --brand-soft:#132420;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 20px 44px -26px rgba(0,0,0,.75);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0a0f0c; --surface:#141b16; --surface-2:#19221c; --surface-3:#212d25;
+    --ink:#e7f0ea; --ink-2:#aabcb1; --ink-3:#71857a;
+    --line:#232f27; --line-2:#1a251f;
+    --brand:#2dd4bf; --brand-2:#4ade80;
+    --warn:#fbbf24; --warn-soft:#241c0c; --warn-line:#4a3a17;
+    --info:#38bdf8;
+    --brand-soft:#132420;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 20px 44px -26px rgba(0,0,0,.75);
+  }
+  :root[data-theme="light"]{
+    --bg:#f4f8f5; --surface:#ffffff; --surface-2:#eef4f0; --surface-3:#e4ede7;
+    --ink:#0f1714; --ink-2:#45514b; --ink-3:#7c8a82;
+    --line:#e1eae4; --line-2:#d9e5de;
+    --brand:#0d9488; --brand-2:#16a34a;
+    --warn:#b45309; --warn-soft:#fdf1e2; --warn-line:#f0d9b5;
+    --info:#0369a1;
+    --brand-soft:#e3f4f1;
+    --shadow:0 1px 2px rgba(16,30,24,.05), 0 16px 32px -22px rgba(16,30,24,.28);
+  }
+
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:var(--font-body);
+    line-height:1.5; -webkit-font-smoothing:antialiased;
+  }
+  @media (prefers-reduced-motion: no-preference){
+    html{scroll-behavior:smooth}
+  }
+  a{color:inherit}
+
+  .slate{
+    max-width:1180px; margin:0 auto; padding:2.25rem 1.5rem 1rem;
+    display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:1rem;
+    border-bottom:1px solid var(--line);
+  }
+  .slate h1{
+    font-family:var(--font-display); font-weight:800; letter-spacing:-.02em;
+    font-size:clamp(1.5rem,2.4vw,2rem); margin:0 0 .35rem; text-wrap:balance;
+  }
+  .slate .kicker{
+    font-family:var(--font-mono); font-size:.7rem; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--brand); margin:0 0 .5rem;
+  }
+  .slate-meta{display:flex; gap:1.75rem; flex-wrap:wrap; padding-bottom:.35rem}
+  .slate-meta div{display:flex; flex-direction:column; gap:.15rem}
+  .slate-meta span:first-child{font-family:var(--font-mono); font-size:.63rem; letter-spacing:.12em; color:var(--ink-3); text-transform:uppercase}
+  .slate-meta span:last-child{font-size:.92rem; font-weight:600}
+
+  .wrap{max-width:1180px; margin:0 auto; padding:0 1.5rem 4rem; display:grid; grid-template-columns:210px minmax(0,1fr); gap:2.5rem}
+  @media (max-width:860px){ .wrap{grid-template-columns:1fr} }
+
+  nav.rail{align-self:start; position:sticky; top:1rem}
+  @media (max-width:860px){
+    nav.rail{
+      position:sticky; top:0; z-index:5; background:var(--bg);
+      padding:.75rem 0; margin:0 -1.5rem; padding-left:1.5rem; padding-right:1.5rem;
+      border-bottom:1px solid var(--line);
+      overflow-x:auto; white-space:nowrap;
+    }
+    nav.rail ol{display:inline-flex; flex-direction:row; gap:.4rem}
+  }
+  nav.rail ol{list-style:none; margin:1.5rem 0 0; padding:0; display:flex; flex-direction:column; gap:.15rem}
+  nav.rail a{
+    display:flex; gap:.55rem; align-items:baseline; text-decoration:none;
+    padding:.4rem .55rem; border-radius:8px; font-size:.84rem; color:var(--ink-2);
+    border-left:2px solid transparent;
+  }
+  nav.rail a:hover{background:var(--surface-2)}
+  nav.rail a.active{color:var(--ink); background:var(--brand-soft); border-left-color:var(--brand); font-weight:600}
+  nav.rail .t{font-family:var(--font-mono); font-size:.68rem; color:var(--ink-3); min-width:3.2em}
+  nav.rail a.active .t{color:var(--brand)}
+  @media (max-width:860px){
+    nav.rail a{border-left:none; border-bottom:2px solid transparent}
+    nav.rail a.active{border-bottom-color:var(--brand)}
+  }
+
+  main{min-width:0; padding-top:1.75rem; display:flex; flex-direction:column; gap:1.75rem}
+
+  .prep{
+    background:var(--surface); border:1px solid var(--line); border-radius:14px;
+    padding:1.25rem 1.4rem; box-shadow:var(--shadow);
+    display:grid; gap:1.1rem; grid-template-columns:1.1fr .9fr;
+  }
+  @media (max-width:700px){ .prep{grid-template-columns:1fr} }
+  .prep h2{font-size:.95rem; margin:0 0 .6rem; font-family:var(--font-display)}
+  .checklist{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:.4rem}
+  .checklist li{
+    display:flex; gap:.55rem; align-items:flex-start; font-size:.88rem; color:var(--ink-2);
+    cursor:pointer; user-select:none;
+  }
+  .checklist li .box{
+    font-family:var(--font-mono); flex:none; width:1.1em; line-height:1.4; color:var(--ink-3);
+  }
+  .checklist li.done{color:var(--ink-3); text-decoration:line-through}
+  .checklist li.done .box{color:var(--brand)}
+
+  .say-names{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:.5rem}
+  .say-names li{font-size:.85rem}
+  .say-names b{font-family:var(--font-mono); background:var(--surface-2); border:1px solid var(--line); border-radius:6px; padding:.1rem .4rem; font-weight:600}
+  .say-names .how{color:var(--ink-2)}
+  .legend{display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin-top:.9rem; padding-top:.9rem; border-top:1px dashed var(--line); grid-column:1/-1}
+  .legend span{display:flex; align-items:center; gap:.4rem; font-size:.76rem; color:var(--ink-3); font-family:var(--font-mono)}
+  .legend i{width:.7rem; height:.7rem; border-radius:3px; display:inline-block}
+  .legend i.say{background:var(--brand)}
+  .legend i.do{background:var(--ink-3)}
+  .legend i.warn{background:var(--warn)}
+
+  .scene{
+    background:var(--surface); border:1px solid var(--line); border-radius:16px;
+    padding:1.5rem 1.6rem 1.7rem; box-shadow:var(--shadow); scroll-margin-top:1rem;
+  }
+  .scene-head{display:flex; align-items:baseline; gap:.75rem; flex-wrap:wrap; margin-bottom:1rem}
+  .scene-num{font-family:var(--font-mono); color:var(--brand); font-size:.78rem; letter-spacing:.08em}
+  .scene h2{font-family:var(--font-display); font-weight:800; letter-spacing:-.01em; font-size:1.2rem; margin:0; text-wrap:balance}
+  .scene-time{font-family:var(--font-mono); font-size:.72rem; color:var(--ink-3); margin-left:auto; white-space:nowrap}
+
+  .line{
+    font-size:1.08rem; line-height:1.75; max-width:62ch; margin:0 0 .7rem;
+    border-left:3px solid var(--brand-soft); padding-left:.9rem;
+  }
+  .line b{color:var(--ink); font-weight:700}
+  .pause{
+    display:block; font-family:var(--font-mono); font-size:.72rem; letter-spacing:.1em;
+    color:var(--ink-3); text-transform:uppercase; margin:.15rem 0 .9rem .9rem;
+  }
+  .cue{
+    display:inline-flex; align-items:center; gap:.4rem; font-family:var(--font-mono);
+    font-size:.74rem; color:var(--ink-2); background:var(--surface-2); border:1px solid var(--line);
+    border-radius:7px; padding:.3rem .55rem; margin:.2rem 0 1rem;
+  }
+  .cue::before{content:"▸"; color:var(--brand)}
+
+  .warn-box{
+    margin-top:1rem; background:var(--warn-soft); border:1px solid var(--warn-line);
+    border-left:3px solid var(--warn); border-radius:0 10px 10px 0; padding:.75rem .95rem;
+  }
+  .warn-box .tag{font-family:var(--font-mono); font-size:.68rem; letter-spacing:.1em; color:var(--warn); text-transform:uppercase; display:block; margin-bottom:.3rem}
+  .warn-box p{margin:0; font-size:.9rem; color:var(--ink-2); max-width:60ch}
+
+  .scene-nav{display:flex; justify-content:space-between; margin-top:1.4rem; padding-top:1rem; border-top:1px solid var(--line-2)}
+  .scene-nav a{font-family:var(--font-mono); font-size:.74rem; color:var(--ink-3); text-decoration:none}
+  .scene-nav a:hover{color:var(--brand)}
+
+  .trouble{background:var(--surface-2); border:1px solid var(--line); border-radius:16px; padding:1.4rem 1.6rem}
+  .trouble h2{font-family:var(--font-display); font-size:1.1rem; margin:0 0 .9rem}
+  .trouble ul{margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:.8rem}
+  .trouble li{font-size:.9rem; color:var(--ink-2); line-height:1.55; padding-left:1.1rem; position:relative}
+  .trouble li::before{content:"—"; position:absolute; left:0; color:var(--warn)}
+  .trouble b{color:var(--ink)}
+
+  footer{max-width:1180px; margin:0 auto; padding:1rem 1.5rem 3rem; font-size:.76rem; color:var(--ink-3); font-family:var(--font-mono)}
+
+  @media print{
+    nav.rail, .scene-nav{display:none}
+    .wrap{grid-template-columns:1fr; padding:0 .5rem}
+    .scene, .prep, .trouble{box-shadow:none; border:1px solid #ccc; break-inside:avoid}
+    body{background:#fff; color:#000}
+  }
+  :focus-visible{outline:2px solid var(--brand); outline-offset:2px}
+</style>
+
+<div class="slate">
+  <div>
+    <p class="kicker">Live demo · presenter script · headline: face &amp; emotion AI</p>
+    <h1>molave.ai — AI Mock Interview Studio</h1>
+  </div>
+  <div class="slate-meta">
+    <div><span>Duration</span><span>≈ 9 minutes</span></div>
+    <div><span>Format</span><span>Live app walkthrough</span></div>
+    <div><span>Audience</span><span>Company managers</span></div>
+  </div>
+</div>
+
+<div class="wrap">
+  <nav class="rail" aria-label="Scene navigation">
+    <ol id="railList">
+      <li><a href="#prep"><span class="t">—</span>Before you start</a></li>
+      <li><a href="#s1"><span class="t">0:00</span>Welcome</a></li>
+      <li><a href="#s2"><span class="t">0:45</span>Setup screen</a></li>
+      <li><a href="#s3"><span class="t">1:30</span>Voice interview</a></li>
+      <li><a href="#s4"><span class="t">2:30</span>Live face tracking</a></li>
+      <li><a href="#s5"><span class="t">4:00</span>Report &amp; score</a></li>
+      <li><a href="#s6"><span class="t">5:00</span>Face &amp; Emotion</a></li>
+      <li><a href="#s7"><span class="t">7:00</span>History</a></li>
+      <li><a href="#s8"><span class="t">7:30</span>Air-Draw</a></li>
+      <li><a href="#s9"><span class="t">8:15</span>Closing</a></li>
+      <li><a href="#trouble"><span class="t">—</span>If it breaks</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <section class="prep" id="prep">
+      <div>
+        <h2>Before you start</h2>
+        <ul class="checklist" id="checklist">
+          <li><span class="box">☐</span>Test camera and microphone 10 minutes early.</li>
+          <li><span class="box">☐</span>Confirm the deep-learning emotion model is on (<code>EMOTION_ANALYSIS=1</code>) — without it, the "Emotion (deep model)" card won't appear.</li>
+          <li><span class="box">☐</span>Close other tabs and apps — stop pop-ups and noise.</li>
+          <li><span class="box">☐</span>Turn off notifications on your computer.</li>
+          <li><span class="box">☐</span>Sit facing good, even light — the face tracking is the star of this demo.</li>
+          <li><span class="box">☐</span>Know the fallback: an old saved session under History.</li>
+          <li><span class="box">☐</span>Practice this script out loud once, with a clock.</li>
+        </ul>
+      </div>
+      <div>
+        <h2>How to say the names</h2>
+        <ul class="say-names">
+          <li><b>molave.ai</b> <span class="how">→ moh-LAH-veh dot A-I</span></li>
+          <li><b>Claude</b> <span class="how">→ rhymes with "loud"</span></li>
+          <li><b>MediaPipe</b> <span class="how">→ two plain words: "media" + "pipe"</span></li>
+          <li><b>FACS</b> <span class="how">→ sounds just like the word "fax"</span></li>
+        </ul>
+      </div>
+      <div class="legend">
+        <span><i class="say"></i>say this, slowly, pause at each period</span>
+        <span><i class="do"></i>stage direction — do not read aloud</span>
+        <span><i class="warn"></i>if this goes wrong, say this instead</span>
+      </div>
+    </section>
+
+    <section class="scene" id="s1">
+      <div class="scene-head">
+        <span class="scene-num">SCENE 01</span>
+        <h2>Welcome</h2>
+        <span class="scene-time">0:00 – 0:45</span>
+      </div>
+      <p class="line">Good morning, everyone.</p>
+      <p class="line">Today, I will show you a new tool. Its name is <b>molave.ai</b>.</p>
+      <span class="pause">pause</span>
+      <p class="line">It is an AI mock interview studio. It helps people practice for job interviews.</p>
+      <p class="line">You talk to an AI. The AI acts like a real interviewer.</p>
+      <span class="pause">pause</span>
+      <p class="line">But the most special part is this: it can read your face, and your true emotions.</p>
+      <p class="line">It uses a technology called <b>MediaPipe</b>, and a science method called <b>FACS</b>.</p>
+      <p class="line">It also uses a deep learning AI model, just for emotion.</p>
+      <span class="pause">pause</span>
+      <p class="line">Together, these check three things: <b>what you say, how you sound, and how you look and feel.</b></p>
+      <p class="line">At the end, you get a score and clear coaching. Let me show you how it works.</p>
+      <div class="scene-nav"><span></span><a href="#s2">Next: Setup screen →</a></div>
+    </section>
+
+    <section class="scene" id="s2">
+      <div class="scene-head">
+        <span class="scene-num">SCENE 02</span>
+        <h2>Setup screen</h2>
+        <span class="scene-time">0:45 – 1:30</span>
+      </div>
+      <p class="cue">Click "New Interview"</p>
+      <p class="line">First, I choose some settings.</p>
+      <span class="pause">pause</span>
+      <p class="line">I choose a <b>role</b>. For example, "Software Engineer."</p>
+      <p class="line">I choose a <b>focus</b>. This can be behavioral, technical, or both.</p>
+      <p class="line">I also choose the <b>difficulty</b>, the <b>number of questions</b>, and a <b>tone</b>.</p>
+      <span class="pause">pause</span>
+      <p class="line">The system uses Claude, an AI model, to write the questions. Every interview is made just for you.</p>
+      <p class="cue">Click "Start"</p>
+      <p class="line">Now, let's begin the interview.</p>
+      <div class="scene-nav"><a href="#s1">← Welcome</a><a href="#s3">Next: Voice interview →</a></div>
+    </section>
+
+    <section class="scene" id="s3">
+      <div class="scene-head">
+        <span class="scene-num">SCENE 03</span>
+        <h2>Live voice interview</h2>
+        <span class="scene-time">1:30 – 2:30</span>
+      </div>
+      <p class="cue">Allow camera and microphone</p>
+      <p class="line">The AI interviewer will now speak to me. I will answer with my voice, like a real interview.</p>
+      <span class="pause">pause</span>
+      <p class="cue">Wait for the AI to ask a question</p>
+      <p class="line">Listen. The AI is asking a question now.</p>
+      <span class="pause">pause — let the AI finish</span>
+      <p class="cue">Answer the question naturally</p>
+      <p class="line">Now, I answer.</p>
+      <span class="pause">pause</span>
+      <p class="line">This feels like a real conversation. There is no typing. Only talking.</p>
+      <div class="warn-box">
+        <span class="tag">If the AI is slow to respond</span>
+        <p>Stay calm and say — <em>"The AI is thinking. This takes a few seconds, just like a real call."</em> Then wait.</p>
+      </div>
+      <div class="scene-nav"><a href="#s2">← Setup screen</a><a href="#s4">Next: Live face tracking →</a></div>
+    </section>
+
+    <section class="scene" id="s4">
+      <div class="scene-head">
+        <span class="scene-num">SCENE 04</span>
+        <h2>Live face tracking — MediaPipe</h2>
+        <span class="scene-time">2:30 – 4:00</span>
+      </div>
+      <p class="line">Now, let me show you the smart part of this tool.</p>
+      <p class="cue">Open the Face Analysis screen, or point to the live camera view</p>
+      <span class="pause">pause</span>
+      <p class="line">The camera uses a technology called <b>MediaPipe</b>. Say it like two words: "media" and "pipe."</p>
+      <p class="line">MediaPipe finds points on my face. It finds about fifty points, in real time.</p>
+      <span class="pause">pause</span>
+      <p class="line">It also finds my hands and my body posture — all at the same time.</p>
+      <p class="line">All of this happens inside the browser. My video never leaves my computer.</p>
+      <span class="pause">pause</span>
+      <p class="line">From these face points, the tool reads my facial muscles.</p>
+      <p class="line">This uses a method called <b>FACS</b>. Say it like the word "fax."</p>
+      <span class="pause">pause</span>
+      <p class="line">Scientists use FACS to study small face muscles — like a lowered brow, or a tight lip.</p>
+      <p class="line">From these muscles, the AI guesses my emotion, many times every second.</p>
+      <p class="cue">Smile, or show surprise, to trigger a reaction effect</p>
+      <p class="line">Watch. If I smile, the tool sees "happy." Small sparkles appear near my face.</p>
+      <span class="pause">pause</span>
+      <p class="line">This happens live, as I talk. It is not a video filter — it is read from real muscle movement.</p>
+      <div class="warn-box">
+        <span class="tag">If an effect does not trigger right away</span>
+        <p>Say — <em>"The camera needs a clear, front-facing view. Let me try again."</em> Face the camera directly and repeat the expression.</p>
+      </div>
+      <div class="scene-nav"><a href="#s3">← Voice interview</a><a href="#s5">Next: Report &amp; score →</a></div>
+    </section>
+
+    <section class="scene" id="s5">
+      <div class="scene-head">
+        <span class="scene-num">SCENE 05</span>
+        <h2>Ending the interview and the report</h2>
+        <span class="scene-time">4:00 – 5:00</span>
+      </div>
+      <p class="cue">Click "End Interview"</p>
+      <p class="line">Now, I end the interview.</p>
+      <span class="pause">pause</span>
+      <p class="line">The system now builds a report.</p>
+      <span class="pause">pause</span>
+      <p class="cue">Show the report screen</p>
+      <p class="line">Look at this. This is the <b>readiness score</b>. It comes from three parts:</p>
+      <p class="line"><b>Delivery</b> — your voice. <b>Presence</b> — your body. <b>Content</b> — your answers.</p>
+      <span class="pause">pause</span>
+      <p class="line">The AI combines all three into one final score, with written coaching below it.</p>
+      <p class="line">This is like having a personal interview coach.</p>
+      <div class="warn-box">
+        <span class="tag">If the report takes a moment to build</span>
+        <p>Say — <em>"The system is scoring several things at once, so this takes a few seconds."</em> Then wait.</p>
+      </div>
+      <div class="scene-nav"><a href="#s4">← Live face tracking</a><a href="#s6">Next: Face &amp; Emotion →</a></div>
+    </section>
+
+    <section class="scene" id="s6">
+      <div class="scene-head">
+        <span class="scene-num">SCENE 06</span>
+        <h2>Face &amp; Emotion deep dive</h2>
+        <span class="scene-time">5:00 – 7:00</span>
+      </div>
+      <p class="line">Now, let's look closer at the face and emotion part of the report.</p>
+      <p class="cue">Scroll to the "Emotional tone" card</p>
+      <span class="pause">pause</span>
+      <p class="line">This card is called "Emotional tone." It shows my main emotion during the interview.</p>
+      <p class="line">It comes from the same MediaPipe and FACS system I showed you before.</p>
+      <span class="pause">pause</span>
+      <p class="cue">Scroll to the "Facial signals" card</p>
+      <p class="line">This next card is called "Facial signals." It shows which face muscles were active.</p>
+      <p class="line">For example, it can show "brow lowered: slight," or "lips pressed: strong."</p>
+      <p class="line">This is the FACS system again, but now shown in detail, after the interview.</p>
+      <span class="pause">pause</span>
+      <p class="cue">Scroll to the "Emotion (deep model)" card</p>
+      <p class="line">This next part is different. It uses a <b>deep learning model</b>.</p>
+      <p class="line">A deep learning model is a smart AI. It is trained on many thousands of real faces.</p>
+      <p class="line">It gives a second opinion on my emotion. This makes the reading more reliable.</p>
+      <span class="pause">pause</span>
+      <p class="line">One last detail: small signs of facial tension also affect the Nervousness score.</p>
+      <p class="line">For example, a pressed mouth, or a lowered brow, can mean a little nervousness.</p>
+      <p class="line">This is only a small part of the score — not the whole story.</p>
+      <div class="warn-box">
+        <span class="tag">If the two emotion readings look a little different</span>
+        <p>Say — <em>"This is normal. One reading uses simple rules. The other uses deep learning. They can disagree a little, just like two people."</em> Move on.</p>
+      </div>
+      <div class="scene-nav"><a href="#s5">← Report &amp; score</a><a href="#s7">Next: History →</a></div>
+    </section>
+
+    <section class="scene" id="s7">
+      <div class="scene-head">
+        <span class="scene-num">SCENE 07</span>
+        <h2>History and progress</h2>
+        <span class="scene-time">7:00 – 7:30</span>
+      </div>
+      <p class="cue">Click "History" or "Progress"</p>
+      <p class="line">Every interview is saved here. You can look back, any time.</p>
+      <span class="pause">pause</span>
+      <p class="line">You can also see your progress over time. Are you improving? This page shows you.</p>
+      <div class="scene-nav"><a href="#s6">← Face &amp; Emotion</a><a href="#s8">Next: Air-Draw →</a></div>
+    </section>
+
+    <section class="scene" id="s8">
+      <div class="scene-head">
+        <span class="scene-num">SCENE 08</span>
+        <h2>Bonus: Air-Draw game</h2>
+        <span class="scene-time">7:30 – 8:15</span>
+      </div>
+      <p class="line">Before I finish, let me show one more fun feature.</p>
+      <p class="cue">Open the Quick Draw screen</p>
+      <p class="line">This is called <b>Air-Draw Quick Draw</b>.</p>
+      <span class="pause">pause</span>
+      <p class="line">Remember MediaPipe, from before? It also tracks my hand here.</p>
+      <p class="line">I draw a picture in the air, using only my finger. No mouse. No touchscreen.</p>
+      <p class="cue">Draw a simple shape, like a star or a house</p>
+      <span class="pause">pause</span>
+      <p class="line">Then, the AI looks at my drawing and guesses what it is.</p>
+      <p class="cue">Wait for the AI's guess</p>
+      <p class="line">This shows what the same tracking technology can do, outside of interviews too.</p>
+      <div class="warn-box">
+        <span class="tag">If the AI guesses wrong</span>
+        <p>Smile and say — <em>"Close! The AI is guessing from a rough sketch, like a real game of Quick Draw."</em> Move on.</p>
+      </div>
+      <div class="scene-nav"><a href="#s7">← History</a><a href="#s9">Next: Closing →</a></div>
+    </section>
+
+    <section class="scene" id="s9">
+      <div class="scene-head">
+        <span class="scene-num">SCENE 09</span>
+        <h2>Closing</h2>
+        <span class="scene-time">8:15 – 9:00</span>
+      </div>
+      <p class="line">So, to summarize:</p>
+      <span class="pause">pause</span>
+      <p class="line">molave.ai lets you practice interviews with an AI.</p>
+      <p class="line">The most special part is the face and emotion technology — <b>MediaPipe, FACS, and a deep learning model</b>, working together.</p>
+      <p class="line">It checks your voice, your body, and your true emotional state — not just your words.</p>
+      <span class="pause">pause</span>
+      <p class="line">It gives you a score and clear coaching. And everything from the camera stays private and safe.</p>
+      <span class="pause">pause</span>
+      <p class="line">Thank you very much for watching. Now, I am happy to answer your questions.</p>
+      <div class="scene-nav"><a href="#s8">← Air-Draw</a><a href="#trouble">If it breaks →</a></div>
+    </section>
+
+    <section class="trouble" id="trouble">
+      <h2>If something goes wrong</h2>
+      <ul>
+        <li><b>Camera or mic will not connect:</b> refresh the page once. If it still fails, say — "Let me show you a finished report from an earlier session instead," and open History.</li>
+        <li><b>Internet is slow or the AI does not answer:</b> wait 5 seconds, then use the "thinking" line from Scene 03. If it still fails after 10 seconds, click "End Interview" and move straight to the Report.</li>
+        <li><b>The "Emotion (deep model)" card is missing:</b> this means <code>EMOTION_ANALYSIS</code> was not turned on for this session. Skip that line and continue — "Emotional tone" and "Facial signals" (MediaPipe + FACS) still work regardless.</li>
+        <li><b>You lose your place:</b> the rail on the left matches the app screens in order. Find your current screen, find that section, and continue from there.</li>
+      </ul>
+    </section>
+  </main>
+</div>
+
+<footer>molave.ai · presenter script · print-friendly · rehearse once with a clock before the real thing</footer>
+
+<script>
+  (function(){
+    var links = Array.prototype.slice.call(document.querySelectorAll('nav.rail a'));
+    var sections = links.map(function(a){ return document.querySelector(a.getAttribute('href')); });
+
+    document.querySelectorAll('.checklist li').forEach(function(li){
+      li.addEventListener('click', function(){
+        li.classList.toggle('done');
+        var box = li.querySelector('.box');
+        box.textContent = li.classList.contains('done') ? '☑' : '☐';
+      });
+    });
+
+    if('IntersectionObserver' in window){
+      var current = null;
+      var io = new IntersectionObserver(function(entries){
+        entries.forEach(function(entry){
+          if(!entry.isIntersecting) return;
+          var idx = sections.indexOf(entry.target);
+          if(idx === -1) return;
+          if(current) current.classList.remove('active');
+          current = links[idx];
+          current.classList.add('active');
+        });
+      }, { rootMargin: '-10% 0px -70% 0px', threshold: 0 });
+      sections.forEach(function(s){ if(s) io.observe(s); });
+    }
+  })();
+</script>
