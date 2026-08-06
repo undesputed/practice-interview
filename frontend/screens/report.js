@@ -44,9 +44,26 @@ function applyLocaleOverlay(s, lang){
   return out;
 }
 
-async function loadSessionForDisplay(id, onStatus){
-  let s = await api.getSession(id);
-  const lang = currentLang() === 'ja' ? 'ja' : 'en';
+/** True when stored LLM prose is not in `lang` and no usable cache exists yet. */
+function needsServerLocalize(s, lang){
+  const wantJa = lang === 'ja';
+  const hasProse = feedbackHasProse(s.verdict) || feedbackHasProse(s.coaching);
+  if (!hasProse) return false;
+
+  const sourceIsJa = feedbackHasProse(s.verdict)
+    ? feedbackLooksJapanese(s.verdict)
+    : feedbackLooksJapanese(s.coaching);
+  if (sourceIsJa === wantJa) return false;
+
+  // Trust a cached translation for this UI language (don't re-check script —
+  // leftover loanwords/kanji used to force a full Anthropic re-translate every view).
+  const cached = s['verdict_' + lang] || s['coaching_' + lang];
+  if (cached && feedbackHasProse(cached)) return false;
+  return true;
+}
+
+/** Best local view of a session for `lang` (cache overlay or original). No network. */
+function sessionForLangLocal(s, lang){
   const wantJa = lang === 'ja';
   const hasProse = feedbackHasProse(s.verdict) || feedbackHasProse(s.coaching);
   if (!hasProse) return s;
@@ -54,34 +71,15 @@ async function loadSessionForDisplay(id, onStatus){
   const sourceIsJa = feedbackHasProse(s.verdict)
     ? feedbackLooksJapanese(s.verdict)
     : feedbackLooksJapanese(s.coaching);
-
-  // Already matches the UI language — show as stored.
   if (sourceIsJa === wantJa) return s;
 
-  // Prefer a cached translation for the target UI language.
-  const cached = s['verdict_' + lang];
-  if (cached && feedbackHasProse(cached)){
-    if (feedbackLooksJapanese(cached) === wantJa){
-      return applyLocaleOverlay(s, lang);
-    }
-  }
-
-  // Source language differs from UI — translate + cache, then overlay.
-  if (onStatus) onStatus(t('report.translating'));
-  try {
-    s = await api.localizeSession(id, lang);
-    if (wantJa && feedbackHasProse(s.verdict) && !feedbackLooksJapanese(s.verdict)){
-      console.warn('[report] localize returned non-Japanese prose');
-    }
-    if (!wantJa && feedbackHasProse(s.verdict) && feedbackLooksJapanese(s.verdict)){
-      console.warn('[report] localize returned non-English prose');
-    }
-  } catch (err){
-    console.warn('[report] localize failed — showing original LLM prose', err);
-    if (onStatus) onStatus(t('report.translateFail'));
-    await new Promise((r) => setTimeout(r, 1200));
-  }
+  const cached = s['verdict_' + lang] || s['coaching_' + lang];
+  if (cached && feedbackHasProse(cached)) return applyLocaleOverlay(s, lang);
   return s;
+}
+
+async function localizeSessionRemote(id, lang){
+  return api.localizeSession(id, lang);
 }
 
 // ── Score cards ───────────────────────────────────────────────────────────────
@@ -145,7 +143,7 @@ function howYouCameAcross(o, s){
   const upright    = o.upright_pct;
   const emoMp      = s.emotion_mediapipe;
   const dominant   = emoMp && emoMp.dominant;
-  const compound   = s.emotion_compound && s.emotion_compound.label;
+  const compound   = s.emotion_compound;
 
   const eyeText = eyePct >= 80 ? t('report.impr.eyeHigh', { pct: eyePct }) :
                   eyePct >= 60 ? t('report.impr.eyeMid', { pct: eyePct }) :
@@ -163,10 +161,11 @@ function howYouCameAcross(o, s){
                     smilePct != null ? t('report.impr.smileLow', { pct: smilePct }) :
                     t('report.impr.smileNone');
 
+  const compoundText = compoundEmotionLabel(compound);
   const emoText = dominant
     ? t('report.impr.emoHas', {
-        dom: dominant,
-        compound: compound ? t('report.impr.emoCompound', { c: compound }) : '',
+        dom: emotionLabel(dominant),
+        compound: compoundText ? t('report.impr.emoCompound', { c: compoundText }) : '',
       })
     : t('report.impr.emoNone');
 
@@ -231,13 +230,33 @@ function facialSignals(aus){
     '</div>';
 }
 
+// ── Emotion labels (EN/JA) ────────────────────────────────────────────────────
+function emotionLabel(name){
+  if (!name) return '—';
+  const key = 'emotion.' + String(name).toLowerCase();
+  const tr = t(key);
+  return tr === key ? name : tr;
+}
+
+function compoundEmotionLabel(compound){
+  if (!compound) return '';
+  const comps = compound.components;
+  if (Array.isArray(comps) && comps.length === 2){
+    const pair = comps.map((c) => String(c).toLowerCase()).sort();
+    const key = 'emotion.compound.' + pair[0] + '_' + pair[1];
+    const tr = t(key);
+    if (tr !== key) return tr;
+  }
+  return compound.label || '';
+}
+
 // ── Emotion bars ──────────────────────────────────────────────────────────────
 function emotionBars(emo){
   if (!emo || !emo.available) return '<p class="muted" style="font-size:12px">' + esc(t('report.emo.na')) + '</p>';
   const dist = emo.overall_distribution || {};
   const items = Object.keys(dist).map((k) => [k, dist[k]]).sort((a, b) => b[1] - a[1]);
-  return '<p style="font-size:12px;margin-bottom:10px">' + esc(t('report.emo.overall')) + ' <b>' + esc(emo.dominant || '—') + '</b></p>' +
-    items.map((it) => '<div class="emrow"><span>' + esc(it[0]) + '</span>' +
+  return '<p style="font-size:12px;margin-bottom:10px">' + esc(t('report.emo.overall')) + ' <b>' + esc(emotionLabel(emo.dominant)) + '</b></p>' +
+    items.map((it) => '<div class="emrow"><span>' + esc(emotionLabel(it[0])) + '</span>' +
       '<span class="track"><span class="fill" style="width:' + Math.max(0, Math.min(100, it[1])) + '%"></span></span>' +
       '<span class="val">' + Math.round(it[1]) + '%</span></div>').join('');
 }
@@ -313,20 +332,23 @@ function sbkRow(label, score01, valueText, targetText){
     '<span class="sbk-target">' + esc(targetText || '') + '</span></div>';
 }
 
-const DELIVERY_META = {
-  pace:    (m) => ['Speaking speed',         (m.wpm ?? '—') + ' wpm',              'ideal: 110–160 wpm'],
-  fillers: (m) => ['Filler words',           (m.filler_rate_per100 ?? '—') + '/100', 'aim: under 3'],
-  pauses:  (m) => ['Long silences',          String(m.long_pause_count ?? '—'),     'aim: 2 or fewer'],
-  pitch:   (m) => ['Vocal variety',          (m.pitch_std_hz ?? '—') + ' Hz',       'aim: 25+ Hz'],
-  energy:  (m) => ['Voice projection',       String(m.energy_mean ?? '—'),          'aim: 0.02+'],
-};
+function deliveryMeta(key, m){
+  switch (key){
+    case 'pace':    return [t('report.sbk.pace'), t('report.sbk.wpm', { n: m.wpm ?? '—' }), t('report.sbk.paceTarget')];
+    case 'fillers': return [t('report.sbk.fillers'), t('report.sbk.per100', { n: m.filler_rate_per100 ?? '—' }), t('report.sbk.fillersTarget')];
+    case 'pauses':  return [t('report.sbk.pauses'), String(m.long_pause_count ?? '—'), t('report.sbk.pausesTarget')];
+    case 'pitch':   return [t('report.sbk.pitch'), t('report.sbk.hz', { n: m.pitch_std_hz ?? '—' }), t('report.sbk.pitchTarget')];
+    case 'energy':  return [t('report.sbk.energy'), String(m.energy_mean ?? '—'), t('report.sbk.energyTarget')];
+    default: return null;
+  }
+}
 
 function deliveryRows(v){
   if (!v || !v.available || !Array.isArray(v.breakdown)) return '';
   const m = v.metrics || {};
   return v.breakdown.map((b) => {
-    const meta = DELIVERY_META[b.key]; if (!meta) return '';
-    const [label, val, target] = meta(m);
+    const meta = deliveryMeta(b.key, m); if (!meta) return '';
+    const [label, val, target] = meta;
     return sbkRow(label, b.score, val, target);
   }).join('');
 }
@@ -336,21 +358,21 @@ function presenceRows(o){
   const add = (label, val, hint) => {
     if (typeof val === 'number') rows.push(sbkRow(label, val / 100, Math.round(val) + '/100', hint));
   };
-  add('Attention & focus',    o.attention,   'were you alert and present?');
-  add('Confidence',           o.confidence,  'did your body show assurance?');
-  add('Composure',            o.composure,   'did you stay calm and steady?');
+  add(t('report.sbk.attention'),  o.attention,  t('report.sbk.attentionHint'));
+  add(t('report.sbk.confidence'), o.confidence, t('report.sbk.confidenceHint'));
+  add(t('report.sbk.composure'),  o.composure,  t('report.sbk.composureHint'));
   if (typeof o.nervousness === 'number')
-    rows.push(sbkRow('Calm (vs nervous)', (100 - o.nervousness) / 100,
-      Math.round(100 - o.nervousness) + '/100', 'higher = more relaxed'));
+    rows.push(sbkRow(t('report.sbk.calm'), (100 - o.nervousness) / 100,
+      Math.round(100 - o.nervousness) + '/100', t('report.sbk.calmHint')));
   return rows.join('');
 }
 
 function contentRows(vd){
   if (vd.content_score == null)
-    return '<div class="sbk-row"><span class="sbk-name">Answer quality</span>' +
-      '<span class="sbk-note muted">Not scored — needs the AI coach (ANTHROPIC_API_KEY).</span></div>';
-  return sbkRow('Answer quality', vd.content_score / 100, vd.content_score + '/100',
-    'clarity · structure · relevance');
+    return '<div class="sbk-row"><span class="sbk-name">' + esc(t('report.sbk.answer')) + '</span>' +
+      '<span class="sbk-note muted">' + esc(t('report.sbk.answerNa')) + '</span></div>';
+  return sbkRow(t('report.sbk.answer'), vd.content_score / 100, vd.content_score + '/100',
+    t('report.sbk.answerHint'));
 }
 
 function scoringBreakdown(vd, o, v){
@@ -479,7 +501,7 @@ function view(s){
 
     // ⑫ Deep emotion model (optional)
     (s.emotion && s.emotion.available
-      ? '<div class="chart-card"><div class="ct">Emotion (deep model)</div>' + emotionBars(s.emotion) + '</div>'
+      ? '<div class="chart-card"><div class="ct">' + esc(t('report.emo.deep')) + '</div>' + emotionBars(s.emotion) + '</div>'
       : '');
 }
 
@@ -489,11 +511,28 @@ export function report(params){
     const root = document.getElementById('report-body');
     if (!root) return;
     try {
-      const s = await loadSessionForDisplay(id, (msg) => {
-        if (document.body.contains(root)) root.innerHTML = '<p class="muted">' + esc(msg) + '</p>';
-      });
+      // Paint immediately — never block the whole report on Anthropic translation.
+      const raw = await api.getSession(id);
       if (!document.body.contains(root)) return;
-      root.innerHTML = view(s);
+      const lang = currentLang() === 'ja' ? 'ja' : 'en';
+      root.innerHTML = view(sessionForLangLocal(raw, lang));
+
+      if (!needsServerLocalize(raw, lang)) return;
+
+      // Background translate + cache; swap prose when ready.
+      const banner = document.createElement('div');
+      banner.className = 'report-translate-banner muted';
+      banner.textContent = t('report.translating');
+      root.insertBefore(banner, root.firstChild);
+      try {
+        const localized = await localizeSessionRemote(id, lang);
+        if (!document.body.contains(root)) return;
+        root.innerHTML = view(localized);
+      } catch (err){
+        console.warn('[report] localize failed — keeping original LLM prose', err);
+        if (banner.isConnected) banner.textContent = t('report.translateFail');
+        setTimeout(() => { if (banner.isConnected) banner.remove(); }, 2500);
+      }
     } catch (e){
       const msg = String(e.message || e);
       root.innerHTML = '<a class="backlink" href="#/history">' + esc(t('common.backHistory')) + '</a>' +

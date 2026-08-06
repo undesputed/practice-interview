@@ -48,6 +48,21 @@ _SAFE_ASSET = re.compile(r"^[a-z_]+\.(?:png|json|txt|csv)$")
 app = FastAPI(title="molave.ai")
 
 
+@app.middleware("http")
+async def _no_cache_frontend_modules(request, call_next):
+    """Keep ES module graphs in sync after deploys.
+
+    Browsers can cache emotion.js while picking up a newer reaction-trigger.js
+    (or the reverse), which surfaces as 'does not provide an export named …'.
+    """
+    response = await call_next(request)
+    path = request.url.path or ""
+    if path.endswith((".js", ".css", ".html")) or path in ("", "/"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
+
 class TokenRequest(BaseModel):
     scenario: str = "job"
     role: str = "Software Engineer"
@@ -449,12 +464,12 @@ async def localize_session_endpoint(session_id: str, req: LocalizeRequest):
     if wants_ja == source_is_ja:
         return data
 
-    # Cached translation for this target language.
-    cached = data.get(cache_key)
+    # Cached translation for this target language. Trust the cache key — do not
+    # re-validate with script detection (loanwords/kanji in EN used to force a
+    # full Anthropic re-translate on every view).
+    cached = data.get(cache_key) or data.get(coach_key)
     if cached and _feedback_has_prose(cached):
-        cached_is_ja = _feedback_looks_japanese(cached)
-        if cached_is_ja == wants_ja:
-            return _overlay_locale(data, lang)
+        return _overlay_locale(data, lang)
 
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
     if not anthropic_key:

@@ -4,6 +4,8 @@ from typing import Optional
 from anthropic import Anthropic
 
 COACH_MODEL = "claude-sonnet-4-6"
+# Translation is a mechanical JSON rewrite — Haiku is much faster than Sonnet.
+TRANSLATE_MODEL = "claude-haiku-4-5"
 
 # Scenario -> coach persona and session label used in system prompts.
 _SCENARIO_COACH = {
@@ -195,9 +197,9 @@ def translate_feedback(api_key: str, verdict: Optional[dict] = None,
             "short — no long why-explanations."
         )
 
-    client = Anthropic(api_key=api_key, timeout=42.0)
+    client = Anthropic(api_key=api_key, timeout=20.0)
     resp = client.messages.create(
-        model=COACH_MODEL,
+        model=TRANSLATE_MODEL,
         max_tokens=900,
         system=[{
             "type": "text",
